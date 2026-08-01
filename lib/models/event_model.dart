@@ -1,3 +1,29 @@
+enum EventTipo { ebd, gc, comunhao, laje, outro }
+
+EventTipo eventTipoFromString(String? value) {
+  return EventTipo.values.firstWhere(
+    (e) => e.name == value,
+    orElse: () => EventTipo.outro,
+  );
+}
+
+extension EventTipoLabel on EventTipo {
+  String get label {
+    switch (this) {
+      case EventTipo.ebd:
+        return 'EBD';
+      case EventTipo.gc:
+        return 'GC';
+      case EventTipo.comunhao:
+        return 'Comunhão';
+      case EventTipo.laje:
+        return 'Laje';
+      case EventTipo.outro:
+        return 'Outro';
+    }
+  }
+}
+
 class EventModel {
   final String id;
   final String titulo;
@@ -6,6 +32,9 @@ class EventModel {
   final DateTime? dataFim;
   final String? local;
   final String? criadoPor;
+  final bool recorrente;
+  final DateTime? recorrenciaFim;
+  final EventTipo tipo;
 
   EventModel({
     required this.id,
@@ -15,6 +44,9 @@ class EventModel {
     this.dataFim,
     this.local,
     this.criadoPor,
+    this.recorrente = false,
+    this.recorrenciaFim,
+    this.tipo = EventTipo.outro,
   });
 
   factory EventModel.fromMap(Map<String, dynamic> map) {
@@ -28,6 +60,11 @@ class EventModel {
           : null,
       local: map['local'] as String?,
       criadoPor: map['criado_por'] as String?,
+      recorrente: map['recorrente'] as bool? ?? false,
+      recorrenciaFim: map['recorrencia_fim'] != null
+          ? DateTime.parse(map['recorrencia_fim'] as String)
+          : null,
+      tipo: eventTipoFromString(map['tipo'] as String?),
     );
   }
 
@@ -38,6 +75,37 @@ class EventModel {
       'data_inicio': dataInicio.toIso8601String(),
       'data_fim': dataFim?.toIso8601String(),
       'local': local,
+      'recorrente': recorrente,
+      'recorrencia_fim': recorrenciaFim?.toIso8601String().split('T').first,
+      'tipo': tipo.name,
     };
+  }
+
+  /// Gera as ocorrencias desse evento dentro do intervalo informado.
+  List<DateTime> occurrencesBetween(DateTime rangeStart, DateTime rangeEnd) {
+    if (!recorrente) {
+      if (!dataInicio.isBefore(rangeStart) && !dataInicio.isAfter(rangeEnd)) {
+        return [dataInicio];
+      }
+      return [];
+    }
+
+    final result = <DateTime>[];
+    var cursor = dataInicio;
+
+    while (cursor.isBefore(rangeStart)) {
+      cursor = cursor.add(const Duration(days: 7));
+      if (recorrenciaFim != null && cursor.isAfter(recorrenciaFim!)) {
+        return result;
+      }
+    }
+
+    while (!cursor.isAfter(rangeEnd)) {
+      if (recorrenciaFim != null && cursor.isAfter(recorrenciaFim!)) break;
+      result.add(cursor);
+      cursor = cursor.add(const Duration(days: 7));
+    }
+
+    return result;
   }
 }

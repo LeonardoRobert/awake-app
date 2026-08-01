@@ -2,15 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/auth_provider.dart';
 import '../calendar/calendar_screen.dart';
+import '../metas/metas_screen.dart';
 import '../profile/profile_screen.dart';
+import '../volunteering/checkin_scanner_screen.dart';
+import '../volunteering/my_qrcode_screen.dart';
 import '../volunteering/shifts_screen.dart';
 
 /// Estrutura principal do app com navegacao por abas (bottom navigation).
-///
-/// Este e o ponto de entrada visual apos o login. As abas disponiveis
-/// (Calendario, Voluntariado, Perfil) sao as mesmas para membro e lider;
-/// a diferenca de permissao acontece dentro de cada tela (ex: botao
-/// "criar evento" so aparece para lider/admin).
 class HomeShell extends ConsumerStatefulWidget {
   const HomeShell({super.key});
 
@@ -20,12 +18,6 @@ class HomeShell extends ConsumerStatefulWidget {
 
 class _HomeShellState extends ConsumerState<HomeShell> {
   int _currentIndex = 0;
-
-  static const _screens = [
-    CalendarScreen(),
-    ShiftsScreen(),
-    ProfileScreen(),
-  ];
 
   @override
   Widget build(BuildContext context) {
@@ -37,15 +29,32 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         body: Center(child: Text('Erro ao carregar perfil: $err')),
       ),
       data: (profile) {
+        final isLider = profile?.isLider ?? false;
+
+        // Membro ve o proprio QR Code; lider/admin ve direto a camera
+        // de check-in (e la dentro escolhe pra qual atividade e).
+        final screens = [
+          const CalendarScreen(),
+          const ShiftsScreen(),
+          isLider ? const CheckinScannerScreen() : const MyQrCodeScreen(),
+          const MetasScreen(),
+          const ProfileScreen(),
+        ];
+
         return Scaffold(
-          body: IndexedStack(index: _currentIndex, children: _screens),
+          body: IndexedStack(index: _currentIndex, children: screens),
           bottomNavigationBar: NavigationBar(
             selectedIndex: _currentIndex,
             onDestinationSelected: (index) => setState(() => _currentIndex = index),
-            destinations: const [
-              NavigationDestination(icon: Icon(Icons.calendar_month), label: 'Calendario'),
-              NavigationDestination(icon: Icon(Icons.volunteer_activism), label: 'Voluntariado'),
-              NavigationDestination(icon: Icon(Icons.person), label: 'Perfil'),
+            destinations: [
+              const NavigationDestination(icon: Icon(Icons.calendar_month), label: 'Calendário'),
+              const NavigationDestination(icon: Icon(Icons.volunteer_activism), label: 'Escala'),
+              NavigationDestination(
+                icon: Icon(isLider ? Icons.qr_code_scanner : Icons.qr_code),
+                label: isLider ? 'Check-in' : 'QR Code',
+              ),
+              const NavigationDestination(icon: Icon(Icons.emoji_events), label: 'Metas'),
+              const NavigationDestination(icon: Icon(Icons.person), label: 'Perfil'),
             ],
           ),
         );

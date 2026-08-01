@@ -1,15 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../models/event_model.dart';
+import '../models/shift_model.dart';
+import '../models/treinamento_model.dart';
 import '../providers/auth_provider.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/signup_screen.dart';
 import '../screens/calendar/event_detail_screen.dart';
 import '../screens/calendar/event_form_screen.dart';
 import '../screens/home/home_shell.dart';
+import '../screens/training/treinamento_detail_screen.dart';
+import '../screens/training/treinamento_form_screen.dart';
+import '../screens/training/treinamentos_screen.dart';
 import '../screens/volunteering/checkin_scanner_screen.dart';
 import '../screens/volunteering/leader_shift_detail_screen.dart';
-import '../screens/volunteering/my_qrcode_screen.dart';
+import '../screens/volunteering/shift_form_screen.dart';
 
 /// Ouvinte simples que permite ao GoRouter reagir a mudancas
 /// no estado de autenticacao do Supabase.
@@ -41,26 +47,44 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/', builder: (context, state) => const HomeShell()),
       GoRoute(
         path: '/eventos/novo',
-        builder: (context, state) => const EventFormScreen(),
+        builder: (context, state) =>
+            EventFormScreen(eventoParaEditar: state.extra as EventModel?),
       ),
       GoRoute(
         path: '/eventos/:id',
-        builder: (context, state) =>
-            EventDetailScreen(eventId: state.pathParameters['id']!),
+        builder: (context, state) => EventDetailScreen(
+          eventId: state.pathParameters['id']!,
+          occurrenceDate: state.extra as DateTime?,
+        ),
       ),
       GoRoute(
-        path: '/meu-qrcode',
-        builder: (context, state) => const MyQrCodeScreen(),
+        path: '/escalas/nova',
+        builder: (context, state) =>
+            ShiftFormScreen(shiftParaEditar: state.extra as ShiftModel?),
       ),
       GoRoute(
         path: '/escalas/:id/inscritos',
-        builder: (context, state) =>
-            LeaderShiftDetailScreen(escalaId: state.pathParameters['id']!),
+        builder: (context, state) => LeaderShiftDetailScreen(
+          escalaId: state.pathParameters['id']!,
+          data: state.extra as DateTime,
+        ),
       ),
       GoRoute(
-        path: '/checkin/:escalaId',
+        path: '/checkin',
+        builder: (context, state) => const CheckinScannerScreen(),
+      ),
+      GoRoute(
+        path: '/treinamentos',
+        builder: (context, state) => const TreinamentosScreen(),
+      ),
+      GoRoute(
+        path: '/treinamentos/novo',
+        builder: (context, state) => const TreinamentoFormScreen(),
+      ),
+      GoRoute(
+        path: '/treinamentos/detalhe',
         builder: (context, state) =>
-            CheckinScannerScreen(escalaId: state.pathParameters['escalaId']!),
+            TreinamentoDetailScreen(treinamento: state.extra as TreinamentoModel),
       ),
     ],
   );

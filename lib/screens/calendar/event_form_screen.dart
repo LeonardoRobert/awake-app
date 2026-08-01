@@ -4,12 +4,11 @@ import 'package:intl/intl.dart';
 import '../../models/event_model.dart';
 import '../../providers/event_provider.dart';
 
-/// Tela de criacao de evento, disponivel apenas para lider/admin
-/// (o acesso a rota ja e controlado pelo botao condicional na
-/// CalendarScreen; para reforco de seguranca, a regra real esta
-/// nas policies do Supabase - ver supabase/schema.sql).
+/// Tela de criacao/edicao de evento, disponivel apenas para lider/admin.
+/// Se `eventoParaEditar` for informado, a tela entra em modo de edicao.
 class EventFormScreen extends ConsumerStatefulWidget {
-  const EventFormScreen({super.key});
+  final EventModel? eventoParaEditar;
+  const EventFormScreen({super.key, this.eventoParaEditar});
 
   @override
   ConsumerState<EventFormScreen> createState() => _EventFormScreenState();
@@ -17,27 +16,59 @@ class EventFormScreen extends ConsumerStatefulWidget {
 
 class _EventFormScreenState extends ConsumerState<EventFormScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _tituloController = TextEditingController();
-  final _descricaoController = TextEditingController();
-  final _localController = TextEditingController();
+  late final TextEditingController _tituloController;
+  late final TextEditingController _descricaoController;
+  late final TextEditingController _localController;
   DateTime? _dataInicio;
+  bool _recorrente = false;
+  DateTime? _recorrenciaFim;
+  EventTipo _tipo = EventTipo.outro;
   bool _saving = false;
+
+  bool get _isEdicao => widget.eventoParaEditar != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final evento = widget.eventoParaEditar;
+    _tituloController = TextEditingController(text: evento?.titulo ?? '');
+    _descricaoController = TextEditingController(text: evento?.descricao ?? '');
+    _localController = TextEditingController(text: evento?.local ?? '');
+    _dataInicio = evento?.dataInicio;
+    _recorrente = evento?.recorrente ?? false;
+    _recorrenciaFim = evento?.recorrenciaFim;
+    _tipo = evento?.tipo ?? EventTipo.outro;
+  }
 
   Future<void> _pickDateTime() async {
     final date = await showDatePicker(
       context: context,
-      initialDate: DateTime.now(),
-      firstDate: DateTime.now(),
+      initialDate: _dataInicio ?? DateTime.now(),
+      firstDate: DateTime.now().subtract(const Duration(days: 365)),
       lastDate: DateTime.now().add(const Duration(days: 730)),
     );
     if (date == null || !mounted) return;
 
-    final time = await showTimePicker(context: context, initialTime: TimeOfDay.now());
+    final time = await showTimePicker(
+      context: context,
+      initialTime:
+          _dataInicio != null ? TimeOfDay.fromDateTime(_dataInicio!) : TimeOfDay.now(),
+    );
     if (time == null) return;
 
     setState(() {
       _dataInicio = DateTime(date.year, date.month, date.day, time.hour, time.minute);
     });
+  }
+
+  Future<void> _pickRecorrenciaFim() async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: _recorrenciaFim ?? DateTime.now().add(const Duration(days: 90)),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 1825)),
+    );
+    if (date != null) setState(() => _recorrenciaFim = date);
   }
 
   Future<void> _submit() async {
@@ -51,14 +82,25 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
     }
 
     setState(() => _saving = true);
+
+    final novoEvento = EventModel(
+      id: widget.eventoParaEditar?.id ?? '',
+      titulo: _tituloController.text.trim(),
+      descricao: _descricaoController.text.trim(),
+      dataInicio: _dataInicio!,
+      local: _localController.text.trim(),
+      recorrente: _recorrente,
+      recorrenciaFim: _recorrente ? _recorrenciaFim : null,
+      tipo: _tipo,
+    );
+
     try {
-      await ref.read(eventServiceProvider).create(EventModel(
-            id: '',
-            titulo: _tituloController.text.trim(),
-            descricao: _descricaoController.text.trim(),
-            dataInicio: _dataInicio!,
-            local: _localController.text.trim(),
-          ));
+      final service = ref.read(eventServiceProvider);
+      if (_isEdicao) {
+        await service.update(widget.eventoParaEditar!.id, novoEvento);
+      } else {
+        await service.create(novoEvento);
+      }
       ref.invalidate(upcomingEventsProvider);
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
@@ -75,7 +117,7 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Novo evento')),
+      appBar: AppBar(title: Text(_isEdicao ? 'Editar evento' : 'Novo evento')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Form(
@@ -87,6 +129,18 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
                 controller: _tituloController,
                 decoration: const InputDecoration(labelText: 'Titulo'),
                 validator: (v) => (v == null || v.trim().isEmpty) ? 'Informe um titulo' : null,
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<EventTipo>(
+                value: _tipo,
+                decoration: const InputDecoration(
+                  labelText: 'Tipo de evento',
+                  helperText: 'Usado para contar as metas mensais dos membros',
+                ),
+                items: EventTipo.values
+                    .map((t) => DropdownMenuItem(value: t, child: Text(t.label)))
+                    .toList(),
+                onChanged: (v) => setState(() => _tipo = v ?? EventTipo.outro),
               ),
               const SizedBox(height: 16),
               TextFormField(
@@ -111,13 +165,43 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
                   ),
                 ),
               ),
+              const SizedBox(height: 16),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                value: _recorrente,
+                onChanged: (v) => setState(() => _recorrente = v),
+                title: const Text('Evento recorrente'),
+                subtitle: Text(
+                  _dataInicio == null
+                      ? 'Repete toda semana, no mesmo dia e horario'
+                      : 'Repete toda ${DateFormat('EEEE', 'pt_BR').format(_dataInicio!)}'
+                          ' às ${DateFormat('HH:mm').format(_dataInicio!)}',
+                ),
+              ),
+              if (_recorrente) ...[
+                const SizedBox(height: 8),
+                InkWell(
+                  onTap: _pickRecorrenciaFim,
+                  child: InputDecorator(
+                    decoration: const InputDecoration(
+                      labelText: 'Repetir até (opcional)',
+                      helperText: 'Deixe em branco para repetir por tempo indeterminado',
+                    ),
+                    child: Text(
+                      _recorrenciaFim == null
+                          ? 'Sem data de término'
+                          : DateFormat('dd/MM/yyyy').format(_recorrenciaFim!),
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(height: 24),
               FilledButton(
                 onPressed: _saving ? null : _submit,
                 child: _saving
                     ? const SizedBox(
                         height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Text('Salvar evento'),
+                    : Text(_isEdicao ? 'Salvar alterações' : 'Salvar evento'),
               ),
             ],
           ),

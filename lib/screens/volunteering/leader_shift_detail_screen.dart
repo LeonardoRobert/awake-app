@@ -1,27 +1,35 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import '../../models/signup_model.dart';
 import '../../providers/shift_provider.dart';
 
-/// Tela do lider: lista quem se inscreveu numa escala e da acesso
-/// ao scanner de check-in.
+/// Tela do lider: lista quem se inscreveu numa ocorrencia (semana)
+/// especifica de uma escala.
 class LeaderShiftDetailScreen extends ConsumerWidget {
   final String escalaId;
-  const LeaderShiftDetailScreen({super.key, required this.escalaId});
+  final DateTime data;
+
+  const LeaderShiftDetailScreen({
+    super.key,
+    required this.escalaId,
+    required this.data,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final signupsAsync = ref.watch(signupsForShiftProvider(escalaId));
+    final signupsAsync =
+        ref.watch(signupsForOccurrenceProvider((escalaId: escalaId, data: data)));
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Inscritos na escala'),
+        title: Text('Inscritos — ${DateFormat('dd/MM/yyyy').format(data)}'),
         actions: [
           IconButton(
             icon: const Icon(Icons.qr_code_scanner),
             tooltip: 'Fazer check-in',
-            onPressed: () => context.push('/checkin/$escalaId'),
+            onPressed: () => context.push('/checkin'),
           ),
         ],
       ),
@@ -30,16 +38,17 @@ class LeaderShiftDetailScreen extends ConsumerWidget {
         error: (err, _) => Center(child: Text('Erro: $err')),
         data: (signups) {
           if (signups.isEmpty) {
-            return const Center(child: Text('Ninguem se inscreveu ainda.'));
+            return const Center(child: Text('Ninguém se inscreveu ainda.'));
           }
           return ListView.builder(
             itemCount: signups.length,
             itemBuilder: (context, index) {
               final signup = signups[index];
+              final feito = signup.status == SignupStatus.checkInFeito;
               return ListTile(
                 leading: Icon(
-                  signup.status.name == 'checkInFeito' ? Icons.check_circle : Icons.person,
-                  color: signup.status.name == 'checkInFeito' ? Colors.green : null,
+                  feito ? Icons.check_circle : Icons.person,
+                  color: feito ? Colors.green : null,
                 ),
                 title: Text(signup.userNome ?? 'Membro'),
                 subtitle: Text(signup.status.label),

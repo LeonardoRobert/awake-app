@@ -33,7 +33,7 @@ extension SignupStatusLabel on SignupStatus {
       case SignupStatus.canceladoForaPrazo:
         return 'Cancelado (fora do prazo)';
       case SignupStatus.checkInFeito:
-        return 'Presenca confirmada';
+        return 'Presença confirmada';
       case SignupStatus.faltou:
         return 'Faltou';
     }
@@ -43,17 +43,18 @@ extension SignupStatusLabel on SignupStatus {
 class SignupModel {
   final String id;
   final String escalaId;
+  final DateTime dataOcorrencia;
   final String userId;
   final SignupStatus status;
   final DateTime inscritoEm;
   final DateTime? canceladoEm;
-  // dados relacionados (join), preenchidos quando disponiveis
   final String? userNome;
   final Map<String, dynamic>? escala;
 
   SignupModel({
     required this.id,
     required this.escalaId,
+    required this.dataOcorrencia,
     required this.userId,
     required this.status,
     required this.inscritoEm,
@@ -66,6 +67,7 @@ class SignupModel {
     return SignupModel(
       id: map['id'] as String,
       escalaId: map['escala_id'] as String,
+      dataOcorrencia: DateTime.parse(map['data_ocorrencia'] as String),
       userId: map['user_id'] as String,
       status: signupStatusFromString(map['status'] as String),
       inscritoEm: DateTime.parse(map['inscrito_em'] as String),

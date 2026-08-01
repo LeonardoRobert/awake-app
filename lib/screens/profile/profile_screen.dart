@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/notification_service.dart';
 
@@ -44,6 +45,13 @@ class ProfileScreen extends ConsumerWidget {
                   leading: const Icon(Icons.phone),
                   title: Text(profile.telefone!),
                 ),
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.school_outlined),
+                title: const Text('Treinamentos'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/treinamentos'),
+              ),
               const Divider(),
               ListTile(
                 leading: const Icon(Icons.logout, color: Colors.red),

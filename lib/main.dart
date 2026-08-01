@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'core/router.dart';
 import 'core/theme/app_theme.dart';
 import 'services/notification_service.dart';
@@ -11,6 +12,7 @@ Future<void> main() async {
 
   await SupabaseService.initialize();
   await NotificationService.initialize();
+  await initializeDateFormatting('pt_BR', null);
 
   runApp(const ProviderScope(child: AwakeApp()));
 }
