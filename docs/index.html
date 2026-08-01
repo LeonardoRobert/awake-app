@@ -57,15 +57,14 @@
     }
 
     .btn {
-      display: inline-block;
+      display: block;
       width: 100%;
-      background: var(--yellow);
-      color: var(--navy);
-      font-weight: 700;
       text-decoration: none;
       padding: 16px 24px;
       border-radius: 12px;
       font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 12px;
       transition: opacity 0.15s ease;
     }
 
@@ -73,15 +72,31 @@
       opacity: 0.85;
     }
 
+    .btn-android {
+      background: var(--yellow);
+      color: var(--navy);
+    }
+
+    .btn-ios {
+      background: transparent;
+      color: var(--off-white);
+      border: 2px solid var(--grey);
+    }
+
     .note {
       margin-top: 16px;
       font-size: 12px;
       color: var(--grey);
       opacity: 0.8;
+      text-align: left;
     }
 
     .note a {
       color: var(--yellow);
+    }
+
+    .note strong {
+      color: var(--off-white);
     }
   </style>
 </head>
@@ -92,25 +107,31 @@
     <h1>Baixe o app do Awake</h1>
     <p>
       Calendário, escalas de voluntariado, metas, troféus e treinamentos —
-      tudo num só lugar. Disponível para Android.
+      tudo num só lugar.
     </p>
-    <a id="download-btn" class="btn" href="#">Baixar APK</a>
+
+    <a id="download-btn" class="btn btn-android" href="#">📱 Baixar para Android</a>
+    <a class="btn btn-ios" href="app/">🍎 Usar no iPhone</a>
+
     <p class="note">
-      Ao instalar, seu Android pode avisar que o app é de "fonte
-      desconhecida" — isso é esperado para apps fora da Play Store. Toque em
-      "Instalar assim mesmo".
+      <strong>Android:</strong> ao instalar, seu celular pode avisar que o app
+      é de "fonte desconhecida" — isso é esperado para apps fora da Play
+      Store. Toque em "Instalar assim mesmo".
       <br /><br />
-      Problemas para baixar? Confira a
+      <strong>iPhone:</strong> o botão abre o app no Safari. Pra usar como um
+      aplicativo de verdade (com ícone na tela e sem as barras do
+      navegador), toque no botão de <strong>Compartilhar</strong> (o
+      quadrado com uma seta pra cima) e depois em
+      <strong>"Adicionar à Tela de Início"</strong>.
+      <br /><br />
+      Problemas para baixar o Android? Confira a
       <a id="releases-link" href="#" target="_blank" rel="noopener">página de releases</a>
       diretamente.
     </p>
   </div>
 
   <script>
-    // Monta o link de download automaticamente a partir da URL do
-    // GitHub Pages (https://USUARIO.github.io/REPOSITORIO/), sem precisar
-    // editar este arquivo manualmente quando o repositorio for criado.
-    const host = window.location.hostname; // ex: usuario.github.io
+    const host = window.location.hostname;
     const owner = host.split('.')[0];
     const pathParts = window.location.pathname.split('/').filter(Boolean);
     const repo = pathParts[0] || '';

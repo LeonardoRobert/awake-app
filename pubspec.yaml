@@ -7,7 +7,6 @@ environment:
   sdk: '>=3.3.0 <4.0.0'
 
 dependencies:
-  webview_flutter: ^4.9.0
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.6
@@ -36,12 +35,31 @@ dependencies:
   # Tipografia (ver observacao em lib/core/theme/app_theme.dart sobre Canva Sans)
   google_fonts: ^6.2.1
 
+  # Player de video embutido (usado no modulo de Treinamentos)
+  webview_flutter: ^4.9.0
+
+  # Abrir links externos (usado no player de treinamento na versao web)
+  url_launcher: ^6.3.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
+  flutter_launcher_icons: ^0.13.1
 
 flutter:
   uses-material-design: true
   assets:
     - assets/images/
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/awake_flame_navy.png"
+  adaptive_icon_background: "#0C192E"
+  adaptive_icon_foreground: "assets/images/awake_flame_white.png"
+  web:
+    generate: true
+    image_path: "assets/images/awake_flame_navy.png"
+    background_color: "#0C192E"
+    theme_color: "#0C192E"

@@ -13,7 +13,6 @@ class ShiftService {
         .toList();
   }
 
-  /// Lista todos os "modelos" de escala (recorrentes ou nao).
   Future<List<ShiftModel>> listShiftTemplates() async {
     final data = await _client.from('escalas').select('*, areas_servico(*)');
     return (data as List)
@@ -21,8 +20,6 @@ class ShiftService {
         .toList();
   }
 
-  /// Contagem de inscritos por (escala, data), pra saber quantas vagas
-  /// ja foram preenchidas em cada ocorrencia.
   Future<Map<String, int>> fetchInscritosCounts() async {
     final data = await _client
         .from('inscricoes')
@@ -64,8 +61,6 @@ class ShiftService {
     await _client.from('escalas').update(shift.toInsertMap()).eq('id', id);
   }
 
-  /// Inscreve o usuario atual numa ocorrencia (semana) especifica.
-  /// Valida vaga e o limite de domingos direto no banco.
   Future<void> signUp(String escalaId, DateTime dataOcorrencia) async {
     await _client.rpc('inscrever_em_escala', params: {
       'p_escala_id': escalaId,
@@ -91,6 +86,8 @@ class ShiftService {
   }
 
   /// Usado pelo lider: lista quem se inscreveu numa ocorrencia especifica.
+  /// So mostra inscricoes ativas (inscrito / check-in feito) -- cancelamentos
+  /// nao aparecem mais aqui, pra nao poluir a lista do lider.
   Future<List<SignupModel>> listSignupsForOccurrence(
     String escalaId,
     DateTime dataOcorrencia,
@@ -100,6 +97,7 @@ class ShiftService {
         .select('*, profiles(nome)')
         .eq('escala_id', escalaId)
         .eq('data_ocorrencia', dataOcorrencia.toIso8601String().split('T').first)
+        .inFilter('status', ['inscrito', 'check_in_feito'])
         .order('inscrito_em', ascending: true);
 
     return (data as List)

@@ -5,6 +5,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../providers/checkin_provider.dart';
 import '../../providers/event_provider.dart';
 import '../../providers/shift_provider.dart';
+import '../../widgets/awake_app_bar.dart';
 
 /// Tela de check-in do lider: escaneia o QR Code do membro primeiro,
 /// depois escolhe a qual atividade de hoje (evento do calendario ou
@@ -23,7 +24,7 @@ class _CheckinScannerScreenState extends ConsumerState<CheckinScannerScreen> {
   bool _feedbackIsError = false;
 
   void _onDetect(BarcodeCapture capture) {
-    if (_qrCodeId != null) return; // ja escaneou, aguardando escolha
+    if (_qrCodeId != null) return;
     final code = capture.barcodes.first.rawValue;
     if (code == null) return;
     setState(() {
@@ -69,7 +70,7 @@ class _CheckinScannerScreenState extends ConsumerState<CheckinScannerScreen> {
     } finally {
       setState(() {
         _processing = false;
-        _qrCodeId = null; // volta a escanear, pronto pra proxima pessoa
+        _qrCodeId = null;
       });
     }
   }
@@ -119,7 +120,7 @@ class _CheckinScannerScreenState extends ConsumerState<CheckinScannerScreen> {
     targets.sort((a, b) => a.horario.compareTo(b.horario));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Check-in')),
+      appBar: const AwakeAppBar(title: 'Check-in'),
       body: Stack(
         children: [
           if (_qrCodeId == null) MobileScanner(onDetect: _onDetect),

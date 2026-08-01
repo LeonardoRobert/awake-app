@@ -1,9 +1,54 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import '../../models/profile_model.dart';
 import '../../providers/auth_provider.dart';
+
+/// Aplica a mascara dd/mm/aaaa enquanto a pessoa digita a data de
+/// nascimento, sem precisar de nenhum pacote externo.
+class _DataNascimentoFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    var digitos = newValue.text.replaceAll(RegExp(r'\D'), '');
+    if (digitos.length > 8) digitos = digitos.substring(0, 8);
+
+    final buffer = StringBuffer();
+    for (var i = 0; i < digitos.length; i++) {
+      buffer.write(digitos[i]);
+      if ((i == 1 || i == 3) && i != digitos.length - 1) {
+        buffer.write('/');
+      }
+    }
+
+    final texto = buffer.toString();
+    return TextEditingValue(
+      text: texto,
+      selection: TextSelection.collapsed(offset: texto.length),
+    );
+  }
+}
+
+/// Converte "dd/mm/aaaa" pra DateTime, validando se a data existe de
+/// verdade (evita aceitar algo tipo 31/02/2024).
+DateTime? _parseDataNascimento(String texto) {
+  final partes = texto.split('/');
+  if (partes.length != 3) return null;
+
+  final dia = int.tryParse(partes[0]);
+  final mes = int.tryParse(partes[1]);
+  final ano = int.tryParse(partes[2]);
+  if (dia == null || mes == null || ano == null) return null;
+  if (mes < 1 || mes > 12) return null;
+  if (ano < 1900 || ano > DateTime.now().year) return null;
+
+  final data = DateTime(ano, mes, dia);
+  if (data.year != ano || data.month != mes || data.day != dia) return null;
+  return data;
+}
 
 class SignupScreen extends ConsumerStatefulWidget {
   const SignupScreen({super.key});
@@ -18,25 +63,26 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   final _emailController = TextEditingController();
   final _telefoneController = TextEditingController();
   final _enderecoController = TextEditingController();
-  final _tempoParticipacaoController = TextEditingController();
+  final _dataNascimentoController = TextEditingController();
   final _senhaController = TextEditingController();
   final _codigoLiderController = TextEditingController();
+
   DateTime? _dataNascimento;
   EstadoCivil? _estadoCivil;
+  bool _ehNovo = false;
   bool _aceitouTermos = false;
   bool _quersSerLider = false;
   bool _loading = false;
   String? _errorMessage;
 
-  Future<void> _pickDate() async {
-    final now = DateTime.now();
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: DateTime(now.year - 15, now.month, now.day),
-      firstDate: DateTime(now.year - 100),
-      lastDate: now,
-    );
-    if (picked != null) setState(() => _dataNascimento = picked);
+  @override
+  void initState() {
+    super.initState();
+    _dataNascimentoController.addListener(() {
+      setState(() {
+        _dataNascimento = _parseDataNascimento(_dataNascimentoController.text);
+      });
+    });
   }
 
   bool get _isMenorDeIdade {
@@ -45,7 +91,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     return idade < 18;
   }
 
-  /// Preview de categoria (Genesis/Next/One) so para feedback visual —
+  /// Preview de categoria (Genesis/Next/One) so para feedback visual --
   /// o calculo oficial e feito no banco (ver supabase/schema.sql).
   String? get _categoriaPreview {
     if (_estadoCivil == EstadoCivil.noivo || _estadoCivil == EstadoCivil.casado) {
@@ -61,7 +107,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (_dataNascimento == null) {
-      setState(() => _errorMessage = 'Informe a data de nascimento.');
+      setState(() => _errorMessage = 'Informe uma data de nascimento válida (dd/mm/aaaa).');
       return;
     }
     if (_estadoCivil == null) {
@@ -69,7 +115,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       return;
     }
     if (!_aceitouTermos) {
-      setState(() => _errorMessage = 'E necessario aceitar os termos para continuar.');
+      setState(() => _errorMessage = 'É necessário aceitar os termos para continuar.');
       return;
     }
 
@@ -81,7 +127,6 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     try {
       final authService = ref.read(authServiceProvider);
 
-      // 1) cria a conta e o perfil (sempre como membro, por padrao)
       await authService.signUp(
         email: _emailController.text.trim(),
         senha: _senhaController.text,
@@ -90,32 +135,36 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         estadoCivil: _estadoCivil!,
         telefone: _telefoneController.text.trim(),
         endereco: _enderecoController.text.trim(),
-        tempoParticipacao: _tempoParticipacaoController.text.trim(),
+        tempoParticipacao: _ehNovo ? 'Novo(a) no Awake' : 'Já participa',
       );
 
-      // 2) se a pessoa marcou "quero ser lider", valida o codigo no
-      // backend e eleva o papel (ver supabase/schema.sql: solicitar_papel_lider)
       if (_quersSerLider) {
         try {
           await authService.solicitarPapelLider(_codigoLiderController.text.trim());
         } catch (_) {
-          // Cadastro continua valido como membro mesmo se o codigo
-          // estiver errado — so avisamos e seguimos.
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text(
-                  'Codigo de lider invalido. Sua conta foi criada como membro; '
-                  'peca o codigo certo e tente de novo depois.',
+                  'Código de líder inválido. Sua conta foi criada como membro; '
+                  'peça o código certo e tente de novo depois.',
                 ),
               ),
             );
           }
         }
       }
-      // O redirect do GoRouter cuida da navegacao apos cadastro.
+
+      if (!mounted) return;
+
+      // Quem e novo no Awake vai direto pro conteudo de apresentacao
+      // (Treinamentos), em vez de cair direto na tela principal.
+      if (_ehNovo) {
+        context.go('/treinamentos');
+      }
+      // Se nao for novo, o redirect do GoRouter ja cuida de levar pra Home.
     } catch (e) {
-      setState(() => _errorMessage = 'Nao foi possivel concluir o cadastro. Tente novamente.');
+      setState(() => _errorMessage = 'Não foi possível concluir o cadastro. Tente novamente.');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -133,12 +182,12 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text('Voce e...', style: TextStyle(fontWeight: FontWeight.w600)),
+                const Text('Você é...', style: TextStyle(fontWeight: FontWeight.w600)),
                 const SizedBox(height: 8),
                 SegmentedButton<bool>(
                   segments: const [
                     ButtonSegment(value: false, label: Text('Membro')),
-                    ButtonSegment(value: true, label: Text('Lider')),
+                    ButtonSegment(value: true, label: Text('Líder')),
                   ],
                   selected: {_quersSerLider},
                   onSelectionChanged: (value) => setState(() => _quersSerLider = value.first),
@@ -154,7 +203,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                   controller: _emailController,
                   decoration: const InputDecoration(labelText: 'E-mail'),
                   keyboardType: TextInputType.emailAddress,
-                  validator: (v) => (v == null || !v.contains('@')) ? 'E-mail invalido' : null,
+                  validator: (v) => (v == null || !v.contains('@')) ? 'E-mail inválido' : null,
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
@@ -168,32 +217,70 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                   decoration: const InputDecoration(labelText: 'Endereço'),
                 ),
                 const SizedBox(height: 16),
-                TextFormField(
-                  controller: _tempoParticipacaoController,
-                  decoration: const InputDecoration(
-                    labelText: 'Há quanto tempo você está no Awake?',
-                    hintText: 'Ex: 6 meses, 2 anos, sou novo...',
-                  ),
+                const Text('Você já participa do Awake?',
+                    style: TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                SegmentedButton<bool>(
+                  segments: const [
+                    ButtonSegment(value: true, label: Text('Sou novo(a)')),
+                    ButtonSegment(value: false, label: Text('Já participo')),
+                  ],
+                  selected: {_ehNovo},
+                  onSelectionChanged: (value) => setState(() => _ehNovo = value.first),
                 ),
+                if (_ehNovo) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    'Depois de concluir o cadastro, vamos te mostrar um vídeo rápido '
+                    'sobre quem somos.',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _senhaController,
                   decoration: const InputDecoration(labelText: 'Senha'),
                   obscureText: true,
-                  validator: (v) => (v == null || v.length < 6) ? 'Minimo de 6 caracteres' : null,
+                  validator: (v) => (v == null || v.length < 6) ? 'Mínimo de 6 caracteres' : null,
                 ),
                 const SizedBox(height: 16),
-                InkWell(
-                  onTap: _pickDate,
-                  child: InputDecorator(
-                    decoration: const InputDecoration(labelText: 'Data de nascimento'),
-                    child: Text(
-                      _dataNascimento == null
-                          ? 'Selecionar data'
-                          : DateFormat('dd/MM/yyyy').format(_dataNascimento!),
-                    ),
+                TextFormField(
+                  controller: _dataNascimentoController,
+                  decoration: const InputDecoration(
+                    labelText: 'Data de nascimento',
+                    hintText: 'dd/mm/aaaa',
                   ),
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [_DataNascimentoFormatter()],
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) return 'Informe a data de nascimento';
+                    if (_parseDataNascimento(v) == null) return 'Data inválida';
+                    return null;
+                  },
                 ),
+                if (_isMenorDeIdade) ...[
+                  const SizedBox(height: 8),
+                  const Text(
+                    // TODO: implementar fluxo completo de consentimento do responsavel
+                    'Por ser menor de idade, o cadastro requer ciência de um responsável. '
+                    'Confirme com um responsável antes de continuar.',
+                    style: TextStyle(fontSize: 12, color: Colors.orange),
+                  ),
+                ],
+                if (_quersSerLider) ...[
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _codigoLiderController,
+                    decoration: const InputDecoration(
+                      labelText: 'Código de líder',
+                      helperText: 'Pedido com o responsável pelo Awake',
+                    ),
+                    validator: (v) {
+                      if (!_quersSerLider) return null;
+                      return (v == null || v.trim().isEmpty) ? 'Informe o código de líder' : null;
+                    },
+                  ),
+                ],
                 const SizedBox(height: 16),
                 DropdownButtonFormField<EstadoCivil>(
                   value: _estadoCivil,
@@ -213,30 +300,6 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                   Text(
                     'Seu grupo: $_categoriaPreview',
                     style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                ],
-                if (_isMenorDeIdade) ...[
-                  const SizedBox(height: 8),
-                  const Text(
-                    // TODO: implementar fluxo completo de consentimento do responsavel
-                    // (ex: campo com nome/contato do responsavel, ou aprovacao manual pelo lider).
-                    'Por ser menor de idade, o cadastro requer ciencia de um responsavel. '
-                    'Confirme com um responsavel antes de continuar.',
-                    style: TextStyle(fontSize: 12, color: Colors.orange),
-                  ),
-                ],
-                if (_quersSerLider) ...[
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _codigoLiderController,
-                    decoration: const InputDecoration(
-                      labelText: 'Codigo de lider',
-                      helperText: 'Pedido com o responsavel pelo Awake',
-                    ),
-                    validator: (v) {
-                      if (!_quersSerLider) return null;
-                      return (v == null || v.trim().isEmpty) ? 'Informe o codigo de lider' : null;
-                    },
                   ),
                 ],
                 const SizedBox(height: 16),
@@ -263,9 +326,11 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                       : const Text('Criar conta'),
                 ),
                 const SizedBox(height: 12),
-                TextButton(
-                  onPressed: () => context.go('/login'),
-                  child: const Text('Ja tem conta? Entrar'),
+                Center(
+                  child: TextButton(
+                    onPressed: () => context.go('/login'),
+                    child: const Text('Já tem conta? Entrar'),
+                  ),
                 ),
               ],
             ),

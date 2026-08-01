@@ -32,7 +32,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           );
       // O redirect do GoRouter cuida da navegacao apos login.
     } catch (e) {
-      setState(() => _errorMessage = 'Nao foi possivel entrar. Verifique seu e-mail e senha.');
+      setState(() => _errorMessage = 'Não foi possível entrar. Verifique seu e-mail e senha.');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -72,7 +72,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           decoration: const InputDecoration(labelText: 'E-mail'),
                           keyboardType: TextInputType.emailAddress,
                           validator: (value) => (value == null || !value.contains('@'))
-                              ? 'Informe um e-mail valido'
+                              ? 'Informe um e-mail válido'
                               : null,
                         ),
                         const SizedBox(height: 16),
@@ -81,7 +81,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           decoration: const InputDecoration(labelText: 'Senha'),
                           obscureText: true,
                           validator: (value) => (value == null || value.length < 6)
-                              ? 'Minimo de 6 caracteres'
+                              ? 'Mínimo de 6 caracteres'
                               : null,
                         ),
                         if (_errorMessage != null) ...[
@@ -103,10 +103,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  TextButton(
-                    onPressed: () => context.go('/cadastro'),
-                    style: TextButton.styleFrom(foregroundColor: AwakeColors.offWhite),
-                    child: const Text('Nao tem conta? Cadastre-se'),
+                  Center(
+                    child: TextButton(
+                      onPressed: () => context.go('/cadastro'),
+                      style: TextButton.styleFrom(foregroundColor: AwakeColors.offWhite),
+                      child: const Text('Não tem conta? Cadastre-se'),
+                    ),
                   ),
                 ],
               ),

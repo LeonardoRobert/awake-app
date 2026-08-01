@@ -6,6 +6,7 @@ import '../../models/shift_model.dart';
 import '../../models/signup_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/shift_provider.dart';
+import '../../widgets/awake_app_bar.dart';
 
 /// Tela principal do modulo de Voluntariado (Escala).
 /// Membro: ve as ocorrencias futuras das escalas e se inscreve.
@@ -13,8 +14,6 @@ import '../../providers/shift_provider.dart';
 class ShiftsScreen extends ConsumerWidget {
   const ShiftsScreen({super.key});
 
-  /// Classifica o horario de chegada em Manha / Tarde / Noite, so pra
-  /// facilitar a leitura visual -- nao afeta nenhuma regra de negocio.
   String _periodo(String horarioInicio) {
     final hora = int.parse(horarioInicio.split(':').first);
     if (hora < 12) return 'Manhã';
@@ -29,18 +28,22 @@ class ShiftsScreen extends ConsumerWidget {
     final isLider = profileAsync.value?.isLider ?? false;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Escala'),
+      appBar: AwakeAppBar(
+        title: 'Escala',
         actions: [
-          IconButton(
-            icon: const Icon(Icons.list_alt),
-            tooltip: 'Minhas inscrições',
-            onPressed: () => _showMySignups(context),
-          ),
+          // "Minhas inscricoes" so faz sentido pra quem se inscreve --
+          // lideres nao precisam ver isso.
+          if (!isLider)
+            IconButton(
+              icon: const Icon(Icons.list_alt),
+              tooltip: 'Minhas inscrições',
+              onPressed: () => _showMySignups(context),
+            ),
         ],
       ),
       floatingActionButton: isLider
-          ? FloatingActionButton(
+          ? FloatingActionButton.small(
+              heroTag: 'fab-escala',
               onPressed: () => context.push('/escalas/nova'),
               child: const Icon(Icons.add),
             )

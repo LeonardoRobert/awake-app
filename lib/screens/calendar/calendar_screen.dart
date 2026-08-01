@@ -6,6 +6,7 @@ import 'package:table_calendar/table_calendar.dart';
 import '../../models/event_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/event_provider.dart';
+import '../../widgets/awake_app_bar.dart';
 
 class CalendarScreen extends ConsumerStatefulWidget {
   const CalendarScreen({super.key});
@@ -27,9 +28,10 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     final isLider = profileAsync.value?.isLider ?? false;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Calendário')),
+      appBar: const AwakeAppBar(title: 'Calendário'),
       floatingActionButton: isLider
-          ? FloatingActionButton(
+          ? FloatingActionButton.small(
+              heroTag: 'fab-calendario',
               onPressed: () => context.push('/eventos/novo'),
               child: const Icon(Icons.add),
             )
@@ -40,7 +42,6 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (err, _) => Center(child: Text('Erro ao carregar eventos: $err')),
           data: (events) {
-            // Janela ampla o suficiente pra cobrir o mes visivel no calendario
             final rangeStart = DateTime(_focusedDay.year, _focusedDay.month - 1, 1);
             final rangeEnd = DateTime(_focusedDay.year, _focusedDay.month + 2, 0);
 
@@ -52,9 +53,6 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
               }
             }
 
-            // Semana de domingo a sabado que contem o dia selecionado.
-            // DateTime.weekday: segunda=1 ... domingo=7. "% 7" transforma
-            // domingo em 0, o que facilita calcular o inicio da semana.
             final diasDesdeODomingo = _selectedDay.weekday % 7;
             final weekStart =
                 _dateOnly(_selectedDay).subtract(Duration(days: diasDesdeODomingo));
@@ -127,10 +125,6 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                                 DateFormat("dd/MM (EEEE) HH:mm", 'pt_BR').format(occ.data) +
                                     (occ.event.local != null ? ' • ${occ.event.local}' : ''),
                               ),
-                              // Passamos a data exata desta ocorrencia como `extra`,
-                              // pra tela de detalhes saber qual data mostrar --
-                              // sem isso, ela sempre mostrava a data original
-                              // de criacao do evento recorrente.
                               onTap: () => context.push(
                                 '/eventos/${occ.event.id}',
                                 extra: occ.data,
