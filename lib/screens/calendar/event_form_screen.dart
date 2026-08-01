@@ -25,6 +25,12 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
   EventTipo _tipo = EventTipo.outro;
   bool _saving = false;
 
+  // Publico-alvo: se _paraTodos for true, publico_alvo fica null (todos
+  // veem). Caso contrario, so quem for de uma das categorias marcadas
+  // aqui consegue ver o evento (lideres/admin sempre veem tudo).
+  bool _paraTodos = true;
+  final Set<String> _categoriasSelecionadas = {};
+
   bool get _isEdicao => widget.eventoParaEditar != null;
 
   @override
@@ -38,6 +44,12 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
     _recorrente = evento?.recorrente ?? false;
     _recorrenciaFim = evento?.recorrenciaFim;
     _tipo = evento?.tipo ?? EventTipo.outro;
+
+    final publicoExistente = evento?.publicoAlvo;
+    if (publicoExistente != null && publicoExistente.isNotEmpty) {
+      _paraTodos = false;
+      _categoriasSelecionadas.addAll(publicoExistente);
+    }
   }
 
   Future<void> _pickDateTime() async {
@@ -80,6 +92,12 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
       }
       return;
     }
+    if (!_paraTodos && _categoriasSelecionadas.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Selecione pelo menos um grupo, ou marque "Para todos".')),
+      );
+      return;
+    }
 
     setState(() => _saving = true);
 
@@ -92,6 +110,7 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
       recorrente: _recorrente,
       recorrenciaFim: _recorrente ? _recorrenciaFim : null,
       tipo: _tipo,
+      publicoAlvo: _paraTodos ? null : _categoriasSelecionadas.toList(),
     );
 
     try {
@@ -196,6 +215,35 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
                 ),
               ],
               const SizedBox(height: 24),
+              const Text('Quem pode ver esse evento?',
+                  style: TextStyle(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              SegmentedButton<bool>(
+                segments: const [
+                  ButtonSegment(value: true, label: Text('Todos')),
+                  ButtonSegment(value: false, label: Text('Grupos específicos')),
+                ],
+                selected: {_paraTodos},
+                onSelectionChanged: (value) => setState(() => _paraTodos = value.first),
+              ),
+              if (!_paraTodos) ...[
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    _grupoChip('genesis', 'Genesis'),
+                    _grupoChip('next', 'Next'),
+                    _grupoChip('one', 'One'),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Líderes e admin sempre veem todos os eventos, independente '
+                  'do que for marcado aqui.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+              const SizedBox(height: 24),
               FilledButton(
                 onPressed: _saving ? null : _submit,
                 child: _saving
@@ -207,6 +255,23 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _grupoChip(String valor, String label) {
+    final selecionado = _categoriasSelecionadas.contains(valor);
+    return FilterChip(
+      label: Text(label),
+      selected: selecionado,
+      onSelected: (marcado) {
+        setState(() {
+          if (marcado) {
+            _categoriasSelecionadas.add(valor);
+          } else {
+            _categoriasSelecionadas.remove(valor);
+          }
+        });
+      },
     );
   }
 }

@@ -36,6 +36,12 @@ class EventModel {
   final DateTime? recorrenciaFim;
   final EventTipo tipo;
 
+  /// null = evento visivel para todos. Se preenchido, so aparece para
+  /// membros cuja categoria (genesis/next/one) estiver nessa lista.
+  /// Lideres e admin sempre veem tudo, independente disso (regra
+  /// aplicada no banco via RLS).
+  final List<String>? publicoAlvo;
+
   EventModel({
     required this.id,
     required this.titulo,
@@ -47,6 +53,7 @@ class EventModel {
     this.recorrente = false,
     this.recorrenciaFim,
     this.tipo = EventTipo.outro,
+    this.publicoAlvo,
   });
 
   factory EventModel.fromMap(Map<String, dynamic> map) {
@@ -65,6 +72,7 @@ class EventModel {
           ? DateTime.parse(map['recorrencia_fim'] as String)
           : null,
       tipo: eventTipoFromString(map['tipo'] as String?),
+      publicoAlvo: (map['publico_alvo'] as List?)?.map((e) => e.toString()).toList(),
     );
   }
 
@@ -78,6 +86,7 @@ class EventModel {
       'recorrente': recorrente,
       'recorrencia_fim': recorrenciaFim?.toIso8601String().split('T').first,
       'tipo': tipo.name,
+      'publico_alvo': publicoAlvo,
     };
   }
 
