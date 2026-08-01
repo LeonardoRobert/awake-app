@@ -1,0 +1,46 @@
+name: awake_app
+description: App de gestao do ministerio Awake - calendario, voluntariado, metas e treinamentos.
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.6
+
+  # Backend / dados
+  supabase_flutter: ^2.5.6
+
+  # Gerenciamento de estado
+  flutter_riverpod: ^2.5.1
+
+  # Navegacao
+  go_router: ^14.2.0
+
+  # QR Code (gerar e ler)
+  qr_flutter: ^4.1.0
+  mobile_scanner: ^5.1.1
+
+  # Push notifications
+  onesignal_flutter: ^5.1.2
+
+  # Utilidades
+  intl: ^0.19.0
+  table_calendar: ^3.1.2
+  uuid: ^4.4.0
+
+  # Tipografia (ver observacao em lib/core/theme/app_theme.dart sobre Canva Sans)
+  google_fonts: ^6.2.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/

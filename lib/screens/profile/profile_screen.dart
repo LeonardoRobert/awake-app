@@ -1,0 +1,73 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../providers/auth_provider.dart';
+import '../../services/notification_service.dart';
+
+class ProfileScreen extends ConsumerWidget {
+  const ProfileScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final profileAsync = ref.watch(currentProfileProvider);
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Perfil')),
+      body: profileAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (err, _) => Center(child: Text('Erro: $err')),
+        data: (profile) {
+          if (profile == null) return const Center(child: Text('Perfil nao encontrado.'));
+          return ListView(
+            padding: const EdgeInsets.all(24),
+            children: [
+              CircleAvatar(
+                radius: 40,
+                child: Text(
+                  profile.nome.isNotEmpty ? profile.nome[0].toUpperCase() : '?',
+                  style: const TextStyle(fontSize: 32),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                profile.nome,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              Text(
+                _labelPapel(profile.papel.name),
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 32),
+              if (profile.telefone != null)
+                ListTile(
+                  leading: const Icon(Icons.phone),
+                  title: Text(profile.telefone!),
+                ),
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.logout, color: Colors.red),
+                title: const Text('Sair', style: TextStyle(color: Colors.red)),
+                onTap: () async {
+                  await NotificationService.logoutUser();
+                  await ref.read(authServiceProvider).signOut();
+                },
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  String _labelPapel(String papel) {
+    switch (papel) {
+      case 'admin':
+        return 'Administrador';
+      case 'lider':
+        return 'Lider';
+      default:
+        return 'Membro';
+    }
+  }
+}

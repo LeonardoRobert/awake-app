@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Awake — App do Ministério</title>
+  <link rel="icon" href="assets/awake_flame_white.png" />
+  <style>
+    :root {
+      --navy: #0C192E;
+      --yellow: #FFD21F;
+      --off-white: #F7F7F6;
+      --grey: #D9DFE6;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--navy);
+      color: var(--off-white);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .card {
+      max-width: 420px;
+      width: 100%;
+      text-align: center;
+    }
+
+    .logo {
+      height: 48px;
+      margin-bottom: 32px;
+    }
+
+    .flame {
+      height: 64px;
+      margin-bottom: 24px;
+      opacity: 0.9;
+    }
+
+    h1 {
+      font-size: 22px;
+      font-weight: 700;
+      margin: 0 0 12px;
+    }
+
+    p {
+      color: var(--grey);
+      line-height: 1.5;
+      margin: 0 0 32px;
+    }
+
+    .btn {
+      display: inline-block;
+      width: 100%;
+      background: var(--yellow);
+      color: var(--navy);
+      font-weight: 700;
+      text-decoration: none;
+      padding: 16px 24px;
+      border-radius: 12px;
+      font-size: 16px;
+      transition: opacity 0.15s ease;
+    }
+
+    .btn:active {
+      opacity: 0.85;
+    }
+
+    .note {
+      margin-top: 16px;
+      font-size: 12px;
+      color: var(--grey);
+      opacity: 0.8;
+    }
+
+    .note a {
+      color: var(--yellow);
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <img class="logo" src="assets/awake_logo_white.png" alt="Awake" />
+    <img class="flame" src="assets/awake_flame_white.png" alt="" />
+    <h1>Baixe o app do Awake</h1>
+    <p>
+      Calendário, escalas de voluntariado, metas, troféus e treinamentos —
+      tudo num só lugar. Disponível para Android.
+    </p>
+    <a id="download-btn" class="btn" href="#">Baixar APK</a>
+    <p class="note">
+      Ao instalar, seu Android pode avisar que o app é de "fonte
+      desconhecida" — isso é esperado para apps fora da Play Store. Toque em
+      "Instalar assim mesmo".
+      <br /><br />
+      Problemas para baixar? Confira a
+      <a id="releases-link" href="#" target="_blank" rel="noopener">página de releases</a>
+      diretamente.
+    </p>
+  </div>
+
+  <script>
+    // Monta o link de download automaticamente a partir da URL do
+    // GitHub Pages (https://USUARIO.github.io/REPOSITORIO/), sem precisar
+    // editar este arquivo manualmente quando o repositorio for criado.
+    const host = window.location.hostname; // ex: usuario.github.io
+    const owner = host.split('.')[0];
+    const pathParts = window.location.pathname.split('/').filter(Boolean);
+    const repo = pathParts[0] || '';
+
+    const apkUrl = `https://github.com/${owner}/${repo}/releases/latest/download/awake-app.apk`;
+    const releasesUrl = `https://github.com/${owner}/${repo}/releases`;
+
+    document.getElementById('download-btn').href = apkUrl;
+    document.getElementById('releases-link').href = releasesUrl;
+  </script>
+</body>
+</html>

@@ -1,0 +1,44 @@
+name: Build e publicar APK
+
+# Roda automaticamente sempre que uma tag "v*" e enviada
+# (ex: git tag v0.1.0 && git push origin v0.1.0), ou manualmente
+# pela aba "Actions" do GitHub ("Run workflow").
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.24.0"
+          channel: "stable"
+
+      - name: Instalar dependencias
+        run: flutter pub get
+
+      - name: Build do APK (release)
+        run: |
+          flutter build apk --release \
+            --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
+            --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} \
+            --dart-define=ONESIGNAL_APP_ID=${{ secrets.ONESIGNAL_APP_ID }}
+
+      - name: Renomear APK
+        run: cp build/app/outputs/flutter-apk/app-release.apk awake-app.apk
+
+      - name: Criar release e publicar o APK
+        uses: softprops/action-gh-release@v2
+        with:
+          files: awake-app.apk
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
