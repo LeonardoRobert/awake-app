@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
+import '../../models/profile_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/notification_service.dart';
 import '../../widgets/awake_app_bar.dart';
@@ -11,6 +13,7 @@ class ProfileScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profileAsync = ref.watch(currentProfileProvider);
+    final email = ref.watch(authServiceProvider).currentUserEmail;
 
     return Scaffold(
       appBar: const AwakeAppBar(title: 'Perfil'),
@@ -50,12 +53,34 @@ class ProfileScreen extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 32),
-              if (profile.telefone != null)
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.phone),
-                  title: Text(profile.telefone!),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.cake_outlined),
+                title: const Text('Data de nascimento'),
+                subtitle: Text(
+                  profile.dataNascimento != null
+                      ? DateFormat('dd/MM/yyyy').format(profile.dataNascimento!)
+                      : 'Não informado',
                 ),
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.email_outlined),
+                title: const Text('E-mail'),
+                subtitle: Text(email ?? 'Não informado'),
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.phone_outlined),
+                title: const Text('Celular'),
+                subtitle: Text(profile.telefone ?? 'Não informado'),
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.groups_outlined),
+                title: const Text('Grupo'),
+                subtitle: Text(profile.categoria?.label ?? 'Não definido'),
+              ),
               const Divider(),
               ListTile(
                 contentPadding: EdgeInsets.zero,

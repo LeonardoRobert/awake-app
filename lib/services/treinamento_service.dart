@@ -26,4 +26,21 @@ class TreinamentoService {
       'url_video': urlVideo,
     });
   }
+
+  Future<void> update(
+    String id, {
+    required String titulo,
+    String? descricao,
+    required String urlVideo,
+  }) async {
+    await _client.from('treinamentos').update({
+      'titulo': titulo,
+      'descricao': descricao,
+      'url_video': urlVideo,
+    }).eq('id', id);
+  }
+
+  Future<void> delete(String id) async {
+    await _client.from('treinamentos').delete().eq('id', id);
+  }
 }

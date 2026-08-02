@@ -10,6 +10,10 @@ import '../../widgets/awake_app_bar.dart';
 /// Tela de check-in do lider: escaneia o QR Code do membro primeiro,
 /// depois escolhe a qual atividade de hoje (evento do calendario ou
 /// escala de voluntariado) aquele check-in se refere.
+///
+/// Eventos do dia aparecem todos (nao exigem inscricao previa). Ja as
+/// escalas so mostram as que a PESSOA ESCANEADA especificamente esta
+/// inscrita naquele dia -- nao todas as escalas do dia.
 class CheckinScannerScreen extends ConsumerStatefulWidget {
   const CheckinScannerScreen({super.key});
 
@@ -23,20 +27,36 @@ class _CheckinScannerScreenState extends ConsumerState<CheckinScannerScreen> {
   String? _feedback;
   bool _feedbackIsError = false;
 
-  void _onDetect(BarcodeCapture capture) {
+  // null enquanto ainda esta buscando; lista vazia = pessoa nao esta
+  // inscrita em nenhuma escala hoje.
+  List<String>? _escalaIdsPermitidos;
+
+  Future<void> _onDetect(BarcodeCapture capture) async {
     if (_qrCodeId != null) return;
     final code = capture.barcodes.first.rawValue;
     if (code == null) return;
+
     setState(() {
       _qrCodeId = code;
       _feedback = null;
+      _escalaIdsPermitidos = null; // dispara o "carregando" no picker
     });
+
+    final hoje = DateTime.now();
+    final ids = await ref
+        .read(checkinServiceProvider)
+        .fetchEscalaIdsInscritosNaData(code, DateTime(hoje.year, hoje.month, hoje.day));
+
+    if (mounted && _qrCodeId == code) {
+      setState(() => _escalaIdsPermitidos = ids);
+    }
   }
 
   void _cancelarSelecao() {
     setState(() {
       _qrCodeId = null;
       _feedback = null;
+      _escalaIdsPermitidos = null;
     });
   }
 
@@ -71,6 +91,7 @@ class _CheckinScannerScreenState extends ConsumerState<CheckinScannerScreen> {
       setState(() {
         _processing = false;
         _qrCodeId = null;
+        _escalaIdsPermitidos = null;
       });
     }
   }
@@ -86,6 +107,8 @@ class _CheckinScannerScreenState extends ConsumerState<CheckinScannerScreen> {
 
     final targets = <_CheckinTarget>[];
 
+    // Eventos: todos os de hoje aparecem, sem restricao (nao exigem
+    // inscricao previa).
     eventsAsync.whenData((events) {
       for (final event in events) {
         for (final occ in event.occurrencesBetween(todayStart, todayEnd)) {
@@ -100,22 +123,27 @@ class _CheckinScannerScreenState extends ConsumerState<CheckinScannerScreen> {
       }
     });
 
-    shiftsAsync.whenData((shifts) {
-      for (final occ in shifts) {
-        final mesmoDia = occ.data.year == todayStart.year &&
-            occ.data.month == todayStart.month &&
-            occ.data.day == todayStart.day;
-        if (mesmoDia) {
-          targets.add(_CheckinTarget(
-            tipo: _TipoAlvo.escala,
-            id: occ.shift.id,
-            label: occ.shift.nome,
-            horario: occ.shift.horarioInicio,
-            data: occ.data,
-          ));
+    // Escalas: so entram na lista se a pessoa escaneada estiver
+    // inscrita nelas (filtro por _escalaIdsPermitidos).
+    if (_escalaIdsPermitidos != null) {
+      shiftsAsync.whenData((shifts) {
+        for (final occ in shifts) {
+          final mesmoDia = occ.data.year == todayStart.year &&
+              occ.data.month == todayStart.month &&
+              occ.data.day == todayStart.day;
+          final inscritoNessaEscala = _escalaIdsPermitidos!.contains(occ.shift.id);
+          if (mesmoDia && inscritoNessaEscala) {
+            targets.add(_CheckinTarget(
+              tipo: _TipoAlvo.escala,
+              id: occ.shift.id,
+              label: occ.shift.nome,
+              horario: occ.shift.horarioInicio,
+              data: occ.data,
+            ));
+          }
         }
-      }
-    });
+      });
+    }
 
     targets.sort((a, b) => a.horario.compareTo(b.horario));
 
@@ -128,6 +156,7 @@ class _CheckinScannerScreenState extends ConsumerState<CheckinScannerScreen> {
             _TargetPicker(
               targets: targets,
               processing: _processing,
+              carregandoEscalas: _escalaIdsPermitidos == null,
               onCancel: _cancelarSelecao,
               onSelect: _confirmarCheckin,
             ),
@@ -135,7 +164,7 @@ class _CheckinScannerScreenState extends ConsumerState<CheckinScannerScreen> {
             Positioned(
               left: 16,
               right: 16,
-              bottom: 24,
+              top: 16,
               child: Card(
                 color: _feedbackIsError ? Colors.red.shade100 : Colors.green.shade100,
                 child: Padding(
@@ -171,12 +200,14 @@ class _CheckinTarget {
 class _TargetPicker extends StatelessWidget {
   final List<_CheckinTarget> targets;
   final bool processing;
+  final bool carregandoEscalas;
   final VoidCallback onCancel;
   final void Function(_CheckinTarget) onSelect;
 
   const _TargetPicker({
     required this.targets,
     required this.processing,
+    required this.carregandoEscalas,
     required this.onCancel,
     required this.onSelect,
   });
@@ -196,35 +227,41 @@ class _TargetPicker extends StatelessWidget {
                 style: Theme.of(context).textTheme.titleMedium,
               ),
             ),
-            if (processing) const LinearProgressIndicator(),
+            if (processing || carregandoEscalas) const LinearProgressIndicator(),
             Expanded(
-              child: targets.isEmpty
-                  ? const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(24),
-                        child: Text('Nenhum evento ou escala programada para hoje.'),
-                      ),
-                    )
-                  : ListView.builder(
-                      itemCount: targets.length,
-                      itemBuilder: (context, index) {
-                        final target = targets[index];
-                        return ListTile(
-                          leading: Icon(
-                            target.tipo == _TipoAlvo.escala
-                                ? Icons.volunteer_activism
-                                : Icons.event,
+              child: carregandoEscalas
+                  ? const Center(child: CircularProgressIndicator())
+                  : targets.isEmpty
+                      ? const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(24),
+                            child: Text(
+                              'Nenhum evento hoje, e essa pessoa não está inscrita '
+                              'em nenhuma escala hoje.',
+                              textAlign: TextAlign.center,
+                            ),
                           ),
-                          title: Text(target.label),
-                          subtitle: Text(
-                            target.tipo == _TipoAlvo.escala
-                                ? 'Escala • ${target.horario}'
-                                : 'Evento • ${target.horario}',
-                          ),
-                          onTap: processing ? null : () => onSelect(target),
-                        );
-                      },
-                    ),
+                        )
+                      : ListView.builder(
+                          itemCount: targets.length,
+                          itemBuilder: (context, index) {
+                            final target = targets[index];
+                            return ListTile(
+                              leading: Icon(
+                                target.tipo == _TipoAlvo.escala
+                                    ? Icons.volunteer_activism
+                                    : Icons.event,
+                              ),
+                              title: Text(target.label),
+                              subtitle: Text(
+                                target.tipo == _TipoAlvo.escala
+                                    ? 'Escala • ${target.horario}'
+                                    : 'Evento • ${target.horario}',
+                              ),
+                              onTap: processing ? null : () => onSelect(target),
+                            );
+                          },
+                        ),
             ),
             Padding(
               padding: const EdgeInsets.all(16),

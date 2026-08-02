@@ -17,7 +17,11 @@ class CalendarScreen extends ConsumerStatefulWidget {
 
 class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   DateTime _focusedDay = DateTime.now();
-  DateTime _selectedDay = DateTime.now();
+
+  // null = mostrando a visao padrao "proximos 7 dias". Quando a pessoa
+  // toca num dia especifico do calendario, isso vira aquele dia, e a
+  // lista abaixo passa a mostrar so os eventos daquele dia.
+  DateTime? _diaSelecionado;
 
   DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
 
@@ -53,18 +57,25 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
               }
             }
 
-            final diasDesdeODomingo = _selectedDay.weekday % 7;
-            final weekStart =
-                _dateOnly(_selectedDay).subtract(Duration(days: diasDesdeODomingo));
-            final weekEnd = weekStart.add(const Duration(days: 6));
+            final hoje = _dateOnly(DateTime.now());
+            final List<_Occurrence> listaExibida;
+            final String tituloLista;
 
-            final weekOccurrences = <_Occurrence>[];
-            for (final event in events) {
-              for (final occ in event.occurrencesBetween(weekStart, weekEnd)) {
-                weekOccurrences.add(_Occurrence(event, occ));
+            if (_diaSelecionado == null) {
+              // Visao padrao: proximos 7 dias a partir de hoje
+              final fim = hoje.add(const Duration(days: 6));
+              listaExibida = [];
+              for (final event in events) {
+                for (final occ in event.occurrencesBetween(hoje, fim)) {
+                  listaExibida.add(_Occurrence(event, occ));
+                }
               }
+              tituloLista = 'Próximos 7 dias';
+            } else {
+              listaExibida = byDay[_dateOnly(_diaSelecionado!)] ?? [];
+              tituloLista = 'Eventos de ${DateFormat("dd/MM (EEEE)", 'pt_BR').format(_diaSelecionado!)}';
             }
-            weekOccurrences.sort((a, b) => a.data.compareTo(b.data));
+            listaExibida.sort((a, b) => a.data.compareTo(b.data));
 
             return Column(
               children: [
@@ -74,11 +85,12 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                   lastDay: DateTime(2035, 12, 31),
                   focusedDay: _focusedDay,
                   startingDayOfWeek: StartingDayOfWeek.sunday,
-                  selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+                  selectedDayPredicate: (day) =>
+                      _diaSelecionado != null && isSameDay(_diaSelecionado, day),
                   eventLoader: (day) => byDay[_dateOnly(day)] ?? [],
                   onDaySelected: (selected, focused) {
                     setState(() {
-                      _selectedDay = selected;
+                      _diaSelecionado = selected;
                       _focusedDay = focused;
                     });
                   },
@@ -100,22 +112,29 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                 const Divider(height: 1),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Eventos da semana '
-                      '(${DateFormat('dd/MM').format(weekStart)} a ${DateFormat('dd/MM').format(weekEnd)})',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          tituloLista,
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                      ),
+                      if (_diaSelecionado != null)
+                        TextButton(
+                          onPressed: () => setState(() => _diaSelecionado = null),
+                          child: const Text('Ver próximos 7 dias'),
+                        ),
+                    ],
                   ),
                 ),
                 Expanded(
-                  child: weekOccurrences.isEmpty
-                      ? const Center(child: Text('Nenhum evento nesta semana.'))
+                  child: listaExibida.isEmpty
+                      ? const Center(child: Text('Nenhum evento neste período.'))
                       : ListView.builder(
-                          itemCount: weekOccurrences.length,
+                          itemCount: listaExibida.length,
                           itemBuilder: (context, index) {
-                            final occ = weekOccurrences[index];
+                            final occ = listaExibida[index];
                             return ListTile(
                               leading: Icon(
                                 occ.event.recorrente ? Icons.repeat : Icons.event,

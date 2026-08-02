@@ -20,17 +20,19 @@ class ShiftService {
         .toList();
   }
 
+  /// Contagem de vagas preenchidas por (escala, data). Usa uma funcao do
+  /// banco (contar_inscritos_geral) em vez de consultar a tabela direto,
+  /// porque a tabela `inscricoes` so mostra as PROPRIAS inscricoes de
+  /// cada pessoa -- a funcao devolve so o numero, sem identificar quem
+  /// se inscreveu, entao todo mundo consegue ver a contagem certa.
   Future<Map<String, int>> fetchInscritosCounts() async {
-    final data = await _client
-        .from('inscricoes')
-        .select('escala_id, data_ocorrencia, status')
-        .inFilter('status', ['inscrito', 'check_in_feito']);
+    final data = await _client.rpc('contar_inscritos_geral');
 
     final counts = <String, int>{};
     for (final row in (data as List)) {
       final map = row as Map<String, dynamic>;
       final key = '${map['escala_id']}_${map['data_ocorrencia']}';
-      counts[key] = (counts[key] ?? 0) + 1;
+      counts[key] = (map['total'] as num).toInt();
     }
     return counts;
   }
@@ -61,6 +63,22 @@ class ShiftService {
     await _client.from('escalas').update(shift.toInsertMap()).eq('id', id);
   }
 
+  /// Apaga a escala inteira (inclusive futuras ocorrencias, se for
+  /// recorrente). As inscricoes e checkins relacionados sao apagados
+  /// junto automaticamente pelo banco.
+  Future<void> deleteShiftTemplate(String id) async {
+    await _client.from('escalas').delete().eq('id', id);
+  }
+
+  /// Apaga so UMA ocorrencia (data) de uma escala recorrente, mantendo
+  /// as outras semanas da serie. Cancela as inscricoes so daquela data.
+  Future<void> deleteShiftOccurrence(String escalaId, DateTime data) async {
+    await _client.rpc('excluir_ocorrencia_escala', params: {
+      'p_escala_id': escalaId,
+      'p_data': data.toIso8601String().split('T').first,
+    });
+  }
+
   Future<void> signUp(String escalaId, DateTime dataOcorrencia) async {
     await _client.rpc('inscrever_em_escala', params: {
       'p_escala_id': escalaId,
@@ -72,13 +90,15 @@ class ShiftService {
     await _client.rpc('cancel_signup', params: {'p_inscricao_id': inscricaoId});
   }
 
+  /// Ordena por data mais proxima primeiro (a escala de amanha aparece
+  /// antes da escala do mes que vem).
   Future<List<SignupModel>> listMySignups() async {
     final userId = _client.auth.currentUser!.id;
     final data = await _client
         .from('inscricoes')
         .select('*, escalas(*, areas_servico(*))')
         .eq('user_id', userId)
-        .order('data_ocorrencia', ascending: false);
+        .order('data_ocorrencia', ascending: true);
 
     return (data as List)
         .map((e) => SignupModel.fromMap(e as Map<String, dynamic>))

@@ -32,4 +32,33 @@ class CheckinService {
     });
     return result as String;
   }
+
+  /// Descobre em quais escalas a pessoa DAQUELE QR Code esta inscrita
+  /// numa data especifica. Usado pra filtrar a lista de check-in: so
+  /// mostra a escala que a propria pessoa se inscreveu, nao todas as
+  /// escalas do dia.
+  Future<List<String>> fetchEscalaIdsInscritosNaData(
+    String qrCodeId,
+    DateTime data,
+  ) async {
+    final perfil = await _client
+        .from('profiles')
+        .select('id')
+        .eq('qr_code_id', qrCodeId)
+        .maybeSingle();
+
+    if (perfil == null) return [];
+    final userId = perfil['id'] as String;
+
+    final inscricoes = await _client
+        .from('inscricoes')
+        .select('escala_id')
+        .eq('user_id', userId)
+        .eq('data_ocorrencia', data.toIso8601String().split('T').first)
+        .eq('status', 'inscrito');
+
+    return (inscricoes as List)
+        .map((e) => (e as Map<String, dynamic>)['escala_id'] as String)
+        .toList();
+  }
 }

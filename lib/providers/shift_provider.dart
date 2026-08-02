@@ -10,8 +10,9 @@ final serviceAreasProvider = FutureProvider.autoDispose<List<ServiceAreaModel>>(
   return ref.watch(shiftServiceProvider).listServiceAreas();
 });
 
-/// Gera as ocorrencias de todas as escalas (recorrentes ou nao) para os
-/// proximos ~60 dias, ja com a contagem de vagas preenchidas.
+/// Gera as ocorrencias de todas as escalas (recorrentes ou nao) dentro do
+/// MES ATUAL, ja com a contagem de vagas preenchidas. Vira sozinho quando
+/// o mes mudar (nao mostra nada do proximo mes ainda).
 final upcomingShiftOccurrencesProvider =
     FutureProvider.autoDispose<List<ShiftOccurrence>>((ref) async {
   final service = ref.watch(shiftServiceProvider);
@@ -20,7 +21,8 @@ final upcomingShiftOccurrencesProvider =
 
   final now = DateTime.now();
   final rangeStart = DateTime(now.year, now.month, now.day);
-  final rangeEnd = rangeStart.add(const Duration(days: 60));
+  // Ultimo dia do mes atual -- vira sozinho quando o mes mudar.
+  final rangeEnd = DateTime(now.year, now.month + 1, 0);
 
   final occurrences = <ShiftOccurrence>[];
   for (final shift in templates) {

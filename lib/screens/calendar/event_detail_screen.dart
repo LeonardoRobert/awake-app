@@ -83,16 +83,130 @@ class EventDetailScreen extends ConsumerWidget {
                 ],
                 if (isLider) ...[
                   const SizedBox(height: 24),
-                  OutlinedButton.icon(
-                    onPressed: () => context.push('/eventos/novo', extra: event),
-                    icon: const Icon(Icons.edit),
-                    label: const Text('Editar evento'),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => context.push('/eventos/novo', extra: event),
+                          icon: const Icon(Icons.edit),
+                          label: const Text('Editar'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+                          onPressed: () => _confirmarExclusao(
+                            context,
+                            ref,
+                            eventId,
+                            event.titulo,
+                            event.recorrente,
+                            dataExibida,
+                          ),
+                          icon: const Icon(Icons.delete_outline),
+                          label: const Text('Excluir'),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ],
             ),
           );
         },
+      ),
+    );
+  }
+
+  Future<void> _confirmarExclusao(
+    BuildContext context,
+    WidgetRef ref,
+    String eventId,
+    String titulo,
+    bool recorrente,
+    DateTime dataOcorrencia,
+  ) async {
+    if (recorrente) {
+      final escopo = await _perguntarEscopo(context, 'evento');
+      if (escopo == null) return;
+
+      if (escopo == 'uma') {
+        try {
+          await ref.read(eventServiceProvider).deleteOccurrence(eventId, dataOcorrencia);
+          ref.invalidate(upcomingEventsProvider);
+          if (context.mounted) Navigator.of(context).pop();
+        } catch (e) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context)
+                .showSnackBar(SnackBar(content: Text('Erro ao excluir: $e')));
+          }
+        }
+        return;
+      }
+      // escopo == 'todas' -> segue pro fluxo normal de confirmação abaixo
+    }
+
+    final confirmou = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Excluir evento?'),
+        content: Text(
+          'Isso vai apagar "$titulo" permanentemente'
+          '${recorrente ? ' (todas as ocorrências da série)' : ''}. '
+          'Essa ação não pode ser desfeita.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Excluir'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmou != true) return;
+
+    try {
+      await ref.read(eventServiceProvider).delete(eventId);
+      ref.invalidate(upcomingEventsProvider);
+      if (context.mounted) Navigator.of(context).pop();
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Erro ao excluir: $e')));
+      }
+    }
+  }
+
+  /// Pergunta se e pra excluir so uma ocorrencia ou a serie toda.
+  /// Retorna 'uma', 'todas', ou null se cancelou.
+  Future<String?> _perguntarEscopo(BuildContext context, String tipoItem) {
+    return showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Esse $tipoItem se repete toda semana'),
+        content: const Text('O que você quer excluir?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancelar'),
+          ),
+          OutlinedButton(
+            onPressed: () => Navigator.of(dialogContext).pop('uma'),
+            child: const Text('Só esta data'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.of(dialogContext).pop('todas'),
+            child: const Text('Toda a série'),
+          ),
+        ],
       ),
     );
   }

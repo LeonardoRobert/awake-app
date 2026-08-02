@@ -79,7 +79,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/treinamentos/novo',
-        builder: (context, state) => const TreinamentoFormScreen(),
+        builder: (context, state) =>
+            TreinamentoFormScreen(treinamentoParaEditar: state.extra as TreinamentoModel?),
       ),
       GoRoute(
         path: '/treinamentos/detalhe',

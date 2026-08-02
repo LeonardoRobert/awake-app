@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../models/treinamento_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/treinamento_provider.dart';
 
@@ -14,7 +15,19 @@ class TreinamentosScreen extends ConsumerWidget {
     final isAdmin = profileAsync.value?.isAdmin ?? false;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Treinamentos')),
+      appBar: AppBar(
+        title: const Text('Treinamentos'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/');
+            }
+          },
+        ),
+      ),
       floatingActionButton: isAdmin
           ? FloatingActionButton(
               onPressed: () => context.push('/treinamentos/novo'),
@@ -40,6 +53,38 @@ class TreinamentosScreen extends ConsumerWidget {
                   subtitle: t.descricao != null
                       ? Text(t.descricao!, maxLines: 2, overflow: TextOverflow.ellipsis)
                       : null,
+                  trailing: isAdmin
+                      ? PopupMenuButton<String>(
+                          onSelected: (opcao) {
+                            switch (opcao) {
+                              case 'editar':
+                                context.push('/treinamentos/novo', extra: t);
+                                break;
+                              case 'excluir':
+                                _confirmarExclusao(context, ref, t);
+                                break;
+                            }
+                          },
+                          itemBuilder: (context) => [
+                            const PopupMenuItem(
+                              value: 'editar',
+                              child: ListTile(
+                                leading: Icon(Icons.edit),
+                                title: Text('Editar'),
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                            ),
+                            const PopupMenuItem(
+                              value: 'excluir',
+                              child: ListTile(
+                                leading: Icon(Icons.delete_outline, color: Colors.red),
+                                title: Text('Excluir', style: TextStyle(color: Colors.red)),
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                            ),
+                          ],
+                        )
+                      : null,
                   onTap: () => context.push('/treinamentos/detalhe', extra: t),
                 );
               },
@@ -48,5 +93,49 @@ class TreinamentosScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _confirmarExclusao(
+    BuildContext context,
+    WidgetRef ref,
+    TreinamentoModel treinamento,
+  ) async {
+    final confirmou = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Excluir treinamento?'),
+        content: Text(
+          'Isso vai apagar "${treinamento.titulo}" permanentemente. '
+          'Essa ação não pode ser desfeita.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Excluir'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmou != true || !context.mounted) return;
+
+    try {
+      await ref.read(treinamentoServiceProvider).delete(treinamento.id);
+      ref.invalidate(treinamentosProvider);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Treinamento excluído.')));
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Erro ao excluir: $e')));
+      }
+    }
   }
 }

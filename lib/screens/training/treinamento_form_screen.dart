@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../models/treinamento_model.dart';
 import '../../providers/treinamento_provider.dart';
 
+/// Tela do admin para criar ou editar um treinamento.
+/// Se `treinamentoParaEditar` for informado, entra em modo de edicao.
 class TreinamentoFormScreen extends ConsumerStatefulWidget {
-  const TreinamentoFormScreen({super.key});
+  final TreinamentoModel? treinamentoParaEditar;
+  const TreinamentoFormScreen({super.key, this.treinamentoParaEditar});
 
   @override
   ConsumerState<TreinamentoFormScreen> createState() => _TreinamentoFormScreenState();
@@ -11,21 +15,42 @@ class TreinamentoFormScreen extends ConsumerStatefulWidget {
 
 class _TreinamentoFormScreenState extends ConsumerState<TreinamentoFormScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _tituloController = TextEditingController();
-  final _descricaoController = TextEditingController();
-  final _urlController = TextEditingController();
+  late final TextEditingController _tituloController;
+  late final TextEditingController _descricaoController;
+  late final TextEditingController _urlController;
   bool _saving = false;
+
+  bool get _isEdicao => widget.treinamentoParaEditar != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final t = widget.treinamentoParaEditar;
+    _tituloController = TextEditingController(text: t?.titulo ?? '');
+    _descricaoController = TextEditingController(text: t?.descricao ?? '');
+    _urlController = TextEditingController(text: t?.urlVideo ?? '');
+  }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _saving = true);
     try {
-      await ref.read(treinamentoServiceProvider).create(
-            titulo: _tituloController.text.trim(),
-            descricao: _descricaoController.text.trim(),
-            urlVideo: _urlController.text.trim(),
-          );
+      final service = ref.read(treinamentoServiceProvider);
+      if (_isEdicao) {
+        await service.update(
+          widget.treinamentoParaEditar!.id,
+          titulo: _tituloController.text.trim(),
+          descricao: _descricaoController.text.trim(),
+          urlVideo: _urlController.text.trim(),
+        );
+      } else {
+        await service.create(
+          titulo: _tituloController.text.trim(),
+          descricao: _descricaoController.text.trim(),
+          urlVideo: _urlController.text.trim(),
+        );
+      }
       ref.invalidate(treinamentosProvider);
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
@@ -41,7 +66,7 @@ class _TreinamentoFormScreenState extends ConsumerState<TreinamentoFormScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Novo treinamento')),
+      appBar: AppBar(title: Text(_isEdicao ? 'Editar treinamento' : 'Novo treinamento')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Form(
@@ -79,7 +104,7 @@ class _TreinamentoFormScreenState extends ConsumerState<TreinamentoFormScreen> {
                 child: _saving
                     ? const SizedBox(
                         height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Text('Publicar'),
+                    : Text(_isEdicao ? 'Salvar alterações' : 'Publicar'),
               ),
             ],
           ),

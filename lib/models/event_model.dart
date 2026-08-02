@@ -42,6 +42,10 @@ class EventModel {
   /// aplicada no banco via RLS).
   final List<String>? publicoAlvo;
 
+  /// Datas puladas dessa recorrencia (ex: "so essa semana nao tem
+  /// esse evento", sem apagar a serie toda).
+  final List<DateTime> excecoes;
+
   EventModel({
     required this.id,
     required this.titulo,
@@ -54,7 +58,9 @@ class EventModel {
     this.recorrenciaFim,
     this.tipo = EventTipo.outro,
     this.publicoAlvo,
+    this.excecoes = const [],
   });
+
 
   factory EventModel.fromMap(Map<String, dynamic> map) {
     return EventModel(
@@ -73,6 +79,10 @@ class EventModel {
           : null,
       tipo: eventTipoFromString(map['tipo'] as String?),
       publicoAlvo: (map['publico_alvo'] as List?)?.map((e) => e.toString()).toList(),
+      excecoes: (map['excecoes'] as List?)
+              ?.map((e) => DateTime.parse(e.toString()))
+              .toList() ??
+          const [],
     );
   }
 
@@ -92,9 +102,12 @@ class EventModel {
 
   /// Gera as ocorrencias desse evento dentro do intervalo informado.
   List<DateTime> occurrencesBetween(DateTime rangeStart, DateTime rangeEnd) {
+    bool ehExcecao(DateTime d) =>
+        excecoes.any((e) => e.year == d.year && e.month == d.month && e.day == d.day);
+
     if (!recorrente) {
       if (!dataInicio.isBefore(rangeStart) && !dataInicio.isAfter(rangeEnd)) {
-        return [dataInicio];
+        return ehExcecao(dataInicio) ? [] : [dataInicio];
       }
       return [];
     }
@@ -111,7 +124,7 @@ class EventModel {
 
     while (!cursor.isAfter(rangeEnd)) {
       if (recorrenciaFim != null && cursor.isAfter(recorrenciaFim!)) break;
-      result.add(cursor);
+      if (!ehExcecao(cursor)) result.add(cursor);
       cursor = cursor.add(const Duration(days: 7));
     }
 

@@ -15,6 +15,10 @@ class ShiftModel {
   final bool recorrente;
   final DateTime? recorrenciaFim;
 
+  /// Datas puladas dessa recorrencia (excluidas so daquela semana,
+  /// mantendo a serie).
+  final List<DateTime> excecoes;
+
   ShiftModel({
     required this.id,
     required this.nome,
@@ -26,6 +30,7 @@ class ShiftModel {
     required this.vagas,
     this.recorrente = false,
     this.recorrenciaFim,
+    this.excecoes = const [],
   });
 
   factory ShiftModel.fromMap(Map<String, dynamic> map) {
@@ -44,6 +49,10 @@ class ShiftModel {
       recorrenciaFim: map['recorrencia_fim'] != null
           ? DateTime.parse(map['recorrencia_fim'] as String)
           : null,
+      excecoes: (map['excecoes'] as List?)
+              ?.map((e) => DateTime.parse(e.toString()))
+              .toList() ??
+          const [],
     );
   }
 
@@ -67,8 +76,13 @@ class ShiftModel {
     final start = DateTime(rangeStart.year, rangeStart.month, rangeStart.day);
     final end = DateTime(rangeEnd.year, rangeEnd.month, rangeEnd.day);
 
+    bool ehExcecao(DateTime d) =>
+        excecoes.any((e) => e.year == d.year && e.month == d.month && e.day == d.day);
+
     if (!recorrente) {
-      if (!anchor.isBefore(start) && !anchor.isAfter(end)) return [anchor];
+      if (!anchor.isBefore(start) && !anchor.isAfter(end)) {
+        return ehExcecao(anchor) ? [] : [anchor];
+      }
       return [];
     }
 
@@ -82,7 +96,7 @@ class ShiftModel {
 
     while (!cursor.isAfter(end)) {
       if (recorrenciaFim != null && cursor.isAfter(recorrenciaFim!)) break;
-      result.add(cursor);
+      if (!ehExcecao(cursor)) result.add(cursor);
       cursor = cursor.add(const Duration(days: 7));
     }
 

@@ -9,6 +9,8 @@ class AuthService {
 
   User? get currentUser => _client.auth.currentUser;
 
+  String? get currentUserEmail => currentUser?.email;
+
   Future<AuthResponse> signUp({
     required String email,
     required String senha,
@@ -27,7 +29,7 @@ class AuthService {
 
     // A trigger handle_new_user (ver supabase/schema.sql) cria a linha em
     // profiles automaticamente. Aqui completamos os campos adicionais.
-    // A categoria (Genesis/Nexus/Uniao) e calculada sozinha no banco a
+    // A categoria (Genesis/Next/One) e calculada sozinha no banco a
     // partir da data de nascimento e do estado civil.
     if (response.user != null) {
       await _client.from('profiles').update({
