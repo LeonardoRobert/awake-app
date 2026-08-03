@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/router.dart';
 import 'core/theme/app_theme.dart';
 import 'services/notification_service.dart';
@@ -17,17 +19,45 @@ Future<void> main() async {
   runApp(const ProviderScope(child: AwakeApp()));
 }
 
-class AwakeApp extends ConsumerWidget {
+class AwakeApp extends ConsumerStatefulWidget {
   const AwakeApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AwakeApp> createState() => _AwakeAppState();
+}
+
+class _AwakeAppState extends ConsumerState<AwakeApp> {
+  StreamSubscription<AuthState>? _authSub;
+
+  @override
+  void initState() {
+    super.initState();
+    // Quando a pessoa clica no link de recuperacao de senha do e-mail,
+    // o Supabase dispara esse evento -- a gente aproveita pra levar
+    // direto pra tela de definir a nova senha.
+    _authSub = SupabaseService.client.auth.onAuthStateChange.listen((state) {
+      if (state.event == AuthChangeEvent.passwordRecovery) {
+        ref.read(routerProvider).go('/redefinir-senha');
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _authSub?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final router = ref.watch(routerProvider);
 
     return MaterialApp.router(
       title: 'Awake',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
+      darkTheme: AppTheme.dark(),
+      themeMode: ThemeMode.system,
       routerConfig: router,
     );
   }

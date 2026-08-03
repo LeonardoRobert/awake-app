@@ -4,12 +4,11 @@ import '../services/metas_service.dart';
 
 final metasServiceProvider = Provider<MetasService>((ref) => MetasService());
 
-final metaDoMesProvider = FutureProvider.autoDispose<MetaMensal>((ref) {
-  return ref.watch(metasServiceProvider).fetchMetaDoMes();
-});
-
-final streakAtualProvider = FutureProvider.autoDispose<int>((ref) {
-  return ref.watch(metasServiceProvider).fetchStreakAtual();
+/// Meta do mes + sequencia de trofeus, buscados juntos numa unica
+/// chamada ao banco.
+final metasResumoProvider =
+    FutureProvider.autoDispose<({MetaMensal meta, int streak})>((ref) {
+  return ref.watch(metasServiceProvider).fetchResumo();
 });
 
 final rankingDoMesProvider = FutureProvider.autoDispose<List<RankingEntry>>((ref) {

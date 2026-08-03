@@ -30,7 +30,7 @@ class LeaderDashboardView extends ConsumerWidget {
         ref.invalidate(rankingPorCategoriaProvider);
       },
       child: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
         children: [
           Text('Participação por grupo (este mês)',
               style: Theme.of(context).textTheme.titleLarge),

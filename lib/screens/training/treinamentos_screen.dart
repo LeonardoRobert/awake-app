@@ -44,6 +44,7 @@ class TreinamentosScreen extends ConsumerWidget {
               return const Center(child: Text('Nenhum treinamento publicado ainda.'));
             }
             return ListView.builder(
+              padding: const EdgeInsets.only(bottom: 90),
               itemCount: lista.length,
               itemBuilder: (context, index) {
                 final t = lista[index];

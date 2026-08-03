@@ -56,6 +56,7 @@ class ProfileModel {
   final UserRole papel;
   final String qrCodeId;
   final bool ativo;
+  final bool tourVisto;
   final DateTime criadoEm;
 
   ProfileModel({
@@ -70,6 +71,7 @@ class ProfileModel {
     required this.papel,
     required this.qrCodeId,
     required this.ativo,
+    this.tourVisto = false,
     required this.criadoEm,
   });
 
@@ -91,6 +93,7 @@ class ProfileModel {
       papel: userRoleFromString(map['papel'] as String? ?? 'membro'),
       qrCodeId: map['qr_code_id'] as String,
       ativo: map['ativo'] as bool? ?? true,
+      tourVisto: map['tour_visto'] as bool? ?? false,
       criadoEm: DateTime.parse(map['criado_em'] as String),
     );
   }

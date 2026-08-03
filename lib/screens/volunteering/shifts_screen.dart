@@ -90,6 +90,7 @@ class _ShiftsScreenState extends ConsumerState<ShiftsScreen> {
             final orderedDateKeys = byDate.keys.toList()..sort();
 
             return ListView.builder(
+              padding: const EdgeInsets.only(bottom: 90),
               itemCount: orderedDateKeys.length,
               itemBuilder: (context, index) {
                 final dateKey = orderedDateKeys[index];

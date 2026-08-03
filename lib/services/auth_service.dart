@@ -56,6 +56,32 @@ class AuthService {
     return _client.auth.signOut();
   }
 
+  /// Manda um e-mail de recuperacao de senha. `redirectTo` deve ser uma
+  /// URL cadastrada em Authentication > URL Configuration no Supabase.
+  Future<void> resetPassword(String email, {required String redirectTo}) {
+    return _client.auth.resetPasswordForEmail(email, redirectTo: redirectTo);
+  }
+
+  /// Usada na tela de "definir nova senha", depois que a pessoa clica no
+  /// link do e-mail de recuperacao.
+  Future<void> updatePassword(String novaSenha) {
+    return _client.auth.updateUser(UserAttributes(password: novaSenha));
+  }
+
+  /// Atualiza campos do proprio perfil (usado na tela de Editar Perfil).
+  Future<void> updateProfileFields(Map<String, dynamic> campos) async {
+    final user = currentUser;
+    if (user == null) return;
+    await _client.from('profiles').update(campos).eq('id', user.id);
+  }
+
+  /// Marca que a pessoa ja viu o tour de introducao (nao aparece de novo).
+  Future<void> marcarTourVisto() async {
+    final user = currentUser;
+    if (user == null) return;
+    await _client.from('profiles').update({'tour_visto': true}).eq('id', user.id);
+  }
+
   /// Valida o codigo de lider no backend e, se correto, eleva o papel
   /// do usuario atual para 'lider'. Lanca excecao se o codigo for invalido
   /// (ver supabase/schema.sql: solicitar_papel_lider).

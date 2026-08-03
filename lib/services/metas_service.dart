@@ -6,83 +6,21 @@ class MetasService {
 
   String _d(DateTime d) => d.toIso8601String().split('T').first;
 
-  /// Conta check-ins por categoria (ebd/gc/comunhao/laje/outro em eventos,
-  /// e escala em inscricoes com check-in feito) para um usuario, num
-  /// intervalo de datas.
-  Future<Map<String, int>> _contarNoPeriodo(
-    String userId,
-    DateTime inicio,
-    DateTime fim,
-  ) async {
-    final presencas = await _client
-        .from('presencas_eventos')
-        .select('eventos(tipo)')
-        .eq('user_id', userId)
-        .gte('data_ocorrencia', _d(inicio))
-        .lte('data_ocorrencia', _d(fim));
+  /// Busca meta do mes atual + sequencia de trofeus numa unica chamada
+  /// ao banco (antes eram ate 24 consultas separadas).
+  Future<({MetaMensal meta, int streak})> fetchResumo() async {
+    final data = await _client.rpc('metas_resumo');
+    final row = (data as List).first as Map<String, dynamic>;
 
-    final counts = <String, int>{'ebd': 0, 'gc': 0, 'comunhao': 0, 'laje': 0, 'outro': 0};
-    for (final row in (presencas as List)) {
-      final map = row as Map<String, dynamic>;
-      final tipo = (map['eventos'] as Map<String, dynamic>?)?['tipo'] as String? ?? 'outro';
-      counts[tipo] = (counts[tipo] ?? 0) + 1;
-    }
-
-    final escalas = await _client
-        .from('inscricoes')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('status', 'check_in_feito')
-        .gte('data_ocorrencia', _d(inicio))
-        .lte('data_ocorrencia', _d(fim));
-    counts['escala'] = (escalas as List).length;
-
-    return counts;
-  }
-
-  Future<MetaMensal> fetchMetaDoMes([DateTime? referencia]) async {
-    final userId = _client.auth.currentUser!.id;
-    final ref = referencia ?? DateTime.now();
-    final inicio = DateTime(ref.year, ref.month, 1);
-    final fim = DateTime(ref.year, ref.month + 1, 0);
-    final counts = await _contarNoPeriodo(userId, inicio, fim);
-
-    return MetaMensal(
-      mes: ref,
-      ebd: counts['ebd'] ?? 0,
-      gc: counts['gc'] ?? 0,
-      comunhao: counts['comunhao'] ?? 0,
-      escala: counts['escala'] ?? 0,
+    final meta = MetaMensal(
+      mes: DateTime.now(),
+      ebd: row['mes_ebd'] as int,
+      gc: row['mes_gc'] as int,
+      comunhao: row['mes_comunhao'] as int,
+      escala: row['mes_escala'] as int,
     );
-  }
 
-  /// Quantos meses CHEIOS e consecutivos (contando pra tras a partir do
-  /// mes passado -- o mes atual ainda esta em andamento, entao nao entra
-  /// nessa conta) a pessoa cumpriu a meta completa.
-  Future<int> fetchStreakAtual() async {
-    final userId = _client.auth.currentUser!.id;
-    final now = DateTime.now();
-    var streak = 0;
-
-    for (var i = 1; i <= 12; i++) {
-      final ref = DateTime(now.year, now.month - i, 1);
-      final inicio = DateTime(ref.year, ref.month, 1);
-      final fim = DateTime(ref.year, ref.month + 1, 0);
-      final counts = await _contarNoPeriodo(userId, inicio, fim);
-
-      final cumpriu = (counts['ebd'] ?? 0) >= MetasConfig.ebd &&
-          (counts['gc'] ?? 0) >= MetasConfig.gc &&
-          (counts['comunhao'] ?? 0) >= MetasConfig.comunhao &&
-          (counts['escala'] ?? 0) >= MetasConfig.escala;
-
-      if (cumpriu) {
-        streak++;
-      } else {
-        break;
-      }
-    }
-
-    return streak;
+    return (meta: meta, streak: row['streak'] as int);
   }
 
   /// Ranking de participacao do mes atual -- uso do lider.

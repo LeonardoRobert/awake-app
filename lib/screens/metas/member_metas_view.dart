@@ -9,38 +9,32 @@ class MemberMetasView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final metaAsync = ref.watch(metaDoMesProvider);
-    final streakAsync = ref.watch(streakAtualProvider);
+    final resumoAsync = ref.watch(metasResumoProvider);
 
     return RefreshIndicator(
       onRefresh: () async {
-        ref.invalidate(metaDoMesProvider);
-        ref.invalidate(streakAtualProvider);
+        ref.invalidate(metasResumoProvider);
       },
-      child: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Text('Minha meta do mês', style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 12),
-          metaAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (err, _) => Text('Erro ao carregar: $err'),
-            data: (meta) => _ChecklistCard(meta: meta),
-          ),
-          const SizedBox(height: 32),
-          Text('Meus troféus', style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 4),
-          Text(
-            'Um troféu novo a cada tanto de meses seguidos com a meta cumprida',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          const SizedBox(height: 12),
-          streakAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (err, _) => Text('Erro ao carregar: $err'),
-            data: (streak) => _TrophyGallery(streakMeses: streak),
-          ),
-        ],
+      child: resumoAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (err, _) => Center(child: Text('Erro ao carregar: $err')),
+        data: (resumo) => ListView(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+          children: [
+            Text('Minha meta do mês', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 12),
+            _ChecklistCard(meta: resumo.meta),
+            const SizedBox(height: 32),
+            Text('Meus troféus', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 4),
+            Text(
+              'Um troféu novo a cada tanto de meses seguidos com a meta cumprida',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 12),
+            _TrophyGallery(streakMeses: resumo.streak),
+          ],
+        ),
       ),
     );
   }

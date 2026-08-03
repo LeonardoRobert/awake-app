@@ -2,18 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import '../../models/event_model.dart';
 import '../../providers/checkin_provider.dart';
 import '../../providers/event_provider.dart';
 import '../../providers/shift_provider.dart';
 import '../../widgets/awake_app_bar.dart';
 
-/// Tela de check-in do lider: escaneia o QR Code do membro primeiro,
-/// depois escolhe a qual atividade de hoje (evento do calendario ou
-/// escala de voluntariado) aquele check-in se refere.
-///
-/// Eventos do dia aparecem todos (nao exigem inscricao previa). Ja as
-/// escalas so mostram as que a PESSOA ESCANEADA especificamente esta
-/// inscrita naquele dia -- nao todas as escalas do dia.
+/// Tipos de evento que realmente contam pro check-in / metas. Eventos
+/// com tipo "outro" ou "laje" (ex: Celebracao) nao aparecem na lista de
+/// check-in -- so o que a gente rastreia de verdade.
+const _tiposCheckinValidos = {EventTipo.ebd, EventTipo.gc, EventTipo.comunhao};
+
+/// Tela de check-in do lider: escaneia o QR Code do membro (ou busca
+/// pelo nome, se a camera nao conseguir ler), depois escolhe a qual
+/// atividade de hoje aquele check-in se refere.
 class CheckinScannerScreen extends ConsumerStatefulWidget {
   const CheckinScannerScreen({super.key});
 
@@ -27,37 +29,55 @@ class _CheckinScannerScreenState extends ConsumerState<CheckinScannerScreen> {
   String? _feedback;
   bool _feedbackIsError = false;
 
-  // null enquanto ainda esta buscando; lista vazia = pessoa nao esta
-  // inscrita em nenhuma escala hoje.
-  List<String>? _escalaIdsPermitidos;
+  List<String>? _escalaIdsDisponiveis;
+  List<String>? _eventoIdsConfirmados;
 
-  Future<void> _onDetect(BarcodeCapture capture) async {
+  Future<void> _selecionarPessoa(String qrCodeId) async {
     if (_qrCodeId != null) return;
-    final code = capture.barcodes.first.rawValue;
-    if (code == null) return;
 
     setState(() {
-      _qrCodeId = code;
+      _qrCodeId = qrCodeId;
       _feedback = null;
-      _escalaIdsPermitidos = null; // dispara o "carregando" no picker
+      _escalaIdsDisponiveis = null;
+      _eventoIdsConfirmados = null;
     });
 
     final hoje = DateTime.now();
-    final ids = await ref
+    final status = await ref
         .read(checkinServiceProvider)
-        .fetchEscalaIdsInscritosNaData(code, DateTime(hoje.year, hoje.month, hoje.day));
+        .fetchStatusDoDia(qrCodeId, DateTime(hoje.year, hoje.month, hoje.day));
 
-    if (mounted && _qrCodeId == code) {
-      setState(() => _escalaIdsPermitidos = ids);
+    if (mounted && _qrCodeId == qrCodeId) {
+      setState(() {
+        _escalaIdsDisponiveis = status.escalaIds;
+        _eventoIdsConfirmados = status.eventoIdsConfirmados;
+      });
     }
+  }
+
+  Future<void> _onDetect(BarcodeCapture capture) async {
+    final code = capture.barcodes.first.rawValue;
+    if (code == null) return;
+    _selecionarPessoa(code);
   }
 
   void _cancelarSelecao() {
     setState(() {
       _qrCodeId = null;
       _feedback = null;
-      _escalaIdsPermitidos = null;
+      _escalaIdsDisponiveis = null;
+      _eventoIdsConfirmados = null;
     });
+  }
+
+  Future<void> _buscarPorNome() async {
+    final resultado = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => const _BuscaPorNomeDialog(),
+    );
+    if (resultado != null) {
+      _selecionarPessoa(resultado);
+    }
   }
 
   Future<void> _confirmarCheckin(_CheckinTarget target) async {
@@ -91,7 +111,8 @@ class _CheckinScannerScreenState extends ConsumerState<CheckinScannerScreen> {
       setState(() {
         _processing = false;
         _qrCodeId = null;
-        _escalaIdsPermitidos = null;
+        _escalaIdsDisponiveis = null;
+        _eventoIdsConfirmados = null;
       });
     }
   }
@@ -105,33 +126,34 @@ class _CheckinScannerScreenState extends ConsumerState<CheckinScannerScreen> {
     final todayStart = DateTime(now.year, now.month, now.day);
     final todayEnd = todayStart.add(const Duration(hours: 23, minutes: 59));
 
+    final carregandoStatus = _escalaIdsDisponiveis == null || _eventoIdsConfirmados == null;
+
     final targets = <_CheckinTarget>[];
 
-    // Eventos: todos os de hoje aparecem, sem restricao (nao exigem
-    // inscricao previa).
-    eventsAsync.whenData((events) {
-      for (final event in events) {
-        for (final occ in event.occurrencesBetween(todayStart, todayEnd)) {
-          targets.add(_CheckinTarget(
-            tipo: _TipoAlvo.evento,
-            id: event.id,
-            label: event.titulo,
-            horario: DateFormat('HH:mm').format(occ),
-            data: DateTime(occ.year, occ.month, occ.day),
-          ));
-        }
-      }
-    });
+    if (!carregandoStatus) {
+      eventsAsync.whenData((events) {
+        for (final event in events) {
+          if (!_tiposCheckinValidos.contains(event.tipo)) continue;
+          if (_eventoIdsConfirmados!.contains(event.id)) continue;
 
-    // Escalas: so entram na lista se a pessoa escaneada estiver
-    // inscrita nelas (filtro por _escalaIdsPermitidos).
-    if (_escalaIdsPermitidos != null) {
+          for (final occ in event.occurrencesBetween(todayStart, todayEnd)) {
+            targets.add(_CheckinTarget(
+              tipo: _TipoAlvo.evento,
+              id: event.id,
+              label: event.titulo,
+              horario: DateFormat('HH:mm').format(occ),
+              data: DateTime(occ.year, occ.month, occ.day),
+            ));
+          }
+        }
+      });
+
       shiftsAsync.whenData((shifts) {
         for (final occ in shifts) {
           final mesmoDia = occ.data.year == todayStart.year &&
               occ.data.month == todayStart.month &&
               occ.data.day == todayStart.day;
-          final inscritoNessaEscala = _escalaIdsPermitidos!.contains(occ.shift.id);
+          final inscritoNessaEscala = _escalaIdsDisponiveis!.contains(occ.shift.id);
           if (mesmoDia && inscritoNessaEscala) {
             targets.add(_CheckinTarget(
               tipo: _TipoAlvo.escala,
@@ -148,7 +170,17 @@ class _CheckinScannerScreenState extends ConsumerState<CheckinScannerScreen> {
     targets.sort((a, b) => a.horario.compareTo(b.horario));
 
     return Scaffold(
-      appBar: const AwakeAppBar(title: 'Check-in'),
+      appBar: AwakeAppBar(
+        title: 'Check-in',
+        actions: [
+          if (_qrCodeId == null)
+            IconButton(
+              icon: const Icon(Icons.search),
+              tooltip: 'Buscar por nome',
+              onPressed: _buscarPorNome,
+            ),
+        ],
+      ),
       body: Stack(
         children: [
           if (_qrCodeId == null) MobileScanner(onDetect: _onDetect),
@@ -156,7 +188,7 @@ class _CheckinScannerScreenState extends ConsumerState<CheckinScannerScreen> {
             _TargetPicker(
               targets: targets,
               processing: _processing,
-              carregandoEscalas: _escalaIdsPermitidos == null,
+              carregando: carregandoStatus,
               onCancel: _cancelarSelecao,
               onSelect: _confirmarCheckin,
             ),
@@ -175,6 +207,79 @@ class _CheckinScannerScreenState extends ConsumerState<CheckinScannerScreen> {
             ),
         ],
       ),
+    );
+  }
+}
+
+class _BuscaPorNomeDialog extends ConsumerStatefulWidget {
+  const _BuscaPorNomeDialog();
+
+  @override
+  ConsumerState<_BuscaPorNomeDialog> createState() => _BuscaPorNomeDialogState();
+}
+
+class _BuscaPorNomeDialogState extends ConsumerState<_BuscaPorNomeDialog> {
+  final _controller = TextEditingController();
+  List<({String nome, String qrCodeId})> _resultados = [];
+  bool _buscando = false;
+
+  Future<void> _buscar(String texto) async {
+    setState(() => _buscando = true);
+    final resultados = await ref.read(checkinServiceProvider).buscarPorNome(texto);
+    if (mounted) {
+      setState(() {
+        _resultados = resultados;
+        _buscando = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Buscar por nome'),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _controller,
+              autofocus: true,
+              decoration: const InputDecoration(hintText: 'Digite o nome...'),
+              onChanged: _buscar,
+            ),
+            const SizedBox(height: 12),
+            if (_buscando) const CircularProgressIndicator(),
+            if (!_buscando && _resultados.isEmpty && _controller.text.length >= 2)
+              const Padding(
+                padding: EdgeInsets.all(16),
+                child: Text('Ninguém encontrado.'),
+              ),
+            if (!_buscando)
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 300),
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: _resultados.length,
+                  itemBuilder: (context, index) {
+                    final pessoa = _resultados[index];
+                    return ListTile(
+                      title: Text(pessoa.nome),
+                      onTap: () => Navigator.of(context).pop(pessoa.qrCodeId),
+                    );
+                  },
+                ),
+              ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        ),
+      ],
     );
   }
 }
@@ -200,14 +305,14 @@ class _CheckinTarget {
 class _TargetPicker extends StatelessWidget {
   final List<_CheckinTarget> targets;
   final bool processing;
-  final bool carregandoEscalas;
+  final bool carregando;
   final VoidCallback onCancel;
   final void Function(_CheckinTarget) onSelect;
 
   const _TargetPicker({
     required this.targets,
     required this.processing,
-    required this.carregandoEscalas,
+    required this.carregando,
     required this.onCancel,
     required this.onSelect,
   });
@@ -223,21 +328,21 @@ class _TargetPicker extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.all(16),
               child: Text(
-                'QR Code lido. Para qual atividade de hoje é o check-in?',
+                'Para qual atividade de hoje é o check-in?',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
             ),
-            if (processing || carregandoEscalas) const LinearProgressIndicator(),
+            if (processing || carregando) const LinearProgressIndicator(),
             Expanded(
-              child: carregandoEscalas
+              child: carregando
                   ? const Center(child: CircularProgressIndicator())
                   : targets.isEmpty
                       ? const Center(
                           child: Padding(
                             padding: EdgeInsets.all(24),
                             child: Text(
-                              'Nenhum evento hoje, e essa pessoa não está inscrita '
-                              'em nenhuma escala hoje.',
+                              'Nada pendente hoje pra essa pessoa (ou já foi tudo '
+                              'confirmado).',
                               textAlign: TextAlign.center,
                             ),
                           ),
@@ -267,7 +372,7 @@ class _TargetPicker extends StatelessWidget {
               padding: const EdgeInsets.all(16),
               child: OutlinedButton(
                 onPressed: processing ? null : onCancel,
-                child: const Text('Cancelar / escanear outro QR Code'),
+                child: const Text('Cancelar / escanear outra pessoa'),
               ),
             ),
           ],

@@ -6,6 +6,7 @@ import '../../models/profile_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/notification_service.dart';
 import '../../widgets/awake_app_bar.dart';
+import 'editar_perfil_screen.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -23,7 +24,7 @@ class ProfileScreen extends ConsumerWidget {
         data: (profile) {
           if (profile == null) return const Center(child: Text('Perfil nao encontrado.'));
           return ListView(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 96),
             children: [
               Row(
                 children: [
@@ -48,6 +49,15 @@ class ProfileScreen extends ConsumerWidget {
                           style: Theme.of(context).textTheme.bodyMedium,
                         ),
                       ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.edit_outlined),
+                    tooltip: 'Editar perfil',
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => EditarPerfilScreen(perfil: profile),
+                      ),
                     ),
                   ),
                 ],
@@ -77,6 +87,12 @@ class ProfileScreen extends ConsumerWidget {
               ),
               ListTile(
                 contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.home_outlined),
+                title: const Text('Endereço'),
+                subtitle: Text(profile.endereco ?? 'Não informado'),
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.groups_outlined),
                 title: const Text('Grupo'),
                 subtitle: Text(profile.categoria?.label ?? 'Não definido'),
@@ -88,6 +104,14 @@ class ProfileScreen extends ConsumerWidget {
                 title: const Text('Treinamentos'),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => context.push('/treinamentos'),
+              ),
+              const Divider(),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.privacy_tip_outlined),
+                title: const Text('Termos de uso e privacidade'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/termos'),
               ),
               const Divider(),
               ListTile(

@@ -6,7 +6,9 @@ import '../models/shift_model.dart';
 import '../models/treinamento_model.dart';
 import '../providers/auth_provider.dart';
 import '../screens/auth/login_screen.dart';
+import '../screens/auth/redefinir_senha_screen.dart';
 import '../screens/auth/signup_screen.dart';
+import '../screens/auth/termos_screen.dart';
 import '../screens/calendar/event_detail_screen.dart';
 import '../screens/calendar/event_form_screen.dart';
 import '../screens/home/home_shell.dart';
@@ -35,15 +37,23 @@ final routerProvider = Provider<GoRouter>((ref) {
       final session = ref.read(authStateProvider).value?.session;
       final isLoggedIn = session != null;
       final isAuthRoute = state.matchedLocation == '/login' ||
-          state.matchedLocation == '/cadastro';
+          state.matchedLocation == '/cadastro' ||
+          state.matchedLocation == '/redefinir-senha';
 
       if (!isLoggedIn && !isAuthRoute) return '/login';
-      if (isLoggedIn && isAuthRoute) return '/';
+      if (isLoggedIn && isAuthRoute && state.matchedLocation != '/redefinir-senha') {
+        return '/';
+      }
       return null;
     },
     routes: [
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(path: '/cadastro', builder: (context, state) => const SignupScreen()),
+      GoRoute(
+        path: '/redefinir-senha',
+        builder: (context, state) => const RedefinirSenhaScreen(),
+      ),
+      GoRoute(path: '/termos', builder: (context, state) => const TermosScreen()),
       GoRoute(path: '/', builder: (context, state) => const HomeShell()),
       GoRoute(
         path: '/eventos/novo',

@@ -132,6 +132,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                   child: listaExibida.isEmpty
                       ? const Center(child: Text('Nenhum evento neste período.'))
                       : ListView.builder(
+                          padding: const EdgeInsets.only(bottom: 90),
                           itemCount: listaExibida.length,
                           itemBuilder: (context, index) {
                             final occ = listaExibida[index];
