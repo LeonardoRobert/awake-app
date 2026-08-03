@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../models/profile_model.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/theme_provider.dart';
 import '../../services/notification_service.dart';
 import '../../widgets/awake_app_bar.dart';
 import 'editar_perfil_screen.dart';
@@ -15,6 +16,7 @@ class ProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final profileAsync = ref.watch(currentProfileProvider);
     final email = ref.watch(authServiceProvider).currentUserEmail;
+    final themeMode = ref.watch(themeModeProvider);
 
     return Scaffold(
       appBar: const AwakeAppBar(title: 'Perfil'),
@@ -96,6 +98,19 @@ class ProfileScreen extends ConsumerWidget {
                 leading: const Icon(Icons.groups_outlined),
                 title: const Text('Grupo'),
                 subtitle: Text(profile.categoria?.label ?? 'Não definido'),
+              ),
+              const Divider(),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                secondary: Icon(
+                  themeMode == ThemeMode.dark ? Icons.dark_mode : Icons.light_mode_outlined,
+                ),
+                title: const Text('Modo escuro'),
+                value: themeMode == ThemeMode.dark,
+                onChanged: (ativado) {
+                  ref.read(themeModeProvider.notifier).state =
+                      ativado ? ThemeMode.dark : ThemeMode.light;
+                },
               ),
               const Divider(),
               ListTile(

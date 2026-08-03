@@ -6,6 +6,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/router.dart';
 import 'core/theme/app_theme.dart';
+import 'providers/theme_provider.dart';
 import 'services/notification_service.dart';
 import 'services/supabase_service.dart';
 
@@ -51,13 +52,16 @@ class _AwakeAppState extends ConsumerState<AwakeApp> {
   @override
   Widget build(BuildContext context) {
     final router = ref.watch(routerProvider);
+    final themeMode = ref.watch(themeModeProvider);
 
     return MaterialApp.router(
       title: 'Awake',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
-      themeMode: ThemeMode.system,
+      // Controlado manualmente pela pessoa (ver Perfil), nao segue mais
+      // o tema do sistema sozinho.
+      themeMode: themeMode,
       routerConfig: router,
     );
   }

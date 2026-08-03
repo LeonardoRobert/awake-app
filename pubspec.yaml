@@ -58,11 +58,11 @@ flutter:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/images/awake_icon_square.png"
+  image_path: "assets/images/awake_icon_square_v2.png"
   adaptive_icon_background: "#0C192E"
-  adaptive_icon_foreground: "assets/images/awake_flame_white.png"
+  adaptive_icon_foreground: "assets/images/awake_flame_adaptive.png"
   web:
     generate: true
-    image_path: "assets/images/awake_icon_square.png"
+    image_path: "assets/images/awake_icon_square_v2.png"
     background_color: "#0C192E"
     theme_color: "#0C192E"

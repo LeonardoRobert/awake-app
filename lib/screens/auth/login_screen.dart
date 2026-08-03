@@ -67,9 +67,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (email == null || email.isEmpty || !email.contains('@')) return;
 
     try {
-      // Sempre redireciona pra versao web do app (mesmo se o pedido foi
-      // feito no Android) -- e o caminho mais simples de garantir que o
-      // link do e-mail abre um lugar que sabe processar a redefinicao.
       // Essa URL precisa estar cadastrada no Supabase em
       // Authentication > URL Configuration > Redirect URLs.
       const redirectTo = 'https://leonardorobert.github.io/awake-app/app/';
@@ -77,7 +74,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Se esse e-mail estiver cadastrado, você vai receber um link pra redefinir a senha.'),
+            content: Text(
+              'Se esse e-mail estiver cadastrado, você vai receber um link pra redefinir a senha.',
+            ),
           ),
         );
       }
@@ -92,84 +91,91 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AwakeColors.navy,
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Image.asset(
-                    'assets/images/awake_logo_white.png',
-                    height: 56,
-                  ),
-                  const SizedBox(height: 40),
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: AwakeColors.offWhite,
-                      borderRadius: BorderRadius.circular(16),
+    // Essa tela tem visual fixo (fundo navy + caixinha branca) por
+    // design de marca -- forçamos o tema claro aqui dentro pra ela
+    // nunca ficar ilegível se o celular estiver no modo escuro.
+    return Theme(
+      data: AppTheme.light(),
+      child: Scaffold(
+        backgroundColor: AwakeColors.navy,
+        body: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Image.asset(
+                      'assets/images/awake_logo_white.png',
+                      height: 56,
                     ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        TextFormField(
-                          controller: _emailController,
-                          decoration: const InputDecoration(labelText: 'E-mail'),
-                          keyboardType: TextInputType.emailAddress,
-                          validator: (value) => (value == null || !value.contains('@'))
-                              ? 'Informe um e-mail válido'
-                              : null,
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _senhaController,
-                          decoration: const InputDecoration(labelText: 'Senha'),
-                          obscureText: true,
-                          validator: (value) => (value == null || value.length < 6)
-                              ? 'Mínimo de 6 caracteres'
-                              : null,
-                        ),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton(
-                            onPressed: _loading ? null : _esqueciSenha,
-                            child: const Text('Esqueci minha senha'),
+                    const SizedBox(height: 40),
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: AwakeColors.offWhite,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          TextFormField(
+                            controller: _emailController,
+                            decoration: const InputDecoration(labelText: 'E-mail'),
+                            keyboardType: TextInputType.emailAddress,
+                            validator: (value) => (value == null || !value.contains('@'))
+                                ? 'Informe um e-mail válido'
+                                : null,
                           ),
-                        ),
-                        if (_errorMessage != null) ...[
-                          const SizedBox(height: 4),
-                          Text(_errorMessage!, style: const TextStyle(color: Colors.red)),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _senhaController,
+                            decoration: const InputDecoration(labelText: 'Senha'),
+                            obscureText: true,
+                            validator: (value) => (value == null || value.length < 6)
+                                ? 'Mínimo de 6 caracteres'
+                                : null,
+                          ),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: _loading ? null : _esqueciSenha,
+                              style: TextButton.styleFrom(foregroundColor: AwakeColors.navy),
+                              child: const Text('Esqueci minha senha'),
+                            ),
+                          ),
+                          if (_errorMessage != null) ...[
+                            const SizedBox(height: 4),
+                            Text(_errorMessage!, style: const TextStyle(color: Colors.red)),
+                          ],
+                          const SizedBox(height: 12),
+                          FilledButton(
+                            onPressed: _loading ? null : _submit,
+                            child: _loading
+                                ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : const Text('Entrar'),
+                          ),
                         ],
-                        const SizedBox(height: 12),
-                        FilledButton(
-                          onPressed: _loading ? null : _submit,
-                          child: _loading
-                              ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
-                                )
-                              : const Text('Entrar'),
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  Center(
-                    child: TextButton(
-                      onPressed: () => context.go('/cadastro'),
-                      style: TextButton.styleFrom(foregroundColor: AwakeColors.offWhite),
-                      child: const Text('Não tem conta? Cadastre-se'),
+                    const SizedBox(height: 16),
+                    Center(
+                      child: TextButton(
+                        onPressed: () => context.go('/cadastro'),
+                        style: TextButton.styleFrom(foregroundColor: AwakeColors.offWhite),
+                        child: const Text('Não tem conta? Cadastre-se'),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
