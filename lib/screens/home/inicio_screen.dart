@@ -8,10 +8,11 @@ import '../../models/event_model.dart';
 import '../../providers/event_provider.dart';
 import '../../widgets/awake_app_bar.dart';
 
-/// Tela de Inicio: mostra so os eventos de SEXTA-FEIRA marcados como
+/// Tela de Inicio: mostra os eventos de SEXTA-FEIRA marcados como
 /// "Exclusivo Awake" (nao eventos gerais da igreja), dos proximos 7
-/// dias -- com a arte do evento (se tiver) e um botao pra compartilhar
-/// no WhatsApp.
+/// dias, e logo abaixo os eventos GERAIS da igreja (Shallom) da mesma
+/// semana -- ambos com a arte do evento (se tiver) e o botao de
+/// compartilhar.
 class InicioScreen extends ConsumerWidget {
   const InicioScreen({super.key});
 
@@ -31,16 +32,28 @@ class InicioScreen extends ConsumerWidget {
             final hoje = DateTime(now.year, now.month, now.day);
             final fim = hoje.add(const Duration(days: 6));
 
-            final eventosDaSemana = <_OcorrenciaAwake>[];
+            // Eventos exclusivos da Awake -- so sexta-feira.
+            final eventosAwake = <_Ocorrencia>[];
             for (final event in events) {
               if (!event.exclusivoAwake) continue;
               for (final occ in event.occurrencesBetween(hoje, fim)) {
                 if (occ.weekday == DateTime.friday) {
-                  eventosDaSemana.add(_OcorrenciaAwake(event, occ));
+                  eventosAwake.add(_Ocorrencia(event, occ));
                 }
               }
             }
-            eventosDaSemana.sort((a, b) => a.data.compareTo(b.data));
+            eventosAwake.sort(_comparar);
+
+            // Eventos gerais da igreja (Shallom) -- qualquer dia da
+            // semana, nao so sexta.
+            final eventosShallom = <_Ocorrencia>[];
+            for (final event in events) {
+              if (event.exclusivoAwake) continue;
+              for (final occ in event.occurrencesBetween(hoje, fim)) {
+                eventosShallom.add(_Ocorrencia(event, occ));
+              }
+            }
+            eventosShallom.sort(_comparar);
 
             return ListView(
               padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
@@ -48,7 +61,7 @@ class InicioScreen extends ConsumerWidget {
                 Text('Essa semana na Awake! 🔥',
                     style: Theme.of(context).textTheme.headlineSmall),
                 const SizedBox(height: 20),
-                if (eventosDaSemana.isEmpty)
+                if (eventosAwake.isEmpty)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 32),
                     child: Center(
@@ -60,7 +73,24 @@ class InicioScreen extends ConsumerWidget {
                     ),
                   )
                 else
-                  ...eventosDaSemana.map((oc) => _EventoAwakeCard(ocorrencia: oc)),
+                  ...eventosAwake.map((oc) => _EventoCard(ocorrencia: oc)),
+                const SizedBox(height: 12),
+                Text('Essa semana na Shallom',
+                    style: Theme.of(context).textTheme.headlineSmall),
+                const SizedBox(height: 20),
+                if (eventosShallom.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 32),
+                    child: Center(
+                      child: Text(
+                        'Nenhum evento geral da igreja essa semana.',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  )
+                else
+                  ...eventosShallom.map((oc) => _EventoCard(ocorrencia: oc)),
               ],
             );
           },
@@ -70,21 +100,37 @@ class InicioScreen extends ConsumerWidget {
   }
 }
 
-class _OcorrenciaAwake {
+class _Ocorrencia {
   final EventModel event;
   final DateTime data;
-  _OcorrenciaAwake(this.event, this.data);
+  _Ocorrencia(this.event, this.data);
 }
 
-class _EventoAwakeCard extends StatefulWidget {
-  final _OcorrenciaAwake ocorrencia;
-  const _EventoAwakeCard({required this.ocorrencia});
+/// Mesma regra de desempate do calendario: Genesis, Next, One.
+int _prioridadeGrupo(EventModel evento) {
+  final grupos = evento.publicoAlvo;
+  if (grupos == null || grupos.isEmpty) return 99;
+  if (grupos.contains('genesis')) return 0;
+  if (grupos.contains('next')) return 1;
+  if (grupos.contains('one')) return 2;
+  return 99;
+}
+
+int _comparar(_Ocorrencia a, _Ocorrencia b) {
+  final porData = a.data.compareTo(b.data);
+  if (porData != 0) return porData;
+  return _prioridadeGrupo(a.event).compareTo(_prioridadeGrupo(b.event));
+}
+
+class _EventoCard extends StatefulWidget {
+  final _Ocorrencia ocorrencia;
+  const _EventoCard({required this.ocorrencia});
 
   @override
-  State<_EventoAwakeCard> createState() => _EventoAwakeCardState();
+  State<_EventoCard> createState() => _EventoCardState();
 }
 
-class _EventoAwakeCardState extends State<_EventoAwakeCard> {
+class _EventoCardState extends State<_EventoCard> {
   bool _compartilhando = false;
   bool _compartilhandoInstagram = false;
 

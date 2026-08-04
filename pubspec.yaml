@@ -11,6 +11,9 @@ dependencies:
     sdk: flutter
   cupertino_icons: ^1.0.6
 
+  # Guarda a preferencia de modo escuro no proprio aparelho
+  shared_preferences: ^2.3.2
+
   # Traduz os componentes visuais do proprio Flutter (calendario/seletor
   # de data e hora, botoes padrao, etc) para portugues
   flutter_localizations:

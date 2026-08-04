@@ -70,7 +70,13 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
               listaExibida = byDay[_dateOnly(_diaSelecionado!)] ?? [];
               tituloLista = 'Eventos de ${DateFormat("dd/MM (EEEE)", 'pt_BR').format(_diaSelecionado!)}';
             }
-            listaExibida.sort((a, b) => a.data.compareTo(b.data));
+            listaExibida.sort((a, b) {
+              final porData = a.data.compareTo(b.data);
+              if (porData != 0) return porData;
+              // Em caso de empate (mesmo dia e horario), ordena por
+              // grupo: Genesis, depois Next, depois One.
+              return _prioridadeGrupo(a.event).compareTo(_prioridadeGrupo(b.event));
+            });
 
             return Column(
               children: [
@@ -189,4 +195,16 @@ class _Occurrence {
   final EventModel event;
   final DateTime data;
   _Occurrence(this.event, this.data);
+}
+
+/// Ordem de desempate quando dois eventos caem no mesmo dia e horario:
+/// Genesis primeiro, depois Next, depois One. Eventos "para todos" (sem
+/// publico_alvo definido) ficam por ultimo nesse desempate.
+int _prioridadeGrupo(EventModel evento) {
+  final grupos = evento.publicoAlvo;
+  if (grupos == null || grupos.isEmpty) return 99;
+  if (grupos.contains('genesis')) return 0;
+  if (grupos.contains('next')) return 1;
+  if (grupos.contains('one')) return 2;
+  return 99;
 }

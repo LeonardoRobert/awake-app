@@ -106,6 +106,15 @@ class _ShiftsScreenState extends ConsumerState<ShiftsScreen> {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (index > 0)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Divider(
+                          height: 24,
+                          thickness: 1,
+                          color: Theme.of(context).colorScheme.outlineVariant,
+                        ),
+                      ),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 20, 16, 4),
                       child: Text(

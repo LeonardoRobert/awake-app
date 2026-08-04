@@ -108,8 +108,7 @@ class ProfileScreen extends ConsumerWidget {
                 title: const Text('Modo escuro'),
                 value: themeMode == ThemeMode.dark,
                 onChanged: (ativado) {
-                  ref.read(themeModeProvider.notifier).state =
-                      ativado ? ThemeMode.dark : ThemeMode.light;
+                  ref.read(themeModeProvider.notifier).definir(ativado);
                 },
               ),
               const Divider(),

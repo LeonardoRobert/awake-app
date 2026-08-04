@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-enum EventTipo { ebd, gc, comunhao, laje, cultoCelebracao, cultoFamilia, outro }
+enum EventTipo { ebd, gc, comunhao, laje, cultoCelebracao, cultoFamilia, embaixadoresMensageiras, outro }
 
 EventTipo eventTipoFromString(String? value) {
   switch (value) {
@@ -16,6 +16,8 @@ EventTipo eventTipoFromString(String? value) {
       return EventTipo.cultoCelebracao;
     case 'culto_familia':
       return EventTipo.cultoFamilia;
+    case 'embaixadores_mensageiras':
+      return EventTipo.embaixadoresMensageiras;
     default:
       return EventTipo.outro;
   }
@@ -37,6 +39,8 @@ extension EventTipoDb on EventTipo {
         return 'culto_celebracao';
       case EventTipo.cultoFamilia:
         return 'culto_familia';
+      case EventTipo.embaixadoresMensageiras:
+        return 'embaixadores_mensageiras';
       case EventTipo.outro:
         return 'outro';
     }
@@ -58,6 +62,8 @@ extension EventTipoLabel on EventTipo {
         return 'Culto de Celebração';
       case EventTipo.cultoFamilia:
         return 'Culto da Família';
+      case EventTipo.embaixadoresMensageiras:
+        return 'Embaixadores e Mensageiras';
       case EventTipo.outro:
         return 'Outro';
     }
@@ -74,6 +80,8 @@ extension EventTipoColor on EventTipo {
         return const Color(0xFF1D4ED8); // azul escuro
       case EventTipo.cultoFamilia:
         return const Color(0xFF60A5FA); // azul claro
+      case EventTipo.embaixadoresMensageiras:
+        return const Color(0xFF8D6E63); // marrom
       case EventTipo.gc:
         return const Color(0xFF4ADE80); // verde claro
       case EventTipo.comunhao:

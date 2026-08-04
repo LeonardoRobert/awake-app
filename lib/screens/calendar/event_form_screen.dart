@@ -246,7 +246,17 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
                           ),
                         ))
                     .toList(),
-                onChanged: (v) => setState(() => _tipo = v ?? EventTipo.outro),
+                onChanged: (v) => setState(() {
+                  _tipo = v ?? EventTipo.outro;
+                  // Esse tipo normalmente e so pro Genesis -- ja deixa
+                  // pre-selecionado, mas a pessoa ainda pode mudar.
+                  if (_tipo == EventTipo.embaixadoresMensageiras) {
+                    _paraTodos = false;
+                    _categoriasSelecionadas
+                      ..clear()
+                      ..add('genesis');
+                  }
+                }),
               ),
               const SizedBox(height: 16),
               TextFormField(
