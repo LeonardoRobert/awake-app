@@ -86,6 +86,7 @@ class _EventoAwakeCard extends StatefulWidget {
 
 class _EventoAwakeCardState extends State<_EventoAwakeCard> {
   bool _compartilhando = false;
+  bool _compartilhandoInstagram = false;
 
   String _montarTexto(EventModel evento, DateTime data) {
     final dataFormatada =
@@ -136,6 +137,34 @@ class _EventoAwakeCardState extends State<_EventoAwakeCard> {
       }
     } finally {
       if (mounted) setState(() => _compartilhando = false);
+    }
+  }
+
+  /// Abre o menu de compartilhar do celular so com a foto formato Story
+  /// -- dentro do Instagram, a pessoa encontra a opcao "Adicionar ao
+  /// Stories" no proprio menu dele. Nao existe um jeito universal
+  /// (Android + iPhone + navegador) de pular direto pro Stories sem
+  /// passar por esse menu.
+  Future<void> _compartilharNoInstagram() async {
+    final evento = widget.ocorrencia.event;
+    if (evento.fotoStoryUrl == null) return;
+
+    setState(() => _compartilhandoInstagram = true);
+    try {
+      final resposta = await http.get(Uri.parse(evento.fotoStoryUrl!));
+      final arquivo = XFile.fromData(
+        resposta.bodyBytes,
+        name: 'story-awake.jpg',
+        mimeType: 'image/jpeg',
+      );
+      await Share.shareXFiles([arquivo]);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Não foi possível compartilhar: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _compartilhandoInstagram = false);
     }
   }
 
@@ -196,6 +225,22 @@ class _EventoAwakeCardState extends State<_EventoAwakeCard> {
                   : const Icon(Icons.share),
               label: Text(_compartilhando ? 'Preparando...' : 'Compartilhar no WhatsApp'),
             ),
+            if (evento.fotoStoryUrl != null) ...[
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: _compartilhandoInstagram ? null : _compartilharNoInstagram,
+                icon: _compartilhandoInstagram
+                    ? const SizedBox(
+                        height: 16,
+                        width: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.camera_alt_outlined),
+                label: Text(
+                  _compartilhandoInstagram ? 'Preparando...' : 'Adicionar ao Instagram',
+                ),
+              ),
+            ],
           ],
         ),
       ),

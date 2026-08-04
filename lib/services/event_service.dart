@@ -39,14 +39,17 @@ class EventService {
     });
   }
 
-  /// Envia a foto do evento pro Storage e devolve a URL publica dela.
+  /// Envia uma foto do evento pro Storage e devolve a URL publica dela.
+  /// `sufixo` diferencia a foto de capa da foto formato Story.
   Future<String> uploadFotoEvento(
     Uint8List bytes,
     String nomeArquivo,
-    String eventoId,
-  ) async {
+    String eventoId, {
+    String sufixo = 'capa',
+  }) async {
     final extensao = nomeArquivo.contains('.') ? nomeArquivo.split('.').last : 'jpg';
-    final caminho = 'eventos/$eventoId-${DateTime.now().millisecondsSinceEpoch}.$extensao';
+    final caminho =
+        'eventos/$eventoId-$sufixo-${DateTime.now().millisecondsSinceEpoch}.$extensao';
 
     await _client.storage.from('eventos-fotos').uploadBinary(
           caminho,

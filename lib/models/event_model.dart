@@ -101,6 +101,10 @@ class EventModel {
   final List<DateTime> excecoes;
   final String? fotoUrl;
 
+  /// Segunda foto opcional, em formato vertical (Story), usada no
+  /// botao "Adicionar ao Instagram".
+  final String? fotoStoryUrl;
+
   /// true = evento exclusivo da Awake (aparece na tela de Inicio se for
   /// sexta-feira). false = evento geral da igreja.
   final bool exclusivoAwake;
@@ -119,6 +123,7 @@ class EventModel {
     this.publicoAlvo,
     this.excecoes = const [],
     this.fotoUrl,
+    this.fotoStoryUrl,
     this.exclusivoAwake = false,
   });
 
@@ -144,6 +149,7 @@ class EventModel {
               .toList() ??
           const [],
       fotoUrl: map['foto_url'] as String?,
+      fotoStoryUrl: map['foto_story_url'] as String?,
       exclusivoAwake: map['exclusivo_awake'] as bool? ?? false,
     );
   }
@@ -161,6 +167,7 @@ class EventModel {
       'tipo': tipo.valorBanco,
       'publico_alvo': publicoAlvo,
       'foto_url': fotoUrl,
+      'foto_story_url': fotoStoryUrl,
       'exclusivo_awake': exclusivoAwake,
     };
   }

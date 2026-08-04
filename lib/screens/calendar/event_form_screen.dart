@@ -31,11 +31,18 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
   final Set<String> _categoriasSelecionadas = {};
   bool _exclusivoAwake = false;
 
-  // Foto opcional
+  // Foto opcional (capa, formato paisagem)
   Uint8List? _novaFotoBytes;
   String? _novaFotoNome;
   String? _fotoUrlExistente;
   bool _removerFoto = false;
+
+  // Segunda foto opcional (formato Story, vertical) -- usada no botao
+  // "Adicionar ao Instagram"
+  Uint8List? _novaFotoStoryBytes;
+  String? _novaFotoStoryNome;
+  String? _fotoStoryUrlExistente;
+  bool _removerFotoStory = false;
 
   bool get _isEdicao => widget.eventoParaEditar != null;
 
@@ -51,6 +58,7 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
     _recorrenciaFim = evento?.recorrenciaFim;
     _tipo = evento?.tipo ?? EventTipo.outro;
     _fotoUrlExistente = evento?.fotoUrl;
+    _fotoStoryUrlExistente = evento?.fotoStoryUrl;
     _exclusivoAwake = evento?.exclusivoAwake ?? false;
 
     final publicoExistente = evento?.publicoAlvo;
@@ -91,28 +99,40 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
     if (date != null) setState(() => _recorrenciaFim = date);
   }
 
-  Future<void> _escolherFoto() async {
+  Future<void> _escolherFoto({required bool ehStory}) async {
     final picker = ImagePicker();
     final arquivo = await picker.pickImage(
       source: ImageSource.gallery,
-      maxWidth: 1600,
+      maxWidth: ehStory ? 1080 : 1600,
       imageQuality: 85,
     );
     if (arquivo == null) return;
 
     final bytes = await arquivo.readAsBytes();
     setState(() {
-      _novaFotoBytes = bytes;
-      _novaFotoNome = arquivo.name;
-      _removerFoto = false;
+      if (ehStory) {
+        _novaFotoStoryBytes = bytes;
+        _novaFotoStoryNome = arquivo.name;
+        _removerFotoStory = false;
+      } else {
+        _novaFotoBytes = bytes;
+        _novaFotoNome = arquivo.name;
+        _removerFoto = false;
+      }
     });
   }
 
-  void _removerFotoSelecionada() {
+  void _removerFotoSelecionada({required bool ehStory}) {
     setState(() {
-      _novaFotoBytes = null;
-      _novaFotoNome = null;
-      _removerFoto = true;
+      if (ehStory) {
+        _novaFotoStoryBytes = null;
+        _novaFotoStoryNome = null;
+        _removerFotoStory = true;
+      } else {
+        _novaFotoBytes = null;
+        _novaFotoNome = null;
+        _removerFoto = true;
+      }
     });
   }
 
@@ -143,6 +163,16 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
         fotoUrl = await service.uploadFotoEvento(_novaFotoBytes!, _novaFotoNome!, eventoId);
       }
 
+      String? fotoStoryUrl = _removerFotoStory ? null : _fotoStoryUrlExistente;
+      if (_novaFotoStoryBytes != null && _novaFotoStoryNome != null) {
+        fotoStoryUrl = await service.uploadFotoEvento(
+          _novaFotoStoryBytes!,
+          _novaFotoStoryNome!,
+          eventoId,
+          sufixo: 'story',
+        );
+      }
+
       final novoEvento = EventModel(
         id: eventoId,
         titulo: _tituloController.text.trim(),
@@ -154,6 +184,7 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
         tipo: _tipo,
         publicoAlvo: _paraTodos ? null : _categoriasSelecionadas.toList(),
         fotoUrl: fotoUrl,
+        fotoStoryUrl: fotoStoryUrl,
         exclusivoAwake: _exclusivoAwake,
       );
 
@@ -312,8 +343,36 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
               const SizedBox(height: 24),
               const Text('Foto do evento (opcional)',
                   style: TextStyle(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 4),
+              Text(
+                'Aparece na tela de Início e nos detalhes do evento',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
               const SizedBox(height: 8),
-              _buildFotoPreview(),
+              _buildFotoPreview(
+                ehStory: false,
+                aspectRatio: 16 / 9,
+                novaFotoBytes: _novaFotoBytes,
+                fotoUrlExistente: _fotoUrlExistente,
+                removida: _removerFoto,
+              ),
+              const SizedBox(height: 24),
+              const Text('Foto formato Story (opcional)',
+                  style: TextStyle(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 4),
+              Text(
+                'Vertical (tipo Stories do Instagram/WhatsApp) — usada no botão '
+                '"Adicionar ao Instagram"',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 8),
+              _buildFotoPreview(
+                ehStory: true,
+                aspectRatio: 9 / 16,
+                novaFotoBytes: _novaFotoStoryBytes,
+                fotoUrlExistente: _fotoStoryUrlExistente,
+                removida: _removerFotoStory,
+              ),
               const SizedBox(height: 24),
               FilledButton(
                 onPressed: _saving ? null : _submit,
@@ -329,13 +388,19 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
     );
   }
 
-  Widget _buildFotoPreview() {
-    final temFotoNova = _novaFotoBytes != null;
-    final temFotoExistente = _fotoUrlExistente != null && !_removerFoto && !temFotoNova;
+  Widget _buildFotoPreview({
+    required bool ehStory,
+    required double aspectRatio,
+    required Uint8List? novaFotoBytes,
+    required String? fotoUrlExistente,
+    required bool removida,
+  }) {
+    final temFotoNova = novaFotoBytes != null;
+    final temFotoExistente = fotoUrlExistente != null && !removida && !temFotoNova;
 
     if (!temFotoNova && !temFotoExistente) {
       return OutlinedButton.icon(
-        onPressed: _escolherFoto,
+        onPressed: () => _escolherFoto(ehStory: ehStory),
         icon: const Icon(Icons.add_photo_alternate_outlined),
         label: const Text('Adicionar foto'),
       );
@@ -344,13 +409,18 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: AspectRatio(
-            aspectRatio: 16 / 9,
-            child: temFotoNova
-                ? Image.memory(_novaFotoBytes!, fit: BoxFit.cover)
-                : Image.network(_fotoUrlExistente!, fit: BoxFit.cover),
+        Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: ehStory ? 200 : double.infinity),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: AspectRatio(
+                aspectRatio: aspectRatio,
+                child: temFotoNova
+                    ? Image.memory(novaFotoBytes, fit: BoxFit.cover)
+                    : Image.network(fotoUrlExistente!, fit: BoxFit.cover),
+              ),
+            ),
           ),
         ),
         const SizedBox(height: 8),
@@ -358,7 +428,7 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
           children: [
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: _escolherFoto,
+                onPressed: () => _escolherFoto(ehStory: ehStory),
                 icon: const Icon(Icons.edit),
                 label: const Text('Trocar'),
               ),
@@ -367,7 +437,7 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
             Expanded(
               child: OutlinedButton.icon(
                 style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
-                onPressed: _removerFotoSelecionada,
+                onPressed: () => _removerFotoSelecionada(ehStory: ehStory),
                 icon: const Icon(Icons.delete_outline),
                 label: const Text('Remover'),
               ),
