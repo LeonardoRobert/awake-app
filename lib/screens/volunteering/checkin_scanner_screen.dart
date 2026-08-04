@@ -172,6 +172,7 @@ class _CheckinScannerScreenState extends ConsumerState<CheckinScannerScreen> {
     return Scaffold(
       appBar: AwakeAppBar(
         title: 'Check-in',
+        showQrButton: false,
         actions: [
           if (_qrCodeId == null)
             IconButton(
@@ -236,42 +237,59 @@ class _BuscaPorNomeDialogState extends ConsumerState<_BuscaPorNomeDialog> {
 
   @override
   Widget build(BuildContext context) {
+    // Altura maxima do resultado se adapta ao tamanho da tela (em vez de
+    // um numero fixo), pra nao estourar quando o teclado abrir.
+    final alturaMaximaLista = MediaQuery.of(context).size.height * 0.3;
+
     return AlertDialog(
       title: const Text('Buscar por nome'),
       content: SizedBox(
         width: double.maxFinite,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: _controller,
-              autofocus: true,
-              decoration: const InputDecoration(hintText: 'Digite o nome...'),
-              onChanged: _buscar,
-            ),
-            const SizedBox(height: 12),
-            if (_buscando) const CircularProgressIndicator(),
-            if (!_buscando && _resultados.isEmpty && _controller.text.length >= 2)
-              const Padding(
-                padding: EdgeInsets.all(16),
-                child: Text('Ninguém encontrado.'),
+        // SingleChildScrollView garante que, mesmo se sobrar pouco espaco
+        // (teclado aberto, celular pequeno), o conteudo rola em vez de
+        // estourar a tela.
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: _controller,
+                autofocus: true,
+                decoration: const InputDecoration(hintText: 'Digite o nome...'),
+                onChanged: _buscar,
               ),
-            if (!_buscando)
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 300),
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: _resultados.length,
-                  itemBuilder: (context, index) {
-                    final pessoa = _resultados[index];
-                    return ListTile(
-                      title: Text(pessoa.nome),
-                      onTap: () => Navigator.of(context).pop(pessoa.qrCodeId),
-                    );
-                  },
+              const SizedBox(height: 12),
+              if (_buscando)
+                const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: CircularProgressIndicator(),
                 ),
-              ),
-          ],
+              if (!_buscando && _resultados.isEmpty && _controller.text.length >= 2)
+                const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Text('Ninguém encontrado.'),
+                ),
+              if (!_buscando && _resultados.isNotEmpty)
+                ConstrainedBox(
+                  constraints: BoxConstraints(maxHeight: alturaMaximaLista),
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    // A rolagem de verdade fica por conta do
+                    // SingleChildScrollView de fora -- isso evita
+                    // "briga" entre duas rolagens aninhadas.
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: _resultados.length,
+                    itemBuilder: (context, index) {
+                      final pessoa = _resultados[index];
+                      return ListTile(
+                        title: Text(pessoa.nome),
+                        onTap: () => Navigator.of(context).pop(pessoa.qrCodeId),
+                      );
+                    },
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
       actions: [

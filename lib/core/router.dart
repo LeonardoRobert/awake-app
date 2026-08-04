@@ -17,6 +17,7 @@ import '../screens/training/treinamento_form_screen.dart';
 import '../screens/training/treinamentos_screen.dart';
 import '../screens/volunteering/checkin_scanner_screen.dart';
 import '../screens/volunteering/leader_shift_detail_screen.dart';
+import '../screens/volunteering/my_qrcode_screen.dart';
 import '../screens/volunteering/shift_form_screen.dart';
 
 /// Ouvinte simples que permite ao GoRouter reagir a mudancas
@@ -82,6 +83,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/checkin',
         builder: (context, state) => const CheckinScannerScreen(),
+      ),
+      GoRoute(
+        path: '/meu-qrcode',
+        builder: (context, state) => const MyQrCodeScreen(),
       ),
       GoRoute(
         path: '/treinamentos',

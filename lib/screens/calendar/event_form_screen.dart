@@ -1,11 +1,13 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:uuid/uuid.dart';
 import '../../models/event_model.dart';
 import '../../providers/event_provider.dart';
 
 /// Tela de criacao/edicao de evento, disponivel apenas para lider/admin.
-/// Se `eventoParaEditar` for informado, a tela entra em modo de edicao.
 class EventFormScreen extends ConsumerStatefulWidget {
   final EventModel? eventoParaEditar;
   const EventFormScreen({super.key, this.eventoParaEditar});
@@ -25,11 +27,15 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
   EventTipo _tipo = EventTipo.outro;
   bool _saving = false;
 
-  // Publico-alvo: se _paraTodos for true, publico_alvo fica null (todos
-  // veem). Caso contrario, so quem for de uma das categorias marcadas
-  // aqui consegue ver o evento (lideres/admin sempre veem tudo).
   bool _paraTodos = true;
   final Set<String> _categoriasSelecionadas = {};
+  bool _exclusivoAwake = false;
+
+  // Foto opcional
+  Uint8List? _novaFotoBytes;
+  String? _novaFotoNome;
+  String? _fotoUrlExistente;
+  bool _removerFoto = false;
 
   bool get _isEdicao => widget.eventoParaEditar != null;
 
@@ -44,6 +50,8 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
     _recorrente = evento?.recorrente ?? false;
     _recorrenciaFim = evento?.recorrenciaFim;
     _tipo = evento?.tipo ?? EventTipo.outro;
+    _fotoUrlExistente = evento?.fotoUrl;
+    _exclusivoAwake = evento?.exclusivoAwake ?? false;
 
     final publicoExistente = evento?.publicoAlvo;
     if (publicoExistente != null && publicoExistente.isNotEmpty) {
@@ -83,6 +91,31 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
     if (date != null) setState(() => _recorrenciaFim = date);
   }
 
+  Future<void> _escolherFoto() async {
+    final picker = ImagePicker();
+    final arquivo = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1600,
+      imageQuality: 85,
+    );
+    if (arquivo == null) return;
+
+    final bytes = await arquivo.readAsBytes();
+    setState(() {
+      _novaFotoBytes = bytes;
+      _novaFotoNome = arquivo.name;
+      _removerFoto = false;
+    });
+  }
+
+  void _removerFotoSelecionada() {
+    setState(() {
+      _novaFotoBytes = null;
+      _novaFotoNome = null;
+      _removerFoto = true;
+    });
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate() || _dataInicio == null) {
       if (_dataInicio == null) {
@@ -101,20 +134,29 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
 
     setState(() => _saving = true);
 
-    final novoEvento = EventModel(
-      id: widget.eventoParaEditar?.id ?? '',
-      titulo: _tituloController.text.trim(),
-      descricao: _descricaoController.text.trim(),
-      dataInicio: _dataInicio!,
-      local: _localController.text.trim(),
-      recorrente: _recorrente,
-      recorrenciaFim: _recorrente ? _recorrenciaFim : null,
-      tipo: _tipo,
-      publicoAlvo: _paraTodos ? null : _categoriasSelecionadas.toList(),
-    );
-
     try {
       final service = ref.read(eventServiceProvider);
+      final eventoId = widget.eventoParaEditar?.id ?? const Uuid().v4();
+
+      String? fotoUrl = _removerFoto ? null : _fotoUrlExistente;
+      if (_novaFotoBytes != null && _novaFotoNome != null) {
+        fotoUrl = await service.uploadFotoEvento(_novaFotoBytes!, _novaFotoNome!, eventoId);
+      }
+
+      final novoEvento = EventModel(
+        id: eventoId,
+        titulo: _tituloController.text.trim(),
+        descricao: _descricaoController.text.trim(),
+        dataInicio: _dataInicio!,
+        local: _localController.text.trim(),
+        recorrente: _recorrente,
+        recorrenciaFim: _recorrente ? _recorrenciaFim : null,
+        tipo: _tipo,
+        publicoAlvo: _paraTodos ? null : _categoriasSelecionadas.toList(),
+        fotoUrl: fotoUrl,
+        exclusivoAwake: _exclusivoAwake,
+      );
+
       if (_isEdicao) {
         await service.update(widget.eventoParaEditar!.id, novoEvento);
       } else {
@@ -154,10 +196,24 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
                 value: _tipo,
                 decoration: const InputDecoration(
                   labelText: 'Tipo de evento',
-                  helperText: 'Usado para contar as metas mensais dos membros',
+                  helperText: 'Define a cor no calendário e conta para as metas mensais',
                 ),
                 items: EventTipo.values
-                    .map((t) => DropdownMenuItem(value: t, child: Text(t.label)))
+                    .map((t) => DropdownMenuItem(
+                          value: t,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 12,
+                                height: 12,
+                                decoration: BoxDecoration(color: t.cor, shape: BoxShape.circle),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(t.label),
+                            ],
+                          ),
+                        ))
                     .toList(),
                 onChanged: (v) => setState(() => _tipo = v ?? EventTipo.outro),
               ),
@@ -215,6 +271,22 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
                 ),
               ],
               const SizedBox(height: 24),
+              const Text('Esse evento é...', style: TextStyle(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 4),
+              Text(
+                'Eventos exclusivos da Awake às sextas aparecem na tela de Início',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 8),
+              SegmentedButton<bool>(
+                segments: const [
+                  ButtonSegment(value: false, label: Text('Da igreja')),
+                  ButtonSegment(value: true, label: Text('Exclusivo Awake')),
+                ],
+                selected: {_exclusivoAwake},
+                onSelectionChanged: (value) => setState(() => _exclusivoAwake = value.first),
+              ),
+              const SizedBox(height: 24),
               const Text('Quem pode ver esse evento?',
                   style: TextStyle(fontWeight: FontWeight.w600)),
               const SizedBox(height: 8),
@@ -236,13 +308,12 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
                     _grupoChip('one', 'One'),
                   ],
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'Líderes e admin sempre veem todos os eventos, independente '
-                  'do que for marcado aqui.',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
               ],
+              const SizedBox(height: 24),
+              const Text('Foto do evento (opcional)',
+                  style: TextStyle(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              _buildFotoPreview(),
               const SizedBox(height: 24),
               FilledButton(
                 onPressed: _saving ? null : _submit,
@@ -255,6 +326,55 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildFotoPreview() {
+    final temFotoNova = _novaFotoBytes != null;
+    final temFotoExistente = _fotoUrlExistente != null && !_removerFoto && !temFotoNova;
+
+    if (!temFotoNova && !temFotoExistente) {
+      return OutlinedButton.icon(
+        onPressed: _escolherFoto,
+        icon: const Icon(Icons.add_photo_alternate_outlined),
+        label: const Text('Adicionar foto'),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: AspectRatio(
+            aspectRatio: 16 / 9,
+            child: temFotoNova
+                ? Image.memory(_novaFotoBytes!, fit: BoxFit.cover)
+                : Image.network(_fotoUrlExistente!, fit: BoxFit.cover),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _escolherFoto,
+                icon: const Icon(Icons.edit),
+                label: const Text('Trocar'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+                onPressed: _removerFotoSelecionada,
+                icon: const Icon(Icons.delete_outline),
+                label: const Text('Remover'),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 

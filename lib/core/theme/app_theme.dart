@@ -25,6 +25,17 @@ class AwakeColors {
 final _bodyFont = GoogleFonts.plusJakartaSansTextTheme();
 
 class AppTheme {
+  // Guarda o tema ja pronto na memoria depois da primeira vez -- antes,
+  // toda vez que QUALQUER coisa no app mudava (nao so o tema em si), o
+  // Flutter recalculava fontes e cores do zero de novo, deixando a
+  // troca de modo claro/escuro (e o app em geral) mais lento, ainda
+  // mais em telas com muito conteudo como a Escala.
+  static ThemeData? _light;
+  static ThemeData? _dark;
+
+  static ThemeData light() => _light ??= _buildLight();
+  static ThemeData dark() => _dark ??= _buildDark();
+
   static TextTheme _buildTextTheme(Color textColor) {
     final base = _bodyFont.apply(bodyColor: textColor, displayColor: textColor);
     return base.copyWith(
@@ -46,7 +57,7 @@ class AppTheme {
     );
   }
 
-  static ThemeData light() {
+  static ThemeData _buildLight() {
     final colorScheme = const ColorScheme.light().copyWith(
       primary: AwakeColors.navy,
       onPrimary: AwakeColors.offWhite,
@@ -68,6 +79,7 @@ class AppTheme {
         backgroundColor: AwakeColors.navy,
         foregroundColor: AwakeColors.offWhite,
         elevation: 0,
+        surfaceTintColor: Colors.transparent,
         titleTextStyle: GoogleFonts.plusJakartaSans(
           color: AwakeColors.offWhite,
           fontSize: 18,
@@ -134,16 +146,28 @@ class AppTheme {
       ),
       cardTheme: CardThemeData(
         color: Colors.white,
-        elevation: 0,
+        elevation: 0.5,
+        shadowColor: Colors.black.withOpacity(0.08),
+        surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(14),
-          side: BorderSide(color: AwakeColors.lightBlueGrey),
+          side: BorderSide(color: AwakeColors.lightBlueGrey.withOpacity(0.5)),
         ),
+      ),
+      dialogTheme: DialogThemeData(
+        surfaceTintColor: Colors.transparent,
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      ),
+      popupMenuTheme: PopupMenuThemeData(
+        surfaceTintColor: Colors.transparent,
+        color: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }
 
-  static ThemeData dark() {
+  static ThemeData _buildDark() {
     final colorScheme = const ColorScheme.dark().copyWith(
       primary: AwakeColors.yellow,
       onPrimary: AwakeColors.navy,
@@ -165,6 +189,7 @@ class AppTheme {
         backgroundColor: AwakeColors.darkSurface,
         foregroundColor: AwakeColors.offWhite,
         elevation: 0,
+        surfaceTintColor: Colors.transparent,
         titleTextStyle: GoogleFonts.plusJakartaSans(
           color: AwakeColors.offWhite,
           fontSize: 18,
@@ -233,11 +258,23 @@ class AppTheme {
       ),
       cardTheme: CardThemeData(
         color: AwakeColors.darkSurface,
-        elevation: 0,
+        elevation: 0.5,
+        shadowColor: Colors.black.withOpacity(0.3),
+        surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(14),
-          side: const BorderSide(color: Color(0xFF3A4A6B)),
+          side: const BorderSide(color: Color(0xFF2A3B5C)),
         ),
+      ),
+      dialogTheme: DialogThemeData(
+        surfaceTintColor: Colors.transparent,
+        backgroundColor: AwakeColors.darkSurface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      ),
+      popupMenuTheme: PopupMenuThemeData(
+        surfaceTintColor: Colors.transparent,
+        color: AwakeColors.darkSurface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }

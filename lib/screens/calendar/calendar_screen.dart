@@ -17,10 +17,6 @@ class CalendarScreen extends ConsumerStatefulWidget {
 
 class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   DateTime _focusedDay = DateTime.now();
-
-  // null = mostrando a visao padrao "proximos 7 dias". Quando a pessoa
-  // toca num dia especifico do calendario, isso vira aquele dia, e a
-  // lista abaixo passa a mostrar so os eventos daquele dia.
   DateTime? _diaSelecionado;
 
   DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
@@ -62,7 +58,6 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
             final String tituloLista;
 
             if (_diaSelecionado == null) {
-              // Visao padrao: proximos 7 dias a partir de hoje
               final fim = hoje.add(const Duration(days: 6));
               listaExibida = [];
               for (final event in events) {
@@ -97,12 +92,32 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                   onPageChanged: (focused) {
                     setState(() => _focusedDay = focused);
                   },
-                  calendarStyle: const CalendarStyle(
-                    markersMaxCount: 3,
-                    markerDecoration: BoxDecoration(
-                      color: Color(0xFFFFD21F),
-                      shape: BoxShape.circle,
-                    ),
+                  calendarStyle: const CalendarStyle(),
+                  calendarBuilders: CalendarBuilders<_Occurrence>(
+                    // Uma bolinha colorida por TIPO de evento presente no
+                    // dia (nao uma por evento) -- assim um dia com 3
+                    // eventos do mesmo tipo mostra so 1 bolinha daquela
+                    // cor, e um dia variado mostra ate 4 cores diferentes.
+                    markerBuilder: (context, day, eventsForDay) {
+                      if (eventsForDay.isEmpty) return null;
+                      final cores = eventsForDay.map((e) => e.event.tipo.cor).toSet().toList();
+
+                      return Positioned(
+                        bottom: 4,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: cores
+                              .take(4)
+                              .map((cor) => Container(
+                                    width: 6,
+                                    height: 6,
+                                    margin: const EdgeInsets.symmetric(horizontal: 1.5),
+                                    decoration: BoxDecoration(color: cor, shape: BoxShape.circle),
+                                  ))
+                              .toList(),
+                        ),
+                      );
+                    },
                   ),
                   headerStyle: const HeaderStyle(
                     formatButtonVisible: false,
@@ -137,14 +152,22 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                           itemBuilder: (context, index) {
                             final occ = listaExibida[index];
                             return ListTile(
-                              leading: Icon(
-                                occ.event.recorrente ? Icons.repeat : Icons.event,
+                              leading: Container(
+                                width: 10,
+                                height: 10,
+                                decoration: BoxDecoration(
+                                  color: occ.event.tipo.cor,
+                                  shape: BoxShape.circle,
+                                ),
                               ),
                               title: Text(occ.event.titulo),
                               subtitle: Text(
                                 DateFormat("dd/MM (EEEE) HH:mm", 'pt_BR').format(occ.data) +
                                     (occ.event.local != null ? ' • ${occ.event.local}' : ''),
                               ),
+                              trailing: occ.event.recorrente
+                                  ? const Icon(Icons.repeat, size: 18)
+                                  : null,
                               onTap: () => context.push(
                                 '/eventos/${occ.event.id}',
                                 extra: occ.data,

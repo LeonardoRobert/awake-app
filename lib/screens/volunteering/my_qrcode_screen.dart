@@ -14,7 +14,7 @@ class MyQrCodeScreen extends ConsumerWidget {
     final profileAsync = ref.watch(currentProfileProvider);
 
     return Scaffold(
-      appBar: const AwakeAppBar(title: 'Meu QR Code'),
+      appBar: const AwakeAppBar(title: 'Meu QR Code', showQrButton: false),
       body: Center(
         child: profileAsync.when(
           loading: () => const CircularProgressIndicator(),

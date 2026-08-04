@@ -1,10 +1,46 @@
-enum EventTipo { ebd, gc, comunhao, laje, outro }
+import 'package:flutter/material.dart';
+
+enum EventTipo { ebd, gc, comunhao, laje, cultoCelebracao, cultoFamilia, outro }
 
 EventTipo eventTipoFromString(String? value) {
-  return EventTipo.values.firstWhere(
-    (e) => e.name == value,
-    orElse: () => EventTipo.outro,
-  );
+  switch (value) {
+    case 'ebd':
+      return EventTipo.ebd;
+    case 'gc':
+      return EventTipo.gc;
+    case 'comunhao':
+      return EventTipo.comunhao;
+    case 'laje':
+      return EventTipo.laje;
+    case 'culto_celebracao':
+      return EventTipo.cultoCelebracao;
+    case 'culto_familia':
+      return EventTipo.cultoFamilia;
+    default:
+      return EventTipo.outro;
+  }
+}
+
+extension EventTipoDb on EventTipo {
+  /// Valor exato salvo no banco (o enum do Postgres usa esses nomes).
+  String get valorBanco {
+    switch (this) {
+      case EventTipo.ebd:
+        return 'ebd';
+      case EventTipo.gc:
+        return 'gc';
+      case EventTipo.comunhao:
+        return 'comunhao';
+      case EventTipo.laje:
+        return 'laje';
+      case EventTipo.cultoCelebracao:
+        return 'culto_celebracao';
+      case EventTipo.cultoFamilia:
+        return 'culto_familia';
+      case EventTipo.outro:
+        return 'outro';
+    }
+  }
 }
 
 extension EventTipoLabel on EventTipo {
@@ -18,8 +54,34 @@ extension EventTipoLabel on EventTipo {
         return 'Comunhão';
       case EventTipo.laje:
         return 'Laje';
+      case EventTipo.cultoCelebracao:
+        return 'Culto de Celebração';
+      case EventTipo.cultoFamilia:
+        return 'Culto da Família';
       case EventTipo.outro:
         return 'Outro';
+    }
+  }
+}
+
+/// Cor da bolinha desse tipo de evento no calendario.
+extension EventTipoColor on EventTipo {
+  Color get cor {
+    switch (this) {
+      case EventTipo.ebd:
+        return const Color(0xFFFFD21F); // amarela
+      case EventTipo.cultoCelebracao:
+        return const Color(0xFF1D4ED8); // azul escuro
+      case EventTipo.cultoFamilia:
+        return const Color(0xFF60A5FA); // azul claro
+      case EventTipo.gc:
+        return const Color(0xFF4ADE80); // verde claro
+      case EventTipo.comunhao:
+        return const Color(0xFFEF4444); // vermelho
+      case EventTipo.laje:
+        return const Color(0xFFFB923C); // laranja
+      case EventTipo.outro:
+        return const Color(0xFFA78BFA); // roxo
     }
   }
 }
@@ -35,16 +97,13 @@ class EventModel {
   final bool recorrente;
   final DateTime? recorrenciaFim;
   final EventTipo tipo;
-
-  /// null = evento visivel para todos. Se preenchido, so aparece para
-  /// membros cuja categoria (genesis/next/one) estiver nessa lista.
-  /// Lideres e admin sempre veem tudo, independente disso (regra
-  /// aplicada no banco via RLS).
   final List<String>? publicoAlvo;
-
-  /// Datas puladas dessa recorrencia (ex: "so essa semana nao tem
-  /// esse evento", sem apagar a serie toda).
   final List<DateTime> excecoes;
+  final String? fotoUrl;
+
+  /// true = evento exclusivo da Awake (aparece na tela de Inicio se for
+  /// sexta-feira). false = evento geral da igreja.
+  final bool exclusivoAwake;
 
   EventModel({
     required this.id,
@@ -59,8 +118,9 @@ class EventModel {
     this.tipo = EventTipo.outro,
     this.publicoAlvo,
     this.excecoes = const [],
+    this.fotoUrl,
+    this.exclusivoAwake = false,
   });
-
 
   factory EventModel.fromMap(Map<String, dynamic> map) {
     return EventModel(
@@ -83,11 +143,14 @@ class EventModel {
               ?.map((e) => DateTime.parse(e.toString()))
               .toList() ??
           const [],
+      fotoUrl: map['foto_url'] as String?,
+      exclusivoAwake: map['exclusivo_awake'] as bool? ?? false,
     );
   }
 
   Map<String, dynamic> toInsertMap() {
     return {
+      'id': id,
       'titulo': titulo,
       'descricao': descricao,
       'data_inicio': dataInicio.toIso8601String(),
@@ -95,8 +158,10 @@ class EventModel {
       'local': local,
       'recorrente': recorrente,
       'recorrencia_fim': recorrenciaFim?.toIso8601String().split('T').first,
-      'tipo': tipo.name,
+      'tipo': tipo.valorBanco,
       'publico_alvo': publicoAlvo,
+      'foto_url': fotoUrl,
+      'exclusivo_awake': exclusivoAwake,
     };
   }
 

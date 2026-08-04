@@ -2,16 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../models/event_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/event_provider.dart';
 
 class EventDetailScreen extends ConsumerWidget {
   final String eventId;
-
-  /// Data especifica da ocorrencia que foi tocada (relevante so para
-  /// eventos recorrentes -- para eventos normais, e igual a dataInicio).
-  /// Se nao vier informado (ex: acesso direto por link), cai de volta
-  /// para a data original do evento.
   final DateTime? occurrenceDate;
 
   const EventDetailScreen({
@@ -40,11 +38,23 @@ class EventDetailScreen extends ConsumerWidget {
 
           final dataExibida = occurrenceDate ?? event.dataInicio;
 
-          return Padding(
+          return SingleChildScrollView(
             padding: const EdgeInsets.all(24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 12,
+                      height: 12,
+                      decoration: BoxDecoration(color: event.tipo.cor, shape: BoxShape.circle),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(event.tipo.label, style: Theme.of(context).textTheme.bodySmall),
+                  ],
+                ),
+                const SizedBox(height: 4),
                 Text(event.titulo, style: Theme.of(context).textTheme.headlineSmall),
                 const SizedBox(height: 8),
                 Row(
@@ -80,6 +90,50 @@ class EventDetailScreen extends ConsumerWidget {
                 if (event.descricao != null) ...[
                   const SizedBox(height: 16),
                   Text(event.descricao!),
+                ],
+                if (event.fotoUrl != null) ...[
+                  const SizedBox(height: 20),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.network(
+                      event.fotoUrl!,
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                      loadingBuilder: (context, child, progress) {
+                        if (progress == null) return child;
+                        return const AspectRatio(
+                          aspectRatio: 16 / 9,
+                          child: Center(child: CircularProgressIndicator()),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => launchUrl(
+                            Uri.parse(event.fotoUrl!),
+                            mode: LaunchMode.externalApplication,
+                          ),
+                          icon: const Icon(Icons.download_outlined),
+                          label: const Text('Baixar'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => Share.share(
+                            event.fotoUrl!,
+                            subject: event.titulo,
+                          ),
+                          icon: const Icon(Icons.share_outlined),
+                          label: const Text('Compartilhar'),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
                 if (isLider) ...[
                   const SizedBox(height: 24),
@@ -144,7 +198,6 @@ class EventDetailScreen extends ConsumerWidget {
         }
         return;
       }
-      // escopo == 'todas' -> segue pro fluxo normal de confirmação abaixo
     }
 
     final confirmou = await showDialog<bool>(
@@ -184,8 +237,6 @@ class EventDetailScreen extends ConsumerWidget {
     }
   }
 
-  /// Pergunta se e pra excluir so uma ocorrencia ou a serie toda.
-  /// Retorna 'uma', 'todas', ou null se cancelou.
   Future<String?> _perguntarEscopo(BuildContext context, String tipoItem) {
     return showDialog<String>(
       context: context,

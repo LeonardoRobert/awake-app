@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/event_model.dart';
 import 'supabase_service.dart';
 
@@ -35,5 +37,23 @@ class EventService {
       'p_evento_id': eventId,
       'p_data': data.toIso8601String().split('T').first,
     });
+  }
+
+  /// Envia a foto do evento pro Storage e devolve a URL publica dela.
+  Future<String> uploadFotoEvento(
+    Uint8List bytes,
+    String nomeArquivo,
+    String eventoId,
+  ) async {
+    final extensao = nomeArquivo.contains('.') ? nomeArquivo.split('.').last : 'jpg';
+    final caminho = 'eventos/$eventoId-${DateTime.now().millisecondsSinceEpoch}.$extensao';
+
+    await _client.storage.from('eventos-fotos').uploadBinary(
+          caminho,
+          bytes,
+          fileOptions: const FileOptions(upsert: true),
+        );
+
+    return _client.storage.from('eventos-fotos').getPublicUrl(caminho);
   }
 }

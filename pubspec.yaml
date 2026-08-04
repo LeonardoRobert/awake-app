@@ -11,6 +11,10 @@ dependencies:
     sdk: flutter
   cupertino_icons: ^1.0.6
 
+  # Foto de evento (escolher da galeria) e compartilhamento
+  image_picker: ^1.1.2
+  share_plus: ^10.1.2
+
   # Busca de endereco por CEP (cadastro e edicao de perfil)
   http: ^1.2.0
 
