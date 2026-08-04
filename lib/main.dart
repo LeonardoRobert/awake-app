@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -62,6 +63,16 @@ class _AwakeAppState extends ConsumerState<AwakeApp> {
       // Controlado manualmente pela pessoa (ver Perfil), nao segue mais
       // o tema do sistema sozinho.
       themeMode: themeMode,
+      // Sem isso, os componentes prontos do proprio Flutter (calendario
+      // do seletor de data, seletor de hora, etc) aparecem em ingles
+      // por padrao, mesmo com o resto do app em portugues.
+      locale: const Locale('pt', 'BR'),
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [Locale('pt', 'BR')],
       routerConfig: router,
     );
   }

@@ -188,8 +188,8 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
             children: [
               TextFormField(
                 controller: _tituloController,
-                decoration: const InputDecoration(labelText: 'Titulo'),
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Informe um titulo' : null,
+                decoration: const InputDecoration(labelText: 'Título'),
+                validator: (v) => (v == null || v.trim().isEmpty) ? 'Informe um título' : null,
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<EventTipo>(
@@ -220,7 +220,7 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
               const SizedBox(height: 16),
               TextFormField(
                 controller: _descricaoController,
-                decoration: const InputDecoration(labelText: 'Descricao'),
+                decoration: const InputDecoration(labelText: 'Descrição'),
                 maxLines: 3,
               ),
               const SizedBox(height: 16),

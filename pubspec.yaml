@@ -11,6 +11,14 @@ dependencies:
     sdk: flutter
   cupertino_icons: ^1.0.6
 
+  # Traduz os componentes visuais do proprio Flutter (calendario/seletor
+  # de data e hora, botoes padrao, etc) para portugues
+  flutter_localizations:
+    sdk: flutter
+
+  # Usado pra montar o arquivo de imagem na hora de compartilhar no WhatsApp
+  cross_file: ^0.3.4+2
+
   # Foto de evento (escolher da galeria) e compartilhamento
   image_picker: ^1.1.2
   share_plus: ^10.1.2
@@ -35,7 +43,7 @@ dependencies:
   onesignal_flutter: ^5.1.2
 
   # Utilidades
-  intl: ^0.19.0
+  intl: ^0.20.2
   table_calendar: ^3.1.2
   uuid: ^4.4.0
 
