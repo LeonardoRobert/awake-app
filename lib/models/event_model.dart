@@ -204,7 +204,9 @@ Color corDoEvento(EventTipo tipo, EventoEscopo escopo) {
       case EventTipo.laje:
         return const Color(0xFFA78BFA); // roxo
       default:
-        return const Color(0xFF60A5FA); // fallback (azul claro)
+        // "Outro" dentro do Awake -- usado por eventos como "Entre
+        // Elas" que nao se encaixam em GC/Comunhao/Laje.
+        return const Color(0xFFA78BFA); // roxo
     }
   }
 
@@ -257,6 +259,10 @@ class EventModel {
   final EventTipo tipo;
   final EventoEscopo escopo;
   final List<String>? publicoAlvo;
+  /// Filtro extra, so dentro do Awake: 'masculino' e/ou 'feminino'.
+  /// Se vazio/null, vale pra qualquer genero -- funciona JUNTO com
+  /// publicoAlvo (os dois precisam bater, nao um ou outro).
+  final List<String>? publicoGenero;
   final List<DateTime> excecoes;
   final String? fotoUrl;
   final String? fotoStoryUrl;
@@ -275,6 +281,7 @@ class EventModel {
     this.tipo = EventTipo.outro,
     this.escopo = EventoEscopo.igreja,
     this.publicoAlvo,
+    this.publicoGenero,
     this.excecoes = const [],
     this.fotoUrl,
     this.fotoStoryUrl,
@@ -302,6 +309,7 @@ class EventModel {
       tipo: eventTipoFromString(map['tipo'] as String?),
       escopo: eventoEscopoFromString(map['escopo'] as String?),
       publicoAlvo: (map['publico_alvo'] as List?)?.map((e) => e.toString()).toList(),
+      publicoGenero: (map['publico_genero'] as List?)?.map((e) => e.toString()).toList(),
       excecoes: (map['excecoes'] as List?)
               ?.map((e) => DateTime.parse(e.toString()))
               .toList() ??
@@ -325,6 +333,7 @@ class EventModel {
       'tipo': tipo.valorBanco,
       'escopo': escopo.valorBanco,
       'publico_alvo': publicoAlvo,
+      'publico_genero': publicoGenero,
       'foto_url': fotoUrl,
       'foto_story_url': fotoStoryUrl,
     };

@@ -17,6 +17,7 @@ class AuthService {
     required String nome,
     required DateTime dataNascimento,
     required EstadoCivil estadoCivil,
+    required Sexo sexo,
     String? telefone,
     String? endereco,
     String? tempoParticipacao,
@@ -40,6 +41,7 @@ class AuthService {
         'data_nascimento': dataNascimento.toIso8601String().split('T').first,
         'tempo_participacao': tempoParticipacao,
         'estado_civil': estadoCivil.name,
+        'sexo': sexo.name,
       }).eq('id', response.user!.id);
 
       for (final ministerio in ministerios) {

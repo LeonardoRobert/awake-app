@@ -110,6 +110,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   final _dataNascimentoController = TextEditingController();
   DateTime? _dataNascimento;
   EstadoCivil? _estadoCivil;
+  Sexo? _sexo;
   bool _temFilhos = false;
   final List<_FilhoRascunho> _filhos = [];
   final Set<String> _ministeriosSelecionados = {}; // 'awake' | 'homens' | 'mulheres'
@@ -265,6 +266,10 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         setState(() => _errorMessage = 'Informe seu estado civil.');
         return;
       }
+      if (_sexo == null) {
+        setState(() => _errorMessage = 'Selecione o sexo.');
+        return;
+      }
       if (_ministeriosSelecionados.isEmpty) {
         setState(() => _errorMessage = 'Selecione pelo menos um ministério.');
         return;
@@ -330,6 +335,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         nome: _nomeController.text.trim(),
         dataNascimento: _dataNascimento!,
         estadoCivil: _estadoCivil!,
+        sexo: _sexo!,
         telefone: _telefoneController.text.trim(),
         endereco: _enderecoCompleto,
         tempoParticipacao: resumoParticipacao,
@@ -512,6 +518,17 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
               DropdownMenuItem(value: EstadoCivil.outro, child: Text('Outro')),
             ],
             onChanged: (v) => setState(() => _estadoCivil = v),
+            validator: (v) => v == null ? 'Selecione uma opção' : null,
+          ),
+          const SizedBox(height: 16),
+          DropdownButtonFormField<Sexo>(
+            value: _sexo,
+            decoration: const InputDecoration(labelText: 'Sexo'),
+            items: const [
+              DropdownMenuItem(value: Sexo.masculino, child: Text('Masculino')),
+              DropdownMenuItem(value: Sexo.feminino, child: Text('Feminino')),
+            ],
+            onChanged: (v) => setState(() => _sexo = v),
             validator: (v) => v == null ? 'Selecione uma opção' : null,
           ),
           if (_categoriaPreview != null) ...[

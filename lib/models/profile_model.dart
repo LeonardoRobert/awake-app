@@ -23,6 +23,20 @@ EstadoCivil? estadoCivilFromString(String? value) {
   );
 }
 
+enum Sexo { masculino, feminino }
+
+Sexo? sexoFromString(String? value) {
+  if (value == null) return null;
+  return Sexo.values.firstWhere(
+    (e) => e.name == value,
+    orElse: () => Sexo.masculino,
+  );
+}
+
+extension SexoLabel on Sexo {
+  String get label => this == Sexo.masculino ? 'Masculino' : 'Feminino';
+}
+
 /// Genesis (13-16, solteiro/namorando), Next (17+, solteiro/namorando),
 /// One (noivo ou casado, qualquer idade). Calculado automaticamente
 /// no banco (ver supabase/schema.sql: calcular_categoria) — aqui so
@@ -85,6 +99,7 @@ class ProfileModel {
   final DateTime? dataNascimento;
   final String? tempoParticipacao;
   final EstadoCivil? estadoCivil;
+  final Sexo? sexo;
   final Categoria? categoria;
   final UserRole papel;
   final String qrCodeId;
@@ -101,6 +116,7 @@ class ProfileModel {
     this.dataNascimento,
     this.tempoParticipacao,
     this.estadoCivil,
+    this.sexo,
     this.categoria,
     required this.papel,
     required this.qrCodeId,
@@ -145,6 +161,7 @@ class ProfileModel {
           : null,
       tempoParticipacao: map['tempo_participacao'] as String?,
       estadoCivil: estadoCivilFromString(map['estado_civil'] as String?),
+      sexo: sexoFromString(map['sexo'] as String?),
       categoria: categoriaFromString(map['categoria'] as String?),
       papel: userRoleFromString(map['papel'] as String? ?? 'membro'),
       qrCodeId: map['qr_code_id'] as String,
@@ -163,6 +180,7 @@ class ProfileModel {
       'data_nascimento': dataNascimento?.toIso8601String(),
       'tempo_participacao': tempoParticipacao,
       'estado_civil': estadoCivil?.name,
+      'sexo': sexo?.name,
     };
   }
 }

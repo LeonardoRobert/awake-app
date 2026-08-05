@@ -40,6 +40,7 @@ class _EditarPerfilScreenState extends ConsumerState<EditarPerfilScreen> {
   late final TextEditingController _bairroController;
   late final TextEditingController _numeroController;
   EstadoCivil? _estadoCivil;
+  Sexo? _sexo;
   bool _buscandoCep = false;
   bool _saving = false;
 
@@ -48,6 +49,7 @@ class _EditarPerfilScreenState extends ConsumerState<EditarPerfilScreen> {
     super.initState();
     _telefoneController = TextEditingController(text: widget.perfil.telefone ?? '');
     _estadoCivil = widget.perfil.estadoCivil;
+    _sexo = widget.perfil.sexo;
 
     // O endereco fica guardado como um texto so ("Rua X, no Y - Bairro Z...").
     // Aqui deixamos os campos em branco pra pessoa preencher de novo se
@@ -81,6 +83,7 @@ class _EditarPerfilScreenState extends ConsumerState<EditarPerfilScreen> {
       final campos = <String, dynamic>{
         'telefone': _telefoneController.text.trim(),
         'estado_civil': _estadoCivil?.name,
+        'sexo': _sexo?.name,
       };
 
       if (_ruaController.text.trim().isNotEmpty) {
@@ -146,6 +149,16 @@ class _EditarPerfilScreenState extends ConsumerState<EditarPerfilScreen> {
                 DropdownMenuItem(value: EstadoCivil.outro, child: Text('Outro')),
               ],
               onChanged: (v) => setState(() => _estadoCivil = v),
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<Sexo>(
+              value: _sexo,
+              decoration: const InputDecoration(labelText: 'Sexo'),
+              items: const [
+                DropdownMenuItem(value: Sexo.masculino, child: Text('Masculino')),
+                DropdownMenuItem(value: Sexo.feminino, child: Text('Feminino')),
+              ],
+              onChanged: (v) => setState(() => _sexo = v),
             ),
             const SizedBox(height: 24),
             Text('Endereço', style: Theme.of(context).textTheme.titleSmall),

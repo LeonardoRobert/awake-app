@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../models/event_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/event_provider.dart';
+import '../../widgets/awake_app_bar.dart';
 
 class EventDetailScreen extends ConsumerWidget {
   final String eventId;
@@ -25,7 +26,7 @@ class EventDetailScreen extends ConsumerWidget {
     final isLider = profileAsync.value?.isLider ?? false;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Detalhes do evento')),
+      appBar: const AwakeAppBar(title: 'Detalhes do evento', showQrButton: false),
       body: eventsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (err, _) => Center(child: Text('Erro: $err')),

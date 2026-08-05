@@ -8,6 +8,7 @@ import '../../models/event_model.dart';
 import '../../models/profile_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/event_provider.dart';
+import '../../widgets/awake_app_bar.dart';
 
 /// Tela de criacao/edicao de evento.
 ///
@@ -38,6 +39,8 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
 
   bool _paraTodos = true;
   final Set<String> _categoriasSelecionadas = {};
+  bool _todosOsGeneros = true;
+  final Set<String> _generosSelecionados = {};
 
   Uint8List? _novaFotoBytes;
   String? _novaFotoNome;
@@ -71,6 +74,12 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
     if (publicoExistente != null && publicoExistente.isNotEmpty) {
       _paraTodos = false;
       _categoriasSelecionadas.addAll(publicoExistente);
+    }
+
+    final generoExistente = evento?.publicoGenero;
+    if (generoExistente != null && generoExistente.isNotEmpty) {
+      _todosOsGeneros = false;
+      _generosSelecionados.addAll(generoExistente);
     }
   }
 
@@ -180,6 +189,13 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
       );
       return;
     }
+    if (usaSubgrupos && !_todosOsGeneros && _generosSelecionados.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Selecione meninos e/ou meninas, ou marque "Meninos e meninas".')),
+      );
+      return;
+    }
 
     setState(() => _saving = true);
 
@@ -219,6 +235,8 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
         // Awake -- pros demais escopos, a visibilidade ja e cuidada
         // inteiramente pelo escopo em si.
         publicoAlvo: usaSubgrupos && !_paraTodos ? _categoriasSelecionadas.toList() : null,
+        publicoGenero:
+            usaSubgrupos && !_todosOsGeneros ? _generosSelecionados.toList() : null,
         fotoUrl: fotoUrl,
         fotoStoryUrl: fotoStoryUrl,
       );
@@ -256,7 +274,10 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
     };
 
     return Scaffold(
-      appBar: AppBar(title: Text(_isEdicao ? 'Editar evento' : 'Novo evento')),
+      appBar: AwakeAppBar(
+        title: _isEdicao ? 'Editar evento' : 'Novo evento',
+        showQrButton: false,
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Form(
@@ -442,6 +463,34 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
                     ],
                   ),
                 ],
+                const SizedBox(height: 20),
+                const Text('Meninos, meninas, ou os dois?',
+                    style: TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 4),
+                Text(
+                  'Funciona junto com o filtro de grupo acima — ex: '
+                  '"Genesis" + "Meninas" mostra só pras garotas do Genesis',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 8),
+                SegmentedButton<bool>(
+                  segments: const [
+                    ButtonSegment(value: true, label: Text('Meninos e meninas')),
+                    ButtonSegment(value: false, label: Text('Só um dos dois')),
+                  ],
+                  selected: {_todosOsGeneros},
+                  onSelectionChanged: (value) => setState(() => _todosOsGeneros = value.first),
+                ),
+                if (!_todosOsGeneros) ...[
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      _generoChip('masculino', 'Meninos'),
+                      _generoChip('feminino', 'Meninas'),
+                    ],
+                  ),
+                ],
               ],
               if (isAdmin) ...[
                 const SizedBox(height: 24),
@@ -563,6 +612,23 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
             _categoriasSelecionadas.add(valor);
           } else {
             _categoriasSelecionadas.remove(valor);
+          }
+        });
+      },
+    );
+  }
+
+  Widget _generoChip(String valor, String label) {
+    final selecionado = _generosSelecionados.contains(valor);
+    return FilterChip(
+      label: Text(label),
+      selected: selecionado,
+      onSelected: (marcado) {
+        setState(() {
+          if (marcado) {
+            _generosSelecionados.add(valor);
+          } else {
+            _generosSelecionados.remove(valor);
           }
         });
       },
