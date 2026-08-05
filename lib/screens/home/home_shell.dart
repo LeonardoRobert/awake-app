@@ -5,6 +5,7 @@ import '../../providers/auth_provider.dart';
 import '../calendar/calendar_screen.dart';
 import '../financeiro/financeiro_screen.dart';
 import '../home/inicio_screen.dart';
+import '../pages/nossos_conteudos_screen.dart';
 import '../metas/metas_screen.dart';
 import '../profile/profile_screen.dart';
 import '../volunteering/shifts_screen.dart';
@@ -99,6 +100,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
             : const [
                 InicioScreen(),
                 CalendarScreen(),
+                NossosConteudosScreen(),
                 FinanceiroScreen(),
                 ProfileScreen(),
               ];
@@ -113,7 +115,8 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         final itensShallom = [
           (Icons.home_outlined, 'Início'),
           (Icons.calendar_month, 'Calendário'),
-          (Icons.volunteer_activism, 'Contribua'),
+          (Icons.ondemand_video_outlined, 'Conteúdos'),
+          (Icons.attach_money, 'Contribua'),
           (Icons.person, 'Perfil'),
         ];
         final itens = ehAwake ? itensAwake : itensShallom;

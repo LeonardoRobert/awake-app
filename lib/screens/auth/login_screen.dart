@@ -119,26 +119,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
+                        const Text('E-mail', style: TextStyle(fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 6),
                         TextFormField(
                           controller: _emailController,
-                          decoration: const InputDecoration(
-                            labelText: 'E-mail',
-                            floatingLabelBehavior: FloatingLabelBehavior.always,
-                            contentPadding: EdgeInsets.fromLTRB(16, 24, 16, 10),
-                          ),
+                          decoration: const InputDecoration(hintText: 'seu@email.com'),
                           keyboardType: TextInputType.emailAddress,
                           validator: (value) => (value == null || !value.contains('@'))
                               ? 'Informe um e-mail válido'
                               : null,
                         ),
                         const SizedBox(height: 16),
+                        const Text('Senha', style: TextStyle(fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 6),
                         TextFormField(
                           controller: _senhaController,
-                          decoration: const InputDecoration(
-                            labelText: 'Senha',
-                            floatingLabelBehavior: FloatingLabelBehavior.always,
-                            contentPadding: EdgeInsets.fromLTRB(16, 24, 16, 10),
-                          ),
+                          decoration: const InputDecoration(hintText: '••••••'),
                           obscureText: true,
                           validator: (value) => (value == null || value.length < 6)
                               ? 'Mínimo de 6 caracteres'

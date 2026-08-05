@@ -14,6 +14,12 @@ enum EventoEscopo {
   awake,
   embaixadoresMensageiras,
   criancas,
+  danca,
+  diaconos,
+  louvor,
+  midia,
+  multimidia,
+  teatro,
 }
 
 /// Ordem oficial de apresentacao (usada no formulario e como
@@ -27,6 +33,12 @@ const ordemEscopos = [
   EventoEscopo.awake,
   EventoEscopo.embaixadoresMensageiras,
   EventoEscopo.criancas,
+  EventoEscopo.danca,
+  EventoEscopo.diaconos,
+  EventoEscopo.louvor,
+  EventoEscopo.midia,
+  EventoEscopo.multimidia,
+  EventoEscopo.teatro,
 ];
 
 EventoEscopo eventoEscopoFromString(String? value) {
@@ -45,6 +57,18 @@ EventoEscopo eventoEscopoFromString(String? value) {
       return EventoEscopo.embaixadoresMensageiras;
     case 'criancas':
       return EventoEscopo.criancas;
+    case 'danca':
+      return EventoEscopo.danca;
+    case 'diaconos':
+      return EventoEscopo.diaconos;
+    case 'louvor':
+      return EventoEscopo.louvor;
+    case 'midia':
+      return EventoEscopo.midia;
+    case 'multimidia':
+      return EventoEscopo.multimidia;
+    case 'teatro':
+      return EventoEscopo.teatro;
     default:
       return EventoEscopo.igreja;
   }
@@ -69,6 +93,18 @@ extension EventoEscopoDb on EventoEscopo {
         return 'embaixadores_mensageiras';
       case EventoEscopo.criancas:
         return 'criancas';
+      case EventoEscopo.danca:
+        return 'danca';
+      case EventoEscopo.diaconos:
+        return 'diaconos';
+      case EventoEscopo.louvor:
+        return 'louvor';
+      case EventoEscopo.midia:
+        return 'midia';
+      case EventoEscopo.multimidia:
+        return 'multimidia';
+      case EventoEscopo.teatro:
+        return 'teatro';
     }
   }
 
@@ -84,6 +120,18 @@ extension EventoEscopoDb on EventoEscopo {
         return 'awake';
       case EventoEscopo.criancas:
         return 'criancas';
+      case EventoEscopo.danca:
+        return 'danca';
+      case EventoEscopo.diaconos:
+        return 'diaconos';
+      case EventoEscopo.louvor:
+        return 'louvor';
+      case EventoEscopo.midia:
+        return 'midia';
+      case EventoEscopo.multimidia:
+        return 'multimidia';
+      case EventoEscopo.teatro:
+        return 'teatro';
       default:
         return null;
     }
@@ -109,6 +157,18 @@ extension EventoEscopoLabel on EventoEscopo {
         return 'Embaixadores e Mensageiras';
       case EventoEscopo.criancas:
         return 'Crianças';
+      case EventoEscopo.danca:
+        return 'Dança';
+      case EventoEscopo.diaconos:
+        return 'Diáconos';
+      case EventoEscopo.louvor:
+        return 'Louvor';
+      case EventoEscopo.midia:
+        return 'Mídia';
+      case EventoEscopo.multimidia:
+        return 'Multimídia';
+      case EventoEscopo.teatro:
+        return 'Teatro';
     }
   }
 
@@ -225,6 +285,15 @@ Color corDoEvento(EventTipo tipo, EventoEscopo escopo) {
       return const Color(0xFF8D6E63); // marrom
     case EventoEscopo.criancas:
       return const Color(0xFFC4B5FD); // lilás
+    case EventoEscopo.danca:
+    case EventoEscopo.diaconos:
+    case EventoEscopo.louvor:
+    case EventoEscopo.midia:
+    case EventoEscopo.multimidia:
+    case EventoEscopo.teatro:
+      // Ministerios de servico -- todos na mesma cor (preto), ja que
+      // aqui a diferenca e o ministerio em si, nao uma faixa etaria.
+      return const Color(0xFF000000);
     case EventoEscopo.awake:
       return const Color(0xFF60A5FA); // nao deveria cair aqui
   }

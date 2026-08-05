@@ -9,6 +9,7 @@ import '../../screens/financeiro/financeiro_screen.dart';
 import '../../screens/messages/admin_mensagens_screen.dart';
 import '../../screens/messages/enviar_mensagem_screen.dart';
 import '../../screens/pages/nossas_paginas_screen.dart';
+import '../../screens/pages/nossos_conteudos_screen.dart';
 import '../../screens/pages/quem_somos_screen.dart';
 import '../../services/notification_service.dart';
 import '../../widgets/awake_app_bar.dart';
@@ -143,6 +144,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ),
               ListTile(
                 contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.ondemand_video_outlined),
+                title: const Text('Nossos Conteúdos'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.of(context)
+                    .push(MaterialPageRoute(builder: (_) => const NossosConteudosScreen())),
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.public_outlined),
                 title: const Text('Nossas páginas'),
                 trailing: const Icon(Icons.chevron_right),
@@ -155,31 +164,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 const Divider(),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.volunteer_activism),
+                  leading: const Icon(Icons.attach_money),
                   title: const Text('Contribua'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => Navigator.of(context)
                       .push(MaterialPageRoute(builder: (_) => const FinanceiroScreen())),
-                ),
-              ],
-              if (profile.isAdmin) ...[
-                const Divider(),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.dashboard_outlined),
-                  title: const Text('Painel de Calendário (navegador)'),
-                  subtitle: const Text('Melhor no computador'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => context.push('/admin/calendario'),
-                ),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.mark_email_unread_outlined),
-                  title: const Text('Caixa de entrada'),
-                  subtitle: const Text('Pedidos de oração e testemunhos'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => Navigator.of(context)
-                      .push(MaterialPageRoute(builder: (_) => const AdminMensagensScreen())),
                 ),
               ],
               const Divider(),
@@ -231,6 +220,26 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ref.read(themeModeProvider.notifier).definir(ativado);
                 },
               ),
+              if (profile.isAdmin) ...[
+                const Divider(),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.dashboard_outlined),
+                  title: const Text('Painel de Calendário (navegador)'),
+                  subtitle: const Text('Melhor no computador'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.push('/admin/calendario'),
+                ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.mark_email_unread_outlined),
+                  title: const Text('Caixa de entrada'),
+                  subtitle: const Text('Pedidos de oração e testemunhos'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(context)
+                      .push(MaterialPageRoute(builder: (_) => const AdminMensagensScreen())),
+                ),
+              ],
               const Divider(),
               ListTile(
                 contentPadding: EdgeInsets.zero,

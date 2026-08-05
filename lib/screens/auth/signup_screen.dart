@@ -115,6 +115,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   bool _temFilhos = false;
   final List<_FilhoRascunho> _filhos = [];
   final Set<String> _ministeriosSelecionados = {}; // 'awake' | 'homens' | 'mulheres'
+  final Set<String> _areasServico = {}; // 'danca', 'diaconos', 'louvor', etc.
 
   // Passo 2
   final _emailController = TextEditingController();
@@ -341,7 +342,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         telefone: _telefoneController.text.trim(),
         endereco: _enderecoCompleto,
         tempoParticipacao: resumoParticipacao,
-        ministerios: _ministeriosSelecionados.toList(),
+        ministerios: [..._ministeriosSelecionados, ..._areasServico],
       );
 
       // Cadastra os filhos informados no Passo 1 (usa a sessao que
@@ -619,6 +620,26 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
               onChanged: (v) => setState(() => _grupoCasais = v),
             ),
           ],
+          const SizedBox(height: 24),
+          const Text('Em qual ministério você serve?',
+              style: TextStyle(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 4),
+          Text(
+            'Opcional — pode marcar quantos fizerem sentido',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            children: [
+              _areaServicoChip('danca', 'Dança'),
+              _areaServicoChip('diaconos', 'Diáconos'),
+              _areaServicoChip('louvor', 'Louvor'),
+              _areaServicoChip('midia', 'Mídia'),
+              _areaServicoChip('multimidia', 'Multimídia'),
+              _areaServicoChip('teatro', 'Teatro'),
+            ],
+          ),
         ],
       ),
     );
@@ -641,6 +662,23 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
             _ministeriosSelecionados.add(valor);
           } else {
             _ministeriosSelecionados.remove(valor);
+          }
+        });
+      },
+    );
+  }
+
+  Widget _areaServicoChip(String valor, String label) {
+    final selecionado = _areasServico.contains(valor);
+    return FilterChip(
+      label: Text(label),
+      selected: selecionado,
+      onSelected: (marcado) {
+        setState(() {
+          if (marcado) {
+            _areasServico.add(valor);
+          } else {
+            _areasServico.remove(valor);
           }
         });
       },

@@ -22,49 +22,14 @@ const _codigoPix =
     '5204000053039865802BR5918COMUNIDADE SHALLOM6015SAO JOAO DE MER'
     '62070503***630438AA';
 
-class _ProjetoApoiado {
-  final String imagem;
-  final String nome;
-  final String responsavel;
-  const _ProjetoApoiado({required this.imagem, required this.nome, required this.responsavel});
-}
-
-const _projetosApoiados = [
-  _ProjetoApoiado(
-    imagem: 'assets/images/projetos/shallom_humaita_amazonia.png',
-    nome: 'Shallom Humaitá Amazônia',
-    responsavel: 'Pr. Alberto',
-  ),
-  _ProjetoApoiado(
-    imagem: 'assets/images/projetos/conexao_asia_africa_jocum.png',
-    nome: 'Conexão Ásia/África Tajiquistão — JOCUM',
-    responsavel: 'Pr. Marcos e esposa',
-  ),
-  _ProjetoApoiado(
-    imagem: 'assets/images/projetos/mais_missao_igreja_sofredora.png',
-    nome: '+Mais — Missão em apoio à igreja sofredora',
-    responsavel: 'Pr. Mário — missões em países muçulmanos',
-  ),
-  _ProjetoApoiado(
-    imagem: 'assets/images/projetos/centro_recuperacao.png',
-    nome: 'Centro de Recuperação',
-    responsavel: 'Pr. Alonso',
-  ),
-  _ProjetoApoiado(
-    imagem: 'assets/images/projetos/missoes_nacionais.png',
-    nome: 'Missões Nacionais',
-    responsavel: '',
-  ),
-  _ProjetoApoiado(
-    imagem: 'assets/images/projetos/missoes_mundiais.png',
-    nome: 'Missões Mundiais',
-    responsavel: '',
-  ),
-  _ProjetoApoiado(
-    imagem: 'assets/images/projetos/carreta_missionaria.png',
-    nome: 'Carreta Missionária',
-    responsavel: '',
-  ),
+const _imagensProjetos = [
+  'assets/images/projetos/shallom_humaita_amazonia.png',
+  'assets/images/projetos/conexao_asia_africa_jocum.png',
+  'assets/images/projetos/mais_missao_igreja_sofredora.png',
+  'assets/images/projetos/centro_recuperacao.png',
+  'assets/images/projetos/missoes_nacionais.png',
+  'assets/images/projetos/missoes_mundiais.png',
+  'assets/images/projetos/carreta_missionaria.png',
 ];
 
 class FinanceiroScreen extends ConsumerWidget {
@@ -183,55 +148,18 @@ class FinanceiroScreen extends ConsumerWidget {
                 style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 12),
             SizedBox(
-              height: 160,
+              height: 140,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
-                itemCount: _projetosApoiados.length,
+                itemCount: _imagensProjetos.length,
                 separatorBuilder: (_, __) => const SizedBox(width: 12),
                 itemBuilder: (context, index) {
-                  final projeto = _projetosApoiados[index];
-                  return SizedBox(
-                    width: 150,
-                    child: Card(
-                      clipBehavior: Clip.antiAlias,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          // Fundo branco fixo atras da logo -- os
-                          // logos tem fundo preto opaco, entao sem
-                          // isso eles somem em temas escuros.
-                          Container(
-                            height: 80,
-                            width: double.infinity,
-                            color: Colors.white,
-                            padding: const EdgeInsets.all(8),
-                            child: Image.asset(projeto.imagem, fit: BoxFit.contain),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.all(8),
-                            child: Column(
-                              children: [
-                                Text(
-                                  projeto.nome,
-                                  textAlign: TextAlign.center,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style:
-                                      const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
-                                ),
-                                if (projeto.responsavel.isNotEmpty)
-                                  Text(
-                                    projeto.responsavel,
-                                    textAlign: TextAlign.center,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(fontSize: 10),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
+                  return ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.asset(
+                      _imagensProjetos[index],
+                      height: 140,
+                      fit: BoxFit.cover,
                     ),
                   );
                 },
