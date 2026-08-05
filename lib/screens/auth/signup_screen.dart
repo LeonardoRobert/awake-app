@@ -632,6 +632,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
           Wrap(
             spacing: 8,
             children: [
+              _areaServicoChip('coral', 'Coral'),
               _areaServicoChip('danca', 'Dança'),
               _areaServicoChip('diaconos', 'Diáconos'),
               _areaServicoChip('louvor', 'Louvor'),

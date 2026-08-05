@@ -126,6 +126,8 @@ extension MinisterioLabel on String {
         return 'Mulheres';
       case 'criancas':
         return 'Crianças';
+      case 'coral':
+        return 'Coral';
       case 'danca':
         return 'Dança';
       case 'diaconos':

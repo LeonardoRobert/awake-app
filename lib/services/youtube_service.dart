@@ -1,51 +1,49 @@
+import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/video_youtube_model.dart';
 
-/// Busca os videos mais recentes do canal usando o feed RSS publico do
-/// YouTube -- nao precisa de chave de API nem de nenhuma conta paga.
-/// Canal: Shallom Online (https://youtube.com/@shallomonline)
+/// Busca os videos mais recentes do canal usando a API oficial do
+/// YouTube (Data API v3) -- diferente do feed RSS, essa API e feita
+/// pra ser chamada direto do navegador (envia os cabecalhos de CORS
+/// certos), entao funciona tanto no app quanto na versao web/iPhone.
+///
+/// A chave e passada na hora de compilar (--dart-define=YOUTUBE_API_KEY=...),
+/// nunca fica escrita direto no codigo.
 class YoutubeService {
+  static const _apiKey = String.fromEnvironment('YOUTUBE_API_KEY');
   static const _channelId = 'UCJjMlNpqp4JmorV6bCLprXg';
-  static const _feedUrl =
-      'https://www.youtube.com/feeds/videos.xml?channel_id=$_channelId';
 
   Future<List<VideoYoutube>> buscarVideosRecentes({int limite = 5}) async {
-    final resposta = await http.get(Uri.parse(_feedUrl));
+    if (_apiKey.isEmpty) {
+      throw Exception('Chave da API do YouTube não configurada.');
+    }
+
+    final uri = Uri.parse(
+      'https://www.googleapis.com/youtube/v3/search'
+      '?key=$_apiKey'
+      '&channelId=$_channelId'
+      '&part=snippet'
+      '&order=date'
+      '&type=video'
+      '&maxResults=$limite',
+    );
+
+    final resposta = await http.get(uri);
     if (resposta.statusCode != 200) {
       throw Exception('Não foi possível carregar os vídeos agora.');
     }
 
-    final corpo = resposta.body;
-    final entradas = RegExp(r'<entry>(.*?)</entry>', dotAll: true).allMatches(corpo);
+    final dados = jsonDecode(resposta.body) as Map<String, dynamic>;
+    final itens = (dados['items'] as List?) ?? [];
 
-    final videos = <VideoYoutube>[];
-    for (final entrada in entradas) {
-      final bloco = entrada.group(1)!;
-      final idMatch = RegExp(r'<yt:videoId>(.*?)</yt:videoId>').firstMatch(bloco);
-      final tituloMatch = RegExp(r'<title>(.*?)</title>').firstMatch(bloco);
-      final publicadoMatch = RegExp(r'<published>(.*?)</published>').firstMatch(bloco);
-      if (idMatch == null || tituloMatch == null) continue;
-
-      videos.add(VideoYoutube(
-        id: idMatch.group(1)!,
-        titulo: _decodificarHtml(tituloMatch.group(1)!),
-        publicadoEm: publicadoMatch != null
-            ? DateTime.tryParse(publicadoMatch.group(1)!) ?? DateTime.now()
-            : DateTime.now(),
-      ));
-
-      if (videos.length >= limite) break;
-    }
-
-    return videos;
-  }
-
-  String _decodificarHtml(String texto) {
-    return texto
-        .replaceAll('&amp;', '&')
-        .replaceAll('&lt;', '<')
-        .replaceAll('&gt;', '>')
-        .replaceAll('&quot;', '"')
-        .replaceAll('&#39;', "'");
+    return itens.map((item) {
+      final id = item['id']['videoId'] as String;
+      final snippet = item['snippet'] as Map<String, dynamic>;
+      return VideoYoutube(
+        id: id,
+        titulo: snippet['title'] as String,
+        publicadoEm: DateTime.tryParse(snippet['publishedAt'] as String) ?? DateTime.now(),
+      );
+    }).toList();
   }
 }

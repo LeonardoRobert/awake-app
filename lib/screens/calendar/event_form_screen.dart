@@ -191,13 +191,14 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
     }
 
     final usaSubgrupos = _escopo == EventoEscopo.awake;
+    final usaGenero = _escopo == EventoEscopo.awake || _escopo == EventoEscopo.coral;
     if (usaSubgrupos && !_paraTodos && _categoriasSelecionadas.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Selecione pelo menos um grupo, ou marque "Para todos".')),
       );
       return;
     }
-    if (usaSubgrupos && !_todosOsGeneros && _generosSelecionados.isEmpty) {
+    if (usaGenero && !_todosOsGeneros && _generosSelecionados.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
             content: Text('Selecione meninos e/ou meninas, ou marque "Meninos e meninas".')),
@@ -252,7 +253,7 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
         // inteiramente pelo escopo em si.
         publicoAlvo: usaSubgrupos && !_paraTodos ? _categoriasSelecionadas.toList() : null,
         publicoGenero:
-            usaSubgrupos && !_todosOsGeneros ? _generosSelecionados.toList() : null,
+            usaGenero && !_todosOsGeneros ? _generosSelecionados.toList() : null,
         publicoCasais: usaCasais && !_todosOsCasais ? _casaisSelecionados.toList() : null,
         fotoUrl: fotoUrl,
         fotoStoryUrl: fotoStoryUrl,
@@ -480,19 +481,27 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
                     ],
                   ),
                 ],
+              ],
+              if (_escopo == EventoEscopo.awake || _escopo == EventoEscopo.coral) ...[
                 const SizedBox(height: 20),
-                const Text('Meninos, meninas, ou os dois?',
-                    style: TextStyle(fontWeight: FontWeight.w600)),
+                Text(
+                  _escopo == EventoEscopo.coral
+                      ? 'Masculino, feminino, ou os dois?'
+                      : 'Meninos, meninas, ou os dois?',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
                 const SizedBox(height: 4),
                 Text(
-                  'Funciona junto com o filtro de grupo acima — ex: '
-                  '"Genesis" + "Meninas" mostra só pras garotas do Genesis',
+                  _escopo == EventoEscopo.coral
+                      ? 'Usa o "Sexo" que a pessoa já preencheu no cadastro'
+                      : 'Funciona junto com o filtro de grupo acima — ex: '
+                          '"Genesis" + "Meninas" mostra só pras garotas do Genesis',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 const SizedBox(height: 8),
                 SegmentedButton<bool>(
                   segments: const [
-                    ButtonSegment(value: true, label: Text('Meninos e meninas')),
+                    ButtonSegment(value: true, label: Text('Todos')),
                     ButtonSegment(value: false, label: Text('Só um dos dois')),
                   ],
                   selected: {_todosOsGeneros},
@@ -503,8 +512,8 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
                   Wrap(
                     spacing: 8,
                     children: [
-                      _generoChip('masculino', 'Meninos'),
-                      _generoChip('feminino', 'Meninas'),
+                      _generoChip('masculino', _escopo == EventoEscopo.coral ? 'Masculino' : 'Meninos'),
+                      _generoChip('feminino', _escopo == EventoEscopo.coral ? 'Feminino' : 'Meninas'),
                     ],
                   ),
                 ],

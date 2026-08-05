@@ -14,6 +14,7 @@ enum EventoEscopo {
   awake,
   embaixadoresMensageiras,
   criancas,
+  coral,
   danca,
   diaconos,
   louvor,
@@ -33,6 +34,7 @@ const ordemEscopos = [
   EventoEscopo.awake,
   EventoEscopo.embaixadoresMensageiras,
   EventoEscopo.criancas,
+  EventoEscopo.coral,
   EventoEscopo.danca,
   EventoEscopo.diaconos,
   EventoEscopo.louvor,
@@ -57,6 +59,8 @@ EventoEscopo eventoEscopoFromString(String? value) {
       return EventoEscopo.embaixadoresMensageiras;
     case 'criancas':
       return EventoEscopo.criancas;
+    case 'coral':
+      return EventoEscopo.coral;
     case 'danca':
       return EventoEscopo.danca;
     case 'diaconos':
@@ -93,6 +97,8 @@ extension EventoEscopoDb on EventoEscopo {
         return 'embaixadores_mensageiras';
       case EventoEscopo.criancas:
         return 'criancas';
+      case EventoEscopo.coral:
+        return 'coral';
       case EventoEscopo.danca:
         return 'danca';
       case EventoEscopo.diaconos:
@@ -120,6 +126,8 @@ extension EventoEscopoDb on EventoEscopo {
         return 'awake';
       case EventoEscopo.criancas:
         return 'criancas';
+      case EventoEscopo.coral:
+        return 'coral';
       case EventoEscopo.danca:
         return 'danca';
       case EventoEscopo.diaconos:
@@ -157,6 +165,8 @@ extension EventoEscopoLabel on EventoEscopo {
         return 'Embaixadores e Mensageiras';
       case EventoEscopo.criancas:
         return 'Crianças';
+      case EventoEscopo.coral:
+        return 'Coral';
       case EventoEscopo.danca:
         return 'Dança';
       case EventoEscopo.diaconos:
@@ -285,6 +295,7 @@ Color corDoEvento(EventTipo tipo, EventoEscopo escopo) {
       return const Color(0xFF8D6E63); // marrom
     case EventoEscopo.criancas:
       return const Color(0xFFC4B5FD); // lilás
+    case EventoEscopo.coral:
     case EventoEscopo.danca:
     case EventoEscopo.diaconos:
     case EventoEscopo.louvor:
