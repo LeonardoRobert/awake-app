@@ -2,13 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../models/profile_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/cep_service.dart';
+import '../../services/filho_service.dart';
 
-/// Aplica a mascara dd/mm/aaaa enquanto a pessoa digita a data de
-/// nascimento, sem precisar de nenhum pacote externo.
-class _DataNascimentoFormatter extends TextInputFormatter {
+/// Aplica a mascara dd/mm/aaaa enquanto a pessoa digita uma data,
+/// sem precisar de nenhum pacote externo.
+class _DataFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(
     TextEditingValue oldValue,
@@ -58,7 +60,7 @@ class _CepFormatter extends TextInputFormatter {
 
 /// Converte "dd/mm/aaaa" pra DateTime, validando se a data existe de
 /// verdade (evita aceitar algo tipo 31/02/2024).
-DateTime? _parseDataNascimento(String texto) {
+DateTime? _parseData(String texto) {
   final partes = texto.split('/');
   if (partes.length != 3) return null;
 
@@ -72,6 +74,21 @@ DateTime? _parseDataNascimento(String texto) {
   final data = DateTime(ano, mes, dia);
   if (data.year != ano || data.month != mes || data.day != dia) return null;
   return data;
+}
+
+class _FilhoRascunho {
+  final String nome;
+  final DateTime dataNascimento;
+  _FilhoRascunho({required this.nome, required this.dataNascimento});
+
+  int get idade {
+    final hoje = DateTime.now();
+    var anos = hoje.year - dataNascimento.year;
+    final aniversarioJaPassou = hoje.month > dataNascimento.month ||
+        (hoje.month == dataNascimento.month && hoje.day >= dataNascimento.day);
+    if (!aniversarioJaPassou) anos--;
+    return anos;
+  }
 }
 
 class SignupScreen extends ConsumerStatefulWidget {
@@ -93,6 +110,9 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   final _dataNascimentoController = TextEditingController();
   DateTime? _dataNascimento;
   EstadoCivil? _estadoCivil;
+  bool _temFilhos = false;
+  final List<_FilhoRascunho> _filhos = [];
+  final Set<String> _ministeriosSelecionados = {}; // 'awake' | 'homens' | 'mulheres'
 
   // Passo 2
   final _emailController = TextEditingController();
@@ -107,8 +127,8 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   String? _erroCep;
 
   // Passo 3
-  bool _ehNovo = false;
-  bool _quersSerLider = false;
+  final Map<String, bool> _ehNovoPorMinisterio = {}; // true = novo(a)
+  final Map<String, bool> _liderPorMinisterio = {};
   final _codigoLiderController = TextEditingController();
   bool _aceitouTermos = false;
 
@@ -120,7 +140,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     super.initState();
     _dataNascimentoController.addListener(() {
       setState(() {
-        _dataNascimento = _parseDataNascimento(_dataNascimentoController.text);
+        _dataNascimento = _parseData(_dataNascimentoController.text);
       });
     });
     _cepController.addListener(_onCepChanged);
@@ -171,6 +191,67 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     return null;
   }
 
+  Future<void> _abrirDialogoAdicionarFilho() async {
+    final nomeController = TextEditingController();
+    final dataController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    final resultado = await showDialog<_FilhoRascunho>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Adicionar filho(a)'),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: nomeController,
+                decoration: const InputDecoration(labelText: 'Nome'),
+                validator: (v) => (v == null || v.trim().isEmpty) ? 'Informe o nome' : null,
+                autofocus: true,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: dataController,
+                decoration: const InputDecoration(
+                  labelText: 'Data de nascimento',
+                  hintText: 'dd/mm/aaaa',
+                ),
+                keyboardType: TextInputType.number,
+                inputFormatters: [_DataFormatter()],
+                validator: (v) {
+                  if (v == null || _parseData(v) == null) return 'Data inválida';
+                  return null;
+                },
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (!formKey.currentState!.validate()) return;
+              Navigator.of(dialogContext).pop(_FilhoRascunho(
+                nome: nomeController.text.trim(),
+                dataNascimento: _parseData(dataController.text)!,
+              ));
+            },
+            child: const Text('Adicionar'),
+          ),
+        ],
+      ),
+    );
+
+    if (resultado != null) {
+      setState(() => _filhos.add(resultado));
+    }
+  }
+
   void _proximoPasso() {
     final formAtual = [_formKeyPasso1, _formKeyPasso2, _formKeyPasso3][_passo];
     if (!formAtual.currentState!.validate()) return;
@@ -182,6 +263,10 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       }
       if (_estadoCivil == null) {
         setState(() => _errorMessage = 'Informe seu estado civil.');
+        return;
+      }
+      if (_ministeriosSelecionados.isEmpty) {
+        setState(() => _errorMessage = 'Selecione pelo menos um ministério.');
         return;
       }
     }
@@ -231,6 +316,14 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     try {
       final authService = ref.read(authServiceProvider);
 
+      // Se ao menos um ministerio foi marcado como "sou novo(a)", leva
+      // a pessoa pro video de boas-vindas depois do cadastro.
+      final algumEhNovo = _ehNovoPorMinisterio.values.any((v) => v);
+      final resumoParticipacao = _ministeriosSelecionados
+          .map((m) => '${m.labelMinisterio}: '
+              '${_ehNovoPorMinisterio[m] == true ? "Novo(a)" : "Já participa"}')
+          .join('; ');
+
       await authService.signUp(
         email: _emailController.text.trim(),
         senha: _senhaController.text,
@@ -239,33 +332,59 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         estadoCivil: _estadoCivil!,
         telefone: _telefoneController.text.trim(),
         endereco: _enderecoCompleto,
-        tempoParticipacao: _ehNovo ? 'Novo(a) no Awake' : 'Já participa',
+        tempoParticipacao: resumoParticipacao,
+        ministerios: _ministeriosSelecionados.toList(),
       );
 
-      if (_quersSerLider) {
-        try {
-          await authService.solicitarPapelLider(_codigoLiderController.text.trim());
-        } catch (_) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text(
-                  'Código de líder inválido. Sua conta foi criada como membro; '
-                  'peça o código certo e tente de novo depois.',
-                ),
-              ),
+      // Cadastra os filhos informados no Passo 1 (usa a sessao que
+      // acabou de ser criada pelo signUp acima).
+      final filhoService = FilhoService();
+      for (final filho in _filhos) {
+        await filhoService.adicionar(nome: filho.nome, dataNascimento: filho.dataNascimento);
+      }
+
+      // Solicita lideranca pra cada ministerio que a pessoa marcou como
+      // "sou lider", usando o mesmo codigo unico.
+      final ministeriosOndeQuerSerLider =
+          _liderPorMinisterio.entries.where((e) => e.value).map((e) => e.key).toList();
+
+      if (ministeriosOndeQuerSerLider.isNotEmpty) {
+        for (final ministerio in ministeriosOndeQuerSerLider) {
+          try {
+            await authService.solicitarPapelLider(
+              _codigoLiderController.text.trim(),
+              ministerio: ministerio,
             );
+          } catch (_) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Código de líder inválido para ${ministerio.labelMinisterio}. '
+                    'Sua conta foi criada como membro; peça o código certo e tente '
+                    'de novo depois.',
+                  ),
+                ),
+              );
+            }
           }
         }
       }
 
       if (!mounted) return;
 
-      if (_ehNovo) {
+      if (algumEhNovo) {
         context.go('/treinamentos');
       }
+    } on AuthApiException catch (e) {
+      final mensagem = e.code == 'user_already_exists'
+          ? 'Esse e-mail já está cadastrado. Tente entrar, ou use outro e-mail.'
+          : 'Não foi possível concluir o cadastro: ${e.message}';
+      setState(() => _errorMessage = mensagem);
     } catch (e) {
-      setState(() => _errorMessage = 'Não foi possível concluir o cadastro. Tente novamente.');
+      // Mostra o erro de verdade (em vez de uma mensagem generica) --
+      // assim da pra saber exatamente o que deu errado.
+      setState(() => _errorMessage = 'Não foi possível concluir o cadastro: $e');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -273,7 +392,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final titulos = ['Quem é você', 'Contato', 'Awake'];
+    final titulos = ['Quem é você', 'Contato', 'Criar conta'];
 
     return Scaffold(
       appBar: AppBar(title: Text('Criar conta — Passo ${_passo + 1} de 3')),
@@ -366,10 +485,10 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
               hintText: 'dd/mm/aaaa',
             ),
             keyboardType: TextInputType.number,
-            inputFormatters: [_DataNascimentoFormatter()],
+            inputFormatters: [_DataFormatter()],
             validator: (v) {
               if (v == null || v.trim().isEmpty) return 'Informe a data de nascimento';
-              if (_parseDataNascimento(v) == null) return 'Data inválida';
+              if (_parseData(v) == null) return 'Data inválida';
               return null;
             },
           ),
@@ -398,12 +517,84 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
           if (_categoriaPreview != null) ...[
             const SizedBox(height: 8),
             Text(
-              'Seu grupo: $_categoriaPreview',
-              style: const TextStyle(fontWeight: FontWeight.w600),
+              'Se marcar Awake, seu grupo lá será: $_categoriaPreview',
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
             ),
           ],
+          const SizedBox(height: 24),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            value: _temFilhos,
+            onChanged: (v) => setState(() => _temFilhos = v),
+            title: const Text('Tenho filhos'),
+            subtitle: const Text('Usado pra liberar conteúdo de Crianças e de Embaixadores e Mensageiras'),
+          ),
+          if (_temFilhos) ...[
+            const SizedBox(height: 8),
+            ..._filhos.asMap().entries.map((entry) {
+              final index = entry.key;
+              final filho = entry.value;
+              return Card(
+                margin: const EdgeInsets.only(bottom: 8),
+                child: ListTile(
+                  dense: true,
+                  title: Text(filho.nome),
+                  subtitle: Text('${filho.idade} anos'),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.close, size: 20),
+                    onPressed: () => setState(() => _filhos.removeAt(index)),
+                  ),
+                ),
+              );
+            }),
+            OutlinedButton.icon(
+              onPressed: _abrirDialogoAdicionarFilho,
+              icon: const Icon(Icons.add),
+              label: const Text('Adicionar filho(a)'),
+            ),
+          ],
+          const SizedBox(height: 24),
+          const Text('Qual ministério você faz parte?',
+              style: TextStyle(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 4),
+          Text(
+            'Pode marcar até 2',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            children: [
+              _ministerioChip('awake', 'Awake'),
+              _ministerioChip('homens', 'Homens'),
+              _ministerioChip('mulheres', 'Mulheres'),
+            ],
+          ),
         ],
       ),
+    );
+  }
+
+  Widget _ministerioChip(String valor, String label) {
+    final selecionado = _ministeriosSelecionados.contains(valor);
+    return FilterChip(
+      label: Text(label),
+      selected: selecionado,
+      onSelected: (marcado) {
+        setState(() {
+          if (marcado) {
+            if (_ministeriosSelecionados.length >= 2) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Você pode marcar no máximo 2 ministérios.')),
+              );
+              return;
+            }
+            _ministeriosSelecionados.add(valor);
+          } else {
+            _ministeriosSelecionados.remove(valor);
+          }
+        });
+      },
     );
   }
 
@@ -498,45 +689,71 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text('Você já participa do Awake?', style: TextStyle(fontWeight: FontWeight.w600)),
-          const SizedBox(height: 8),
-          SegmentedButton<bool>(
-            segments: const [
-              ButtonSegment(value: true, label: Text('Sou novo(a)')),
-              ButtonSegment(value: false, label: Text('Já participo')),
-            ],
-            selected: {_ehNovo},
-            onSelectionChanged: (value) => setState(() => _ehNovo = value.first),
+          Text(
+            'Seu(s) ministério(s): '
+            '${_ministeriosSelecionados.map((m) => m.labelMinisterio).join(', ')}',
+            style: const TextStyle(fontWeight: FontWeight.w600),
           ),
-          if (_ehNovo) ...[
-            const SizedBox(height: 6),
+          const SizedBox(height: 20),
+          for (final ministerio in _ministeriosSelecionados) ...[
+            Text('Você já participa do ${ministerio.labelMinisterio}?',
+                style: const TextStyle(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            SegmentedButton<bool>(
+              segments: const [
+                ButtonSegment(value: true, label: Text('Sou novo(a)')),
+                ButtonSegment(value: false, label: Text('Já participo')),
+              ],
+              selected: {_ehNovoPorMinisterio[ministerio] ?? true},
+              onSelectionChanged: (value) =>
+                  setState(() => _ehNovoPorMinisterio[ministerio] = value.first),
+            ),
+            const SizedBox(height: 20),
+          ],
+          if (_ministeriosSelecionados.length == 1) ...[
+            const Text('Você é líder?', style: TextStyle(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            SegmentedButton<bool>(
+              segments: const [
+                ButtonSegment(value: false, label: Text('Não')),
+                ButtonSegment(value: true, label: Text('Sim')),
+              ],
+              selected: {_liderPorMinisterio[_ministeriosSelecionados.first] ?? false},
+              onSelectionChanged: (value) => setState(
+                () => _liderPorMinisterio[_ministeriosSelecionados.first] = value.first,
+              ),
+            ),
+          ] else ...[
+            const Text('Você é líder de qual ministério?',
+                style: TextStyle(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 4),
             Text(
-              'Depois de concluir o cadastro, vamos te mostrar um vídeo rápido '
-              'sobre quem somos.',
+              'Deixe tudo desmarcado se você é membro em todos',
               style: Theme.of(context).textTheme.bodySmall,
             ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              children: _ministeriosSelecionados
+                  .map((m) => FilterChip(
+                        label: Text(m.labelMinisterio),
+                        selected: _liderPorMinisterio[m] ?? false,
+                        onSelected: (marcado) =>
+                            setState(() => _liderPorMinisterio[m] = marcado),
+                      ))
+                  .toList(),
+            ),
           ],
-          const SizedBox(height: 24),
-          const Text('Você é...', style: TextStyle(fontWeight: FontWeight.w600)),
-          const SizedBox(height: 8),
-          SegmentedButton<bool>(
-            segments: const [
-              ButtonSegment(value: false, label: Text('Membro')),
-              ButtonSegment(value: true, label: Text('Líder')),
-            ],
-            selected: {_quersSerLider},
-            onSelectionChanged: (value) => setState(() => _quersSerLider = value.first),
-          ),
-          if (_quersSerLider) ...[
+          if (_liderPorMinisterio.values.any((v) => v)) ...[
             const SizedBox(height: 16),
             TextFormField(
               controller: _codigoLiderController,
               decoration: const InputDecoration(
                 labelText: 'Código de líder',
-                helperText: 'Pedido com o responsável pelo Awake',
+                helperText: 'O mesmo código, pedido com a liderança da igreja',
               ),
               validator: (v) {
-                if (!_quersSerLider) return null;
+                if (!_liderPorMinisterio.values.any((x) => x)) return null;
                 return (v == null || v.trim().isEmpty) ? 'Informe o código de líder' : null;
               },
             ),

@@ -15,6 +15,16 @@ class AwakeColors {
   static const darkBackground = Color(0xFF0A1220);
 }
 
+/// Paleta da Shallom (usada nas telas de quem NAO e Awake -- Homens,
+/// Mulheres). O azul e a cor de destaque; o "chrome" (barra de baixo,
+/// cabecalho) continua navy pra manter a identidade unificada da
+/// igreja, so troca o acento e o icone.
+class ShallomColors {
+  static const azul = Color(0xFF9BB0C7);
+  static const creme = Color(0xFFF7F2DD);
+  static const dourado = Color(0xFFCBA135);
+}
+
 /// Tema visual do app, baseado na identidade oficial do Awake.
 ///
 /// NOTA SOBRE FONTE: a identidade usa "Canva Sans" para o corpo de texto e
@@ -25,16 +35,27 @@ class AwakeColors {
 final _bodyFont = GoogleFonts.plusJakartaSansTextTheme();
 
 class AppTheme {
-  // Guarda o tema ja pronto na memoria depois da primeira vez -- antes,
-  // toda vez que QUALQUER coisa no app mudava (nao so o tema em si), o
-  // Flutter recalculava fontes e cores do zero de novo, deixando a
-  // troca de modo claro/escuro (e o app em geral) mais lento, ainda
-  // mais em telas com muito conteudo como a Escala.
-  static ThemeData? _light;
-  static ThemeData? _dark;
+  // Guarda os temas ja prontos na memoria depois da primeira vez de
+  // cada um -- um cache por combinacao (claro/escuro x Awake/Shallom),
+  // assim nunca precisa recalcular fontes e cores do zero de novo.
+  static ThemeData? _lightAwake;
+  static ThemeData? _lightShallom;
+  static ThemeData? _darkAwake;
+  static ThemeData? _darkShallom;
 
-  static ThemeData light() => _light ??= _buildLight();
-  static ThemeData dark() => _dark ??= _buildDark();
+  /// `ehAwake` decide a cor de destaque do app inteiro (botoes, FAB,
+  /// barra de navegacao): amarelo Awake ou azul Shallom. Nas telas de
+  /// login/cadastro, antes de sabermos o ministerio da pessoa, usa o
+  /// padrao (Awake).
+  static ThemeData light({bool ehAwake = true}) {
+    if (ehAwake) return _lightAwake ??= _buildLight(true);
+    return _lightShallom ??= _buildLight(false);
+  }
+
+  static ThemeData dark({bool ehAwake = true}) {
+    if (ehAwake) return _darkAwake ??= _buildDark(true);
+    return _darkShallom ??= _buildDark(false);
+  }
 
   static TextTheme _buildTextTheme(Color textColor) {
     final base = _bodyFont.apply(bodyColor: textColor, displayColor: textColor);
@@ -57,11 +78,13 @@ class AppTheme {
     );
   }
 
-  static ThemeData _buildLight() {
+  static ThemeData _buildLight(bool ehAwake) {
+    final corDestaque = ehAwake ? AwakeColors.yellow : ShallomColors.azul;
+
     final colorScheme = const ColorScheme.light().copyWith(
       primary: AwakeColors.navy,
       onPrimary: AwakeColors.offWhite,
-      secondary: AwakeColors.yellow,
+      secondary: corDestaque,
       onSecondary: AwakeColors.navy,
       surface: AwakeColors.offWhite,
       onSurface: AwakeColors.navy,
@@ -88,7 +111,7 @@ class AppTheme {
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          backgroundColor: AwakeColors.yellow,
+          backgroundColor: corDestaque,
           foregroundColor: AwakeColors.navy,
           textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
           padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
@@ -109,13 +132,23 @@ class AppTheme {
           textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
         ),
       ),
-      floatingActionButtonTheme: const FloatingActionButtonThemeData(
-        backgroundColor: AwakeColors.yellow,
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: corDestaque,
         foregroundColor: AwakeColors.navy,
+      ),
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.resolveWith((states) {
+          return states.contains(WidgetState.selected) ? corDestaque : null;
+        }),
+        trackColor: WidgetStateProperty.resolveWith((states) {
+          return states.contains(WidgetState.selected)
+              ? corDestaque.withOpacity(0.5)
+              : null;
+        }),
       ),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: AwakeColors.navy,
-        indicatorColor: AwakeColors.yellow,
+        indicatorColor: corDestaque,
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);
@@ -167,11 +200,13 @@ class AppTheme {
     );
   }
 
-  static ThemeData _buildDark() {
+  static ThemeData _buildDark(bool ehAwake) {
+    final corDestaque = ehAwake ? AwakeColors.yellow : ShallomColors.azul;
+
     final colorScheme = const ColorScheme.dark().copyWith(
       primary: AwakeColors.yellow,
       onPrimary: AwakeColors.navy,
-      secondary: AwakeColors.yellow,
+      secondary: corDestaque,
       onSecondary: AwakeColors.navy,
       surface: AwakeColors.darkSurface,
       onSurface: AwakeColors.offWhite,
@@ -198,7 +233,7 @@ class AppTheme {
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          backgroundColor: AwakeColors.yellow,
+          backgroundColor: corDestaque,
           foregroundColor: AwakeColors.navy,
           textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
           padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
@@ -217,17 +252,27 @@ class AppTheme {
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          foregroundColor: AwakeColors.yellow,
+          foregroundColor: corDestaque,
           textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
         ),
       ),
-      floatingActionButtonTheme: const FloatingActionButtonThemeData(
-        backgroundColor: AwakeColors.yellow,
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: corDestaque,
         foregroundColor: AwakeColors.navy,
+      ),
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.resolveWith((states) {
+          return states.contains(WidgetState.selected) ? corDestaque : null;
+        }),
+        trackColor: WidgetStateProperty.resolveWith((states) {
+          return states.contains(WidgetState.selected)
+              ? corDestaque.withOpacity(0.5)
+              : null;
+        }),
       ),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: AwakeColors.darkSurface,
-        indicatorColor: AwakeColors.yellow,
+        indicatorColor: corDestaque,
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);
@@ -253,7 +298,7 @@ class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AwakeColors.yellow, width: 2),
+          borderSide: BorderSide(color: corDestaque, width: 2),
         ),
       ),
       cardTheme: CardThemeData(

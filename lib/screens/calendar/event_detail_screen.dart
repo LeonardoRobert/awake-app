@@ -48,10 +48,10 @@ class EventDetailScreen extends ConsumerWidget {
                     Container(
                       width: 12,
                       height: 12,
-                      decoration: BoxDecoration(color: event.tipo.cor, shape: BoxShape.circle),
+                      decoration: BoxDecoration(color: event.cor, shape: BoxShape.circle),
                     ),
                     const SizedBox(width: 8),
-                    Text(event.tipo.label, style: Theme.of(context).textTheme.bodySmall),
+                    Text(event.labelCategoria, style: Theme.of(context).textTheme.bodySmall),
                   ],
                 ),
                 const SizedBox(height: 4),

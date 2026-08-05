@@ -3,14 +3,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
 import '../calendar/calendar_screen.dart';
+import '../financeiro/financeiro_screen.dart';
 import '../home/inicio_screen.dart';
+import '../home/inicio_shallom_screen.dart';
 import '../metas/metas_screen.dart';
 import '../profile/profile_screen.dart';
 import '../volunteering/shifts_screen.dart';
 
 /// Estrutura principal do app com navegacao por abas.
-/// O QR Code/Check-in nao e mais uma aba -- agora e um botao fixo no
-/// canto superior direito de cada tela (ver AwakeAppBar).
+///
+/// Quem pertence ao Awake (mesmo que tambem pertenca a outro
+/// ministerio) usa a navegacao Awake de 5 abas. Quem NAO pertence ao
+/// Awake (so Homens e/ou Mulheres) usa a navegacao Shallom, de 4 abas
+/// (sem Escala/Metas/QR, que sao coisas exclusivas do Awake).
 class HomeShell extends ConsumerStatefulWidget {
   const HomeShell({super.key});
 
@@ -22,34 +27,41 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   int _currentIndex = 0;
   bool _tourMostrado = false;
 
-  void _mostrarTourSeNecessario() {
+  void _mostrarTourSeNecessario(bool ehAwake) {
     if (_tourMostrado) return;
     final profile = ref.read(currentProfileProvider).value;
     if (profile == null || profile.tourVisto) return;
 
     _tourMostrado = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _abrirTour();
+      if (mounted) _abrirTour(ehAwake);
     });
   }
 
-  Future<void> _abrirTour() async {
+  Future<void> _abrirTour(bool ehAwake) async {
     await showDialog(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Bem-vindo(a) ao Awake! 🔥'),
-        content: const Column(
+        title: Text('Bem-vindo(a)! ${ehAwake ? "🔥" : ""}'),
+        content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _ItemTour(icon: Icons.home_outlined, texto: 'Início — os eventos exclusivos da Awake dessa semana, prontos pra compartilhar.'),
-            _ItemTour(icon: Icons.calendar_month, texto: 'Calendário — veja os próximos eventos e a programação da semana.'),
-            _ItemTour(icon: Icons.volunteer_activism, texto: 'Escala — inscreva-se para servir nos horários disponíveis.'),
-            _ItemTour(icon: Icons.emoji_events, texto: 'Metas — acompanhe sua constância e seus troféus.'),
-            _ItemTour(icon: Icons.person, texto: 'Perfil — seus dados e treinamentos.'),
-            _ItemTour(icon: Icons.qr_code, texto: 'O ícone no topo da tela é seu QR Code (ou, se você for líder, a câmera de check-in).'),
-          ],
+          children: ehAwake
+              ? const [
+                  _ItemTour(icon: Icons.home_outlined, texto: 'Início — os eventos exclusivos da Awake dessa semana, prontos pra compartilhar.'),
+                  _ItemTour(icon: Icons.calendar_month, texto: 'Calendário — veja os próximos eventos e a programação da semana.'),
+                  _ItemTour(icon: Icons.volunteer_activism, texto: 'Escala — inscreva-se para servir nos horários disponíveis.'),
+                  _ItemTour(icon: Icons.emoji_events, texto: 'Metas — acompanhe sua constância e seus troféus.'),
+                  _ItemTour(icon: Icons.person, texto: 'Perfil — seus dados e treinamentos.'),
+                  _ItemTour(icon: Icons.qr_code, texto: 'O ícone no topo da tela é seu QR Code (ou, se você for líder, a câmera de check-in).'),
+                ]
+              : const [
+                  _ItemTour(icon: Icons.home_outlined, texto: 'Início — os eventos do seu ministério dessa semana, prontos pra compartilhar.'),
+                  _ItemTour(icon: Icons.calendar_month, texto: 'Calendário — veja os próximos eventos e a programação da semana.'),
+                  _ItemTour(icon: Icons.attach_money, texto: 'Finanças — seu histórico de contribuições e como contribuir.'),
+                  _ItemTour(icon: Icons.person, texto: 'Perfil — seus dados e treinamentos.'),
+                ],
         ),
         actions: [
           FilledButton(
@@ -74,67 +86,68 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         body: Center(child: Text('Erro ao carregar perfil: $err')),
       ),
       data: (profile) {
-        _mostrarTourSeNecessario();
+        final ehAwake = profile?.pertenceAwake ?? true;
+        _mostrarTourSeNecessario(ehAwake);
 
-        final screens = [
-          const InicioScreen(),
-          const CalendarScreen(),
-          const ShiftsScreen(),
-          const MetasScreen(),
-          const ProfileScreen(),
+        final screens = ehAwake
+            ? const [
+                InicioScreen(),
+                CalendarScreen(),
+                ShiftsScreen(),
+                MetasScreen(),
+                ProfileScreen(),
+              ]
+            : const [
+                InicioShallomScreen(),
+                CalendarScreen(),
+                FinanceiroScreen(),
+                ProfileScreen(),
+              ];
+
+        final itensAwake = [
+          (Icons.home_outlined, 'Início'),
+          (Icons.calendar_month, 'Calendário'),
+          (Icons.volunteer_activism, 'Escala'),
+          (Icons.emoji_events, 'Metas'),
+          (Icons.person, 'Perfil'),
         ];
+        final itensShallom = [
+          (Icons.home_outlined, 'Início'),
+          (Icons.calendar_month, 'Calendário'),
+          (Icons.attach_money, 'Finanças'),
+          (Icons.person, 'Perfil'),
+        ];
+        final itens = ehAwake ? itensAwake : itensShallom;
+        final corFundo = ehAwake ? AwakeColors.navy : ShallomColors.azul;
+        // No Awake, o item selecionado fica amarelo sobre fundo navy.
+        // Na Shallom, o fundo ja e o azul -- entao o selecionado vira
+        // navy solido (bem mais forte que o azul de fundo), e o resto
+        // fica branco, do mesmo jeito que aparece no material da marca.
+        final corSelecionada = ehAwake ? AwakeColors.yellow : AwakeColors.navy;
+        final corNaoSelecionada = AwakeColors.offWhite;
 
         return Scaffold(
           body: IndexedStack(index: _currentIndex, children: screens),
           bottomNavigationBar: ColoredBox(
-            color: AwakeColors.navy,
+            color: corFundo,
             child: SafeArea(
               top: false,
               child: SizedBox(
                 height: 62,
                 child: Row(
-                  children: [
-                    Expanded(
+                  children: List.generate(itens.length, (index) {
+                    final (icon, label) = itens[index];
+                    return Expanded(
                       child: _NavItem(
-                        icon: Icons.home_outlined,
-                        label: 'Início',
-                        selected: _currentIndex == 0,
-                        onTap: () => setState(() => _currentIndex = 0),
+                        icon: icon,
+                        label: label,
+                        selected: _currentIndex == index,
+                        corSelecionada: corSelecionada,
+                        corNaoSelecionada: corNaoSelecionada,
+                        onTap: () => setState(() => _currentIndex = index),
                       ),
-                    ),
-                    Expanded(
-                      child: _NavItem(
-                        icon: Icons.calendar_month,
-                        label: 'Calendário',
-                        selected: _currentIndex == 1,
-                        onTap: () => setState(() => _currentIndex = 1),
-                      ),
-                    ),
-                    Expanded(
-                      child: _NavItem(
-                        icon: Icons.volunteer_activism,
-                        label: 'Escala',
-                        selected: _currentIndex == 2,
-                        onTap: () => setState(() => _currentIndex = 2),
-                      ),
-                    ),
-                    Expanded(
-                      child: _NavItem(
-                        icon: Icons.emoji_events,
-                        label: 'Metas',
-                        selected: _currentIndex == 3,
-                        onTap: () => setState(() => _currentIndex = 3),
-                      ),
-                    ),
-                    Expanded(
-                      child: _NavItem(
-                        icon: Icons.person,
-                        label: 'Perfil',
-                        selected: _currentIndex == 4,
-                        onTap: () => setState(() => _currentIndex = 4),
-                      ),
-                    ),
-                  ],
+                    );
+                  }),
                 ),
               ),
             ),
@@ -170,18 +183,22 @@ class _NavItem extends StatelessWidget {
   final IconData icon;
   final String label;
   final bool selected;
+  final Color corSelecionada;
+  final Color corNaoSelecionada;
   final VoidCallback onTap;
 
   const _NavItem({
     required this.icon,
     required this.label,
     required this.selected,
+    required this.corSelecionada,
+    required this.corNaoSelecionada,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final color = selected ? AwakeColors.yellow : AwakeColors.offWhite;
+    final color = selected ? corSelecionada : corNaoSelecionada;
     return InkWell(
       onTap: onTap,
       splashColor: Colors.transparent,

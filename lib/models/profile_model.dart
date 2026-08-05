@@ -1,10 +1,16 @@
-enum UserRole { membro, lider, admin }
+enum UserRole { membro, admin, adminFinanceiro }
 
 UserRole userRoleFromString(String value) {
-  return UserRole.values.firstWhere(
-    (e) => e.name == value,
-    orElse: () => UserRole.membro,
-  );
+  switch (value) {
+    case 'admin':
+      return UserRole.admin;
+    case 'admin_financeiro':
+      return UserRole.adminFinanceiro;
+    default:
+      // Cobre 'membro' e tambem o antigo 'lider' (que nao existe mais
+      // como papel global -- virou papel por ministerio).
+      return UserRole.membro;
+  }
 }
 
 enum EstadoCivil { solteiro, namorando, noivo, casado, outro }
@@ -20,7 +26,7 @@ EstadoCivil? estadoCivilFromString(String? value) {
 /// Genesis (13-16, solteiro/namorando), Next (17+, solteiro/namorando),
 /// One (noivo ou casado, qualquer idade). Calculado automaticamente
 /// no banco (ver supabase/schema.sql: calcular_categoria) — aqui so
-/// refletimos o valor para exibir na tela.
+/// refletimos o valor para exibir na tela. Vale so dentro do Awake.
 enum Categoria { genesis, next, one }
 
 Categoria? categoriaFromString(String? value) {
@@ -44,6 +50,33 @@ extension CategoriaLabel on Categoria {
   }
 }
 
+/// Vinculo da pessoa com um ministerio (Awake, Homens, Mulheres,
+/// Criancas) -- uma pessoa pode ter ate 2 ao mesmo tempo, cada um com
+/// seu proprio papel (membro ou lider).
+class MinisterioMembership {
+  final String ministerio; // 'awake' | 'homens' | 'mulheres' | 'criancas'
+  final bool ehLider;
+
+  const MinisterioMembership({required this.ministerio, required this.ehLider});
+}
+
+extension MinisterioLabel on String {
+  String get labelMinisterio {
+    switch (this) {
+      case 'awake':
+        return 'Awake';
+      case 'homens':
+        return 'Homens';
+      case 'mulheres':
+        return 'Mulheres';
+      case 'criancas':
+        return 'Crianças';
+      default:
+        return this;
+    }
+  }
+}
+
 class ProfileModel {
   final String id;
   final String nome;
@@ -58,6 +91,7 @@ class ProfileModel {
   final bool ativo;
   final bool tourVisto;
   final DateTime criadoEm;
+  final List<MinisterioMembership> ministerios;
 
   ProfileModel({
     required this.id,
@@ -73,12 +107,34 @@ class ProfileModel {
     required this.ativo,
     this.tourVisto = false,
     required this.criadoEm,
+    this.ministerios = const [],
   });
 
-  bool get isLider => papel == UserRole.lider || papel == UserRole.admin;
-  bool get isAdmin => papel == UserRole.admin;
+  /// admin "comum" e admin financeiro tem as mesmas permissoes gerais
+  /// -- o financeiro e um extra em cima disso, nao um papel separado
+  /// pros fins de "pode fazer tudo que admin faz".
+  bool get isAdmin => papel == UserRole.admin || papel == UserRole.adminFinanceiro;
+  bool get isAdminFinanceiro => papel == UserRole.adminFinanceiro;
 
-  factory ProfileModel.fromMap(Map<String, dynamic> map) {
+  bool get pertenceAwake => ministerios.any((m) => m.ministerio == 'awake');
+  bool get pertenceHomens => ministerios.any((m) => m.ministerio == 'homens');
+  bool get pertenceMulheres => ministerios.any((m) => m.ministerio == 'mulheres');
+  bool get pertenceCriancas => ministerios.any((m) => m.ministerio == 'criancas');
+
+  bool get ehLiderDeAlgumMinisterio => isAdmin || ministerios.any((m) => m.ehLider);
+
+  /// Mantido com esse nome de proposito: ate hoje, toda lideranca do
+  /// app e lideranca do Awake, e as telas de Escala, Check-in, Metas e
+  /// Treinamentos usam esse getter esperando exatamente esse
+  /// significado. Trocar o nome exigiria mexer em varias telas sem
+  /// necessidade.
+  bool get isLider =>
+      isAdmin || ministerios.any((m) => m.ministerio == 'awake' && m.ehLider);
+
+  factory ProfileModel.fromMap(
+    Map<String, dynamic> map, {
+    List<MinisterioMembership> ministerios = const [],
+  }) {
     return ProfileModel(
       id: map['id'] as String,
       nome: map['nome'] as String? ?? '',
@@ -95,6 +151,7 @@ class ProfileModel {
       ativo: map['ativo'] as bool? ?? true,
       tourVisto: map['tour_visto'] as bool? ?? false,
       criadoEm: DateTime.parse(map['criado_em'] as String),
+      ministerios: ministerios,
     );
   }
 

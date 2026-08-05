@@ -20,6 +20,7 @@ class AuthService {
     String? telefone,
     String? endereco,
     String? tempoParticipacao,
+    required List<String> ministerios,
   }) async {
     final response = await _client.auth.signUp(
       email: email,
@@ -40,6 +41,17 @@ class AuthService {
         'tempo_participacao': tempoParticipacao,
         'estado_civil': estadoCivil.name,
       }).eq('id', response.user!.id);
+
+      for (final ministerio in ministerios) {
+        await _client.from('profile_ministerios').upsert(
+          {
+            'profile_id': response.user!.id,
+            'ministerio': ministerio,
+            'papel': 'membro',
+          },
+          onConflict: 'profile_id,ministerio',
+        );
+      }
     }
 
     return response;
@@ -83,10 +95,13 @@ class AuthService {
   }
 
   /// Valida o codigo de lider no backend e, se correto, eleva o papel
-  /// do usuario atual para 'lider'. Lanca excecao se o codigo for invalido
-  /// (ver supabase/schema.sql: solicitar_papel_lider).
-  Future<void> solicitarPapelLider(String codigo) {
-    return _client.rpc('solicitar_papel_lider', params: {'p_codigo': codigo});
+  /// do usuario atual para 'lider' NO MINISTERIO informado. Lanca
+  /// excecao se o codigo for invalido.
+  Future<void> solicitarPapelLider(String codigo, {required String ministerio}) {
+    return _client.rpc('solicitar_papel_lider', params: {
+      'p_codigo': codigo,
+      'p_ministerio': ministerio,
+    });
   }
 
   Future<ProfileModel?> fetchCurrentProfile() async {
@@ -100,6 +115,19 @@ class AuthService {
         .maybeSingle();
 
     if (data == null) return null;
-    return ProfileModel.fromMap(data);
+
+    final ministeriosData = await _client
+        .from('profile_ministerios')
+        .select('ministerio, papel')
+        .eq('profile_id', user.id);
+
+    final ministerios = (ministeriosData as List)
+        .map((m) => MinisterioMembership(
+              ministerio: (m as Map<String, dynamic>)['ministerio'] as String,
+              ehLider: m['papel'] == 'lider',
+            ))
+        .toList();
+
+    return ProfileModel.fromMap(data, ministerios: ministerios);
   }
 }

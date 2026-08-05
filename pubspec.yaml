@@ -73,11 +73,12 @@ flutter:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/images/awake_icon_square_v2.png"
+  image_path: "assets/images/shallom_icon_square.png"
   adaptive_icon_background: "#0C192E"
-  adaptive_icon_foreground: "assets/images/awake_flame_adaptive.png"
+  adaptive_icon_foreground: "assets/images/shallom_pomba_adaptativa.png"
   web:
     generate: true
-    image_path: "assets/images/awake_icon_square_v2.png"
+    image_path: "assets/images/shallom_icon_square.png"
     background_color: "#0C192E"
     theme_color: "#0C192E"
+

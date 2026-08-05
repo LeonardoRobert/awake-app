@@ -1,6 +1,127 @@
 import 'package:flutter/material.dart';
 
-enum EventTipo { ebd, gc, comunhao, laje, cultoCelebracao, cultoFamilia, embaixadoresMensageiras, outro }
+// =========================================================
+// ESCOPO — define QUEM PODE VER o evento (e, em quase todos os casos,
+// tambem a cor da bolinha no calendario). Substitui o antigo booleano
+// "exclusivoAwake".
+// =========================================================
+enum EventoEscopo {
+  igreja,
+  lideranca,
+  casais,
+  homens,
+  mulheres,
+  awake,
+  embaixadoresMensageiras,
+  criancas,
+}
+
+/// Ordem oficial de apresentacao (usada no formulario e como
+/// desempate quando dois eventos caem no mesmo dia/horario).
+const ordemEscopos = [
+  EventoEscopo.igreja,
+  EventoEscopo.lideranca,
+  EventoEscopo.casais,
+  EventoEscopo.homens,
+  EventoEscopo.mulheres,
+  EventoEscopo.awake,
+  EventoEscopo.embaixadoresMensageiras,
+  EventoEscopo.criancas,
+];
+
+EventoEscopo eventoEscopoFromString(String? value) {
+  switch (value) {
+    case 'lideranca':
+      return EventoEscopo.lideranca;
+    case 'casais':
+      return EventoEscopo.casais;
+    case 'homens':
+      return EventoEscopo.homens;
+    case 'mulheres':
+      return EventoEscopo.mulheres;
+    case 'awake':
+      return EventoEscopo.awake;
+    case 'embaixadores_mensageiras':
+      return EventoEscopo.embaixadoresMensageiras;
+    case 'criancas':
+      return EventoEscopo.criancas;
+    default:
+      return EventoEscopo.igreja;
+  }
+}
+
+extension EventoEscopoDb on EventoEscopo {
+  String get valorBanco {
+    switch (this) {
+      case EventoEscopo.igreja:
+        return 'igreja';
+      case EventoEscopo.lideranca:
+        return 'lideranca';
+      case EventoEscopo.casais:
+        return 'casais';
+      case EventoEscopo.homens:
+        return 'homens';
+      case EventoEscopo.mulheres:
+        return 'mulheres';
+      case EventoEscopo.awake:
+        return 'awake';
+      case EventoEscopo.embaixadoresMensageiras:
+        return 'embaixadores_mensageiras';
+      case EventoEscopo.criancas:
+        return 'criancas';
+    }
+  }
+
+  /// Ministerio correspondente (usado pra saber se um lider de
+  /// ministerio pode gerenciar esse escopo). null = so admin.
+  String? get ministerioCorrespondente {
+    switch (this) {
+      case EventoEscopo.homens:
+        return 'homens';
+      case EventoEscopo.mulheres:
+        return 'mulheres';
+      case EventoEscopo.awake:
+        return 'awake';
+      case EventoEscopo.criancas:
+        return 'criancas';
+      default:
+        return null;
+    }
+  }
+}
+
+extension EventoEscopoLabel on EventoEscopo {
+  String get label {
+    switch (this) {
+      case EventoEscopo.igreja:
+        return 'Igreja (todos)';
+      case EventoEscopo.lideranca:
+        return 'Liderança geral';
+      case EventoEscopo.casais:
+        return 'Casais';
+      case EventoEscopo.homens:
+        return 'Homens';
+      case EventoEscopo.mulheres:
+        return 'Mulheres';
+      case EventoEscopo.awake:
+        return 'Awake';
+      case EventoEscopo.embaixadoresMensageiras:
+        return 'Embaixadores e Mensageiras';
+      case EventoEscopo.criancas:
+        return 'Crianças';
+    }
+  }
+
+  int get prioridade => ordemEscopos.indexOf(this);
+}
+
+// =========================================================
+// TIPO — so importa DENTRO de dois escopos: "igreja" (EBD, Culto de
+// Celebracao, Culto da Familia) e "awake" (GC, Comunhao, Laje). Pros
+// demais escopos, o tipo fica em "outro" e nao aparece na tela --
+// a cor e o significado ja vem inteiramente do escopo.
+// =========================================================
+enum EventTipo { ebd, gc, comunhao, laje, cultoCelebracao, cultoFamilia, outro }
 
 EventTipo eventTipoFromString(String? value) {
   switch (value) {
@@ -16,15 +137,12 @@ EventTipo eventTipoFromString(String? value) {
       return EventTipo.cultoCelebracao;
     case 'culto_familia':
       return EventTipo.cultoFamilia;
-    case 'embaixadores_mensageiras':
-      return EventTipo.embaixadoresMensageiras;
     default:
       return EventTipo.outro;
   }
 }
 
 extension EventTipoDb on EventTipo {
-  /// Valor exato salvo no banco (o enum do Postgres usa esses nomes).
   String get valorBanco {
     switch (this) {
       case EventTipo.ebd:
@@ -39,8 +157,6 @@ extension EventTipoDb on EventTipo {
         return 'culto_celebracao';
       case EventTipo.cultoFamilia:
         return 'culto_familia';
-      case EventTipo.embaixadoresMensageiras:
-        return 'embaixadores_mensageiras';
       case EventTipo.outro:
         return 'outro';
     }
@@ -62,36 +178,66 @@ extension EventTipoLabel on EventTipo {
         return 'Culto de Celebração';
       case EventTipo.cultoFamilia:
         return 'Culto da Família';
-      case EventTipo.embaixadoresMensageiras:
-        return 'Embaixadores e Mensageiras';
       case EventTipo.outro:
         return 'Outro';
     }
   }
 }
 
-/// Cor da bolinha desse tipo de evento no calendario.
-extension EventTipoColor on EventTipo {
-  Color get cor {
-    switch (this) {
-      case EventTipo.ebd:
-        return const Color(0xFFFFD21F); // amarela
-      case EventTipo.cultoCelebracao:
-        return const Color(0xFF1D4ED8); // azul escuro
-      case EventTipo.cultoFamilia:
-        return const Color(0xFF60A5FA); // azul claro
-      case EventTipo.embaixadoresMensageiras:
-        return const Color(0xFF8D6E63); // marrom
+/// Tipos selecionaveis quando o escopo e "igreja".
+const tiposDoEscopoIgreja = [EventTipo.ebd, EventTipo.cultoCelebracao, EventTipo.cultoFamilia, EventTipo.outro];
+
+/// Tipos selecionaveis quando o escopo e "awake".
+const tiposDoEscopoAwake = [EventTipo.gc, EventTipo.comunhao, EventTipo.laje, EventTipo.outro];
+
+// =========================================================
+// Cor final do evento: vem do ESCOPO, exceto dentro do Awake, onde
+// GC/Comunhao/Laje tem cada um sua propria cor.
+// =========================================================
+Color corDoEvento(EventTipo tipo, EventoEscopo escopo) {
+  if (escopo == EventoEscopo.awake) {
+    switch (tipo) {
       case EventTipo.gc:
-        return const Color(0xFF4ADE80); // verde claro
+        return const Color(0xFF4ADE80); // verde
       case EventTipo.comunhao:
-        return const Color(0xFFEF4444); // vermelho
+        return const Color(0xFFFACC15); // amarelo
       case EventTipo.laje:
-        return const Color(0xFFFB923C); // laranja
-      case EventTipo.outro:
         return const Color(0xFFA78BFA); // roxo
+      default:
+        return const Color(0xFF60A5FA); // fallback (azul claro)
     }
   }
+
+  switch (escopo) {
+    case EventoEscopo.igreja:
+      return const Color(0xFF60A5FA); // azul claro
+    case EventoEscopo.lideranca:
+      return const Color(0xFFFB923C); // laranja
+    case EventoEscopo.casais:
+      return const Color(0xFFEF4444); // vermelho
+    case EventoEscopo.homens:
+      return const Color(0xFF1D4ED8); // azul escuro
+    case EventoEscopo.mulheres:
+      return const Color(0xFFEC4899); // rosa
+    case EventoEscopo.embaixadoresMensageiras:
+      return const Color(0xFF8D6E63); // marrom
+    case EventoEscopo.criancas:
+      return const Color(0xFFC4B5FD); // lilás
+    case EventoEscopo.awake:
+      return const Color(0xFF60A5FA); // nao deveria cair aqui
+  }
+}
+
+/// Texto curto pra mostrar acima do titulo do evento (ex: "Awake • GC",
+/// ou so "Homens" pra escopos sem sub-tipo).
+String labelDoEvento(EventTipo tipo, EventoEscopo escopo) {
+  if (escopo == EventoEscopo.awake && tipo != EventTipo.outro) {
+    return '${escopo.label} • ${tipo.label}';
+  }
+  if (escopo == EventoEscopo.igreja && tipo != EventTipo.outro) {
+    return tipo.label;
+  }
+  return escopo.label;
 }
 
 class EventModel {
@@ -105,17 +251,11 @@ class EventModel {
   final bool recorrente;
   final DateTime? recorrenciaFim;
   final EventTipo tipo;
+  final EventoEscopo escopo;
   final List<String>? publicoAlvo;
   final List<DateTime> excecoes;
   final String? fotoUrl;
-
-  /// Segunda foto opcional, em formato vertical (Story), usada no
-  /// botao "Adicionar ao Instagram".
   final String? fotoStoryUrl;
-
-  /// true = evento exclusivo da Awake (aparece na tela de Inicio se for
-  /// sexta-feira). false = evento geral da igreja.
-  final bool exclusivoAwake;
 
   EventModel({
     required this.id,
@@ -128,12 +268,15 @@ class EventModel {
     this.recorrente = false,
     this.recorrenciaFim,
     this.tipo = EventTipo.outro,
+    this.escopo = EventoEscopo.igreja,
     this.publicoAlvo,
     this.excecoes = const [],
     this.fotoUrl,
     this.fotoStoryUrl,
-    this.exclusivoAwake = false,
   });
+
+  Color get cor => corDoEvento(tipo, escopo);
+  String get labelCategoria => labelDoEvento(tipo, escopo);
 
   factory EventModel.fromMap(Map<String, dynamic> map) {
     return EventModel(
@@ -151,6 +294,7 @@ class EventModel {
           ? DateTime.parse(map['recorrencia_fim'] as String)
           : null,
       tipo: eventTipoFromString(map['tipo'] as String?),
+      escopo: eventoEscopoFromString(map['escopo'] as String?),
       publicoAlvo: (map['publico_alvo'] as List?)?.map((e) => e.toString()).toList(),
       excecoes: (map['excecoes'] as List?)
               ?.map((e) => DateTime.parse(e.toString()))
@@ -158,7 +302,6 @@ class EventModel {
           const [],
       fotoUrl: map['foto_url'] as String?,
       fotoStoryUrl: map['foto_story_url'] as String?,
-      exclusivoAwake: map['exclusivo_awake'] as bool? ?? false,
     );
   }
 
@@ -173,10 +316,10 @@ class EventModel {
       'recorrente': recorrente,
       'recorrencia_fim': recorrenciaFim?.toIso8601String().split('T').first,
       'tipo': tipo.valorBanco,
+      'escopo': escopo.valorBanco,
       'publico_alvo': publicoAlvo,
       'foto_url': fotoUrl,
       'foto_story_url': fotoStoryUrl,
-      'exclusivo_awake': exclusivoAwake,
     };
   }
 

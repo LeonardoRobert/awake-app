@@ -95,9 +95,56 @@ class ProfileScreen extends ConsumerWidget {
               ),
               ListTile(
                 contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.groups_outlined),
-                title: const Text('Grupo'),
-                subtitle: Text(profile.categoria?.label ?? 'Não definido'),
+                leading: const Icon(Icons.volunteer_activism_outlined),
+                title: const Text('Ministério(s)'),
+                subtitle: Text(
+                  profile.ministerios.isEmpty
+                      ? 'Não definido'
+                      : profile.ministerios
+                          .map((m) => m.ehLider
+                              ? '${m.ministerio.labelMinisterio} (líder)'
+                              : m.ministerio.labelMinisterio)
+                          .join(', '),
+                ),
+              ),
+              if (profile.pertenceAwake) ...[
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.groups_outlined),
+                  title: const Text('Grupo'),
+                  subtitle: Text(profile.categoria?.label ?? 'Não definido'),
+                ),
+              ],
+              // So aparece aqui dentro do Perfil pra quem e Awake -- os
+              // demais ministerios ja tem "Financas" como aba propria.
+              if (profile.pertenceAwake) ...[
+                const Divider(),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.attach_money),
+                  title: const Text('Financeiro'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.push('/financeiro'),
+                ),
+              ],
+              if (profile.isAdmin) ...[
+                const Divider(),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.dashboard_outlined),
+                  title: const Text('Painel de Calendário (navegador)'),
+                  subtitle: const Text('Melhor no computador'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.push('/admin/calendario'),
+                ),
+              ],
+              const Divider(),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.school_outlined),
+                title: const Text('Treinamentos'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/treinamentos'),
               ),
               const Divider(),
               SwitchListTile(
@@ -110,14 +157,6 @@ class ProfileScreen extends ConsumerWidget {
                 onChanged: (ativado) {
                   ref.read(themeModeProvider.notifier).definir(ativado);
                 },
-              ),
-              const Divider(),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.school_outlined),
-                title: const Text('Treinamentos'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => context.push('/treinamentos'),
               ),
               const Divider(),
               ListTile(
@@ -148,8 +187,8 @@ class ProfileScreen extends ConsumerWidget {
     switch (papel) {
       case 'admin':
         return 'Administrador';
-      case 'lider':
-        return 'Lider';
+      case 'adminFinanceiro':
+        return 'Administrador Financeiro';
       default:
         return 'Membro';
     }

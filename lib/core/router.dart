@@ -9,8 +9,10 @@ import '../screens/auth/login_screen.dart';
 import '../screens/auth/redefinir_senha_screen.dart';
 import '../screens/auth/signup_screen.dart';
 import '../screens/auth/termos_screen.dart';
+import '../screens/calendar/admin_calendario_screen.dart';
 import '../screens/calendar/event_detail_screen.dart';
 import '../screens/calendar/event_form_screen.dart';
+import '../screens/financeiro/financeiro_screen.dart';
 import '../screens/home/home_shell.dart';
 import '../screens/training/treinamento_detail_screen.dart';
 import '../screens/training/treinamento_form_screen.dart';
@@ -55,7 +57,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const RedefinirSenhaScreen(),
       ),
       GoRoute(path: '/termos', builder: (context, state) => const TermosScreen()),
+      GoRoute(path: '/financeiro', builder: (context, state) => const FinanceiroScreen()),
       GoRoute(path: '/', builder: (context, state) => const HomeShell()),
+      GoRoute(
+        path: '/admin/calendario',
+        builder: (context, state) => const AdminCalendarioScreen(),
+      ),
       GoRoute(
         path: '/eventos/novo',
         builder: (context, state) =>

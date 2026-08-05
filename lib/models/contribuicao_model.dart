@@ -1,0 +1,86 @@
+enum MeioPagamento { pix, dinheiro, cartao, transferencia, boleto, outro }
+
+MeioPagamento meioPagamentoFromString(String? value) {
+  switch (value) {
+    case 'pix':
+      return MeioPagamento.pix;
+    case 'dinheiro':
+      return MeioPagamento.dinheiro;
+    case 'cartao':
+      return MeioPagamento.cartao;
+    case 'transferencia':
+      return MeioPagamento.transferencia;
+    case 'boleto':
+      return MeioPagamento.boleto;
+    default:
+      return MeioPagamento.outro;
+  }
+}
+
+extension MeioPagamentoLabel on MeioPagamento {
+  String get valorBanco {
+    switch (this) {
+      case MeioPagamento.pix:
+        return 'pix';
+      case MeioPagamento.dinheiro:
+        return 'dinheiro';
+      case MeioPagamento.cartao:
+        return 'cartao';
+      case MeioPagamento.transferencia:
+        return 'transferencia';
+      case MeioPagamento.boleto:
+        return 'boleto';
+      case MeioPagamento.outro:
+        return 'outro';
+    }
+  }
+
+  String get label {
+    switch (this) {
+      case MeioPagamento.pix:
+        return 'Pix';
+      case MeioPagamento.dinheiro:
+        return 'Dinheiro';
+      case MeioPagamento.cartao:
+        return 'Cartão';
+      case MeioPagamento.transferencia:
+        return 'Transferência';
+      case MeioPagamento.boleto:
+        return 'Boleto';
+      case MeioPagamento.outro:
+        return 'Outro';
+    }
+  }
+}
+
+class ContribuicaoModel {
+  final String id;
+  final String profileId;
+  final DateTime data;
+  final String? horario;
+  final double valor;
+  final MeioPagamento meioPagamento;
+  final String? observacao;
+
+  ContribuicaoModel({
+    required this.id,
+    required this.profileId,
+    required this.data,
+    this.horario,
+    required this.valor,
+    required this.meioPagamento,
+    this.observacao,
+  });
+
+  factory ContribuicaoModel.fromMap(Map<String, dynamic> map) {
+    return ContribuicaoModel(
+      id: map['id'] as String,
+      profileId: map['profile_id'] as String,
+      data: DateTime.parse(map['data'] as String),
+      horario: map['horario'] as String?,
+      valor: (map['valor'] as num).toDouble(),
+      meioPagamento: meioPagamentoFromString(map['meio_pagamento'] as String?),
+      observacao: map['observacao'] as String?,
+    );
+  }
+}

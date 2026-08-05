@@ -25,11 +25,14 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   Widget build(BuildContext context) {
     final eventsAsync = ref.watch(upcomingEventsProvider);
     final profileAsync = ref.watch(currentProfileProvider);
-    final isLider = profileAsync.value?.isLider ?? false;
+    // Diferente da Escala/Check-in (que sao coisas so do Awake), criar
+    // evento no calendario e permitido pra lider de QUALQUER ministerio
+    // (ou admin) -- por isso usa esse getter, nao o "isLider" comum.
+    final podeGerenciarEventos = profileAsync.value?.ehLiderDeAlgumMinisterio ?? false;
 
     return Scaffold(
       appBar: const AwakeAppBar(title: 'Calendário'),
-      floatingActionButton: isLider
+      floatingActionButton: podeGerenciarEventos
           ? FloatingActionButton.small(
               heroTag: 'fab-calendario',
               onPressed: () => context.push('/eventos/novo'),
@@ -70,13 +73,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
               listaExibida = byDay[_dateOnly(_diaSelecionado!)] ?? [];
               tituloLista = 'Eventos de ${DateFormat("dd/MM (EEEE)", 'pt_BR').format(_diaSelecionado!)}';
             }
-            listaExibida.sort((a, b) {
-              final porData = a.data.compareTo(b.data);
-              if (porData != 0) return porData;
-              // Em caso de empate (mesmo dia e horario), ordena por
-              // grupo: Genesis, depois Next, depois One.
-              return _prioridadeGrupo(a.event).compareTo(_prioridadeGrupo(b.event));
-            });
+            listaExibida.sort(_compararOcorrencias);
 
             return Column(
               children: [
@@ -100,13 +97,12 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                   },
                   calendarStyle: const CalendarStyle(),
                   calendarBuilders: CalendarBuilders<_Occurrence>(
-                    // Uma bolinha colorida por TIPO de evento presente no
-                    // dia (nao uma por evento) -- assim um dia com 3
-                    // eventos do mesmo tipo mostra so 1 bolinha daquela
-                    // cor, e um dia variado mostra ate 4 cores diferentes.
+                    // Uma bolinha colorida por CATEGORIA presente no dia
+                    // (nao uma por evento) -- um dia com 3 eventos da
+                    // mesma categoria mostra so 1 bolinha daquela cor.
                     markerBuilder: (context, day, eventsForDay) {
                       if (eventsForDay.isEmpty) return null;
-                      final cores = eventsForDay.map((e) => e.event.tipo.cor).toSet().toList();
+                      final cores = eventsForDay.map((e) => e.event.cor).toSet().toList();
 
                       return Positioned(
                         bottom: 4,
@@ -162,13 +158,14 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                                 width: 10,
                                 height: 10,
                                 decoration: BoxDecoration(
-                                  color: occ.event.tipo.cor,
+                                  color: occ.event.cor,
                                   shape: BoxShape.circle,
                                 ),
                               ),
                               title: Text(occ.event.titulo),
                               subtitle: Text(
-                                DateFormat("dd/MM (EEEE) HH:mm", 'pt_BR').format(occ.data) +
+                                '${occ.event.labelCategoria} • ' +
+                                    DateFormat("dd/MM (EEEE) HH:mm", 'pt_BR').format(occ.data) +
                                     (occ.event.local != null ? ' • ${occ.event.local}' : ''),
                               ),
                               trailing: occ.event.recorrente
@@ -197,9 +194,21 @@ class _Occurrence {
   _Occurrence(this.event, this.data);
 }
 
-/// Ordem de desempate quando dois eventos caem no mesmo dia e horario:
-/// Genesis primeiro, depois Next, depois One. Eventos "para todos" (sem
-/// publico_alvo definido) ficam por ultimo nesse desempate.
+int _compararOcorrencias(_Occurrence a, _Occurrence b) {
+  final porData = a.data.compareTo(b.data);
+  if (porData != 0) return porData;
+  // Empate no dia/horario: primeiro pela ordem oficial das categorias
+  // (Igreja, Lideranca, Casais, Homens, Mulheres, Awake, Embaixadores
+  // e Mensageiras, Criancas)...
+  final porEscopo = a.event.escopo.prioridade.compareTo(b.event.escopo.prioridade);
+  if (porEscopo != 0) return porEscopo;
+  // ...e, se os dois forem do Awake, por subgrupo: Genesis, Next, One.
+  if (a.event.escopo == EventoEscopo.awake) {
+    return _prioridadeGrupo(a.event).compareTo(_prioridadeGrupo(b.event));
+  }
+  return 0;
+}
+
 int _prioridadeGrupo(EventModel evento) {
   final grupos = evento.publicoAlvo;
   if (grupos == null || grupos.isEmpty) return 99;

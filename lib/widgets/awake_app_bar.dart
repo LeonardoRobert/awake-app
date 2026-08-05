@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../core/theme/app_theme.dart';
 import '../providers/auth_provider.dart';
 
-/// AppBar padrao do app: chama + titulo, e um botao fixo de QR Code /
-/// Check-in no canto superior direito (antes isso era uma aba na barra
-/// de baixo -- agora fica sempre visivel, em qualquer tela).
+/// AppBar padrao do app. Se adapta sozinha a quem esta logado:
+/// - Pessoa Awake: chama branca + botao de QR Code/Check-in fixo
+/// - Pessoa de outro ministerio (Homens/Mulheres): pomba da Shallom,
+///   sem botao de QR (esses ministerios nao tem escala/check-in)
 ///
-/// Use `showQrButton: false` nas proprias telas de QR/Check-in, pra nao
-/// mostrar o botao dentro delas mesmas.
+/// Use `showQrButton: false` nas proprias telas de QR/Check-in, pra
+/// nao mostrar o botao dentro delas mesmas.
 class AwakeAppBar extends ConsumerWidget implements PreferredSizeWidget {
   final String title;
   final List<Widget>? actions;
@@ -24,20 +26,31 @@ class AwakeAppBar extends ConsumerWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profileAsync = ref.watch(currentProfileProvider);
-    final isLider = profileAsync.value?.isLider ?? false;
+    final profile = profileAsync.value;
+    final isLider = profile?.isLider ?? false;
+    // Enquanto carrega (profile null), assume Awake pra nao "piscar"
+    // pra pomba e voltar pra chama um instante depois -- a maioria de
+    // quem usa o app hoje e Awake.
+    final ehAwake = profile?.pertenceAwake ?? true;
+
+    final icone = ehAwake
+        ? 'assets/images/awake_flame_white.png'
+        : 'assets/images/shallom_pomba_branca.png';
 
     return AppBar(
+      backgroundColor: ehAwake ? AwakeColors.navy : ShallomColors.azul,
       title: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Image.asset('assets/images/awake_flame_white.png', height: 20),
+          Image.asset(icone, height: 20),
           const SizedBox(width: 10),
           Flexible(child: Text(title, overflow: TextOverflow.ellipsis)),
         ],
       ),
       actions: [
         ...?actions,
-        if (showQrButton)
+        // QR Code / Check-in so existe pro Awake.
+        if (showQrButton && ehAwake)
           IconButton(
             icon: Icon(isLider ? Icons.qr_code_scanner : Icons.qr_code),
             tooltip: isLider ? 'Check-in' : 'Meu QR Code',

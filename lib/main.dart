@@ -7,6 +7,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/router.dart';
 import 'core/theme/app_theme.dart';
+import 'providers/auth_provider.dart';
 import 'providers/theme_provider.dart';
 import 'services/notification_service.dart';
 import 'services/supabase_service.dart';
@@ -55,11 +56,17 @@ class _AwakeAppState extends ConsumerState<AwakeApp> {
     final router = ref.watch(routerProvider);
     final themeMode = ref.watch(themeModeProvider);
 
+    // Antes do login (perfil ainda nao carregado), usa o tema Shallom
+    // como padrao -- e o app "guarda-chuva", o Awake e um dos
+    // ministerios dentro dele. Assim que a pessoa entra, se ela for
+    // Awake, o tema se ajusta sozinho pro amarelo/chama.
+    final ehAwake = ref.watch(currentProfileProvider).value?.pertenceAwake ?? false;
+
     return MaterialApp.router(
-      title: 'Awake',
+      title: 'Shallom',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.light(),
-      darkTheme: AppTheme.dark(),
+      theme: AppTheme.light(ehAwake: ehAwake),
+      darkTheme: AppTheme.dark(ehAwake: ehAwake),
       // Controlado manualmente pela pessoa (ver Perfil), nao segue mais
       // o tema do sistema sozinho.
       themeMode: themeMode,
