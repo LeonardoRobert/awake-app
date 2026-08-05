@@ -1,40 +1,109 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
-import '../../models/profile_model.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/theme_provider.dart';
+import '../../screens/financeiro/financeiro_screen.dart';
+import '../../screens/messages/admin_mensagens_screen.dart';
+import '../../screens/messages/enviar_mensagem_screen.dart';
+import '../../screens/pages/nossas_paginas_screen.dart';
+import '../../screens/pages/quem_somos_screen.dart';
 import '../../services/notification_service.dart';
 import '../../widgets/awake_app_bar.dart';
-import 'editar_perfil_screen.dart';
+import 'meu_perfil_screen.dart';
 
-class ProfileScreen extends ConsumerWidget {
+/// Essa tela virou um MENU (antes era a lista direta de dados do
+/// perfil -- isso agora fica em "Ver meu perfil" / MeuPerfilScreen).
+class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+  bool _enviandoFoto = false;
+
+  Future<void> _trocarFoto() async {
+    final picker = ImagePicker();
+    final arquivo = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 800,
+      imageQuality: 85,
+    );
+    if (arquivo == null) return;
+
+    setState(() => _enviandoFoto = true);
+    try {
+      final Uint8List bytes = await arquivo.readAsBytes();
+      await ref.read(authServiceProvider).uploadFotoPerfil(bytes, arquivo.name);
+      ref.invalidate(currentProfileProvider);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Erro ao enviar foto: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _enviandoFoto = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final profileAsync = ref.watch(currentProfileProvider);
     final email = ref.watch(authServiceProvider).currentUserEmail;
     final themeMode = ref.watch(themeModeProvider);
 
     return Scaffold(
-      appBar: const AwakeAppBar(title: 'Perfil'),
+      appBar: const AwakeAppBar(title: 'Menu'),
       body: profileAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (err, _) => Center(child: Text('Erro: $err')),
         data: (profile) {
-          if (profile == null) return const Center(child: Text('Perfil nao encontrado.'));
+          if (profile == null) return const Center(child: Text('Perfil não encontrado.'));
+
           return ListView(
             padding: const EdgeInsets.fromLTRB(24, 24, 24, 96),
             children: [
               Row(
                 children: [
-                  CircleAvatar(
-                    radius: 36,
-                    child: Text(
-                      profile.nome.isNotEmpty ? profile.nome[0].toUpperCase() : '?',
-                      style: const TextStyle(fontSize: 28),
+                  GestureDetector(
+                    onTap: _enviandoFoto ? null : _trocarFoto,
+                    child: Stack(
+                      children: [
+                        CircleAvatar(
+                          radius: 36,
+                          backgroundImage:
+                              profile.fotoUrl != null ? NetworkImage(profile.fotoUrl!) : null,
+                          child: profile.fotoUrl == null
+                              ? Text(
+                                  profile.nome.isNotEmpty ? profile.nome[0].toUpperCase() : '?',
+                                  style: const TextStyle(fontSize: 28),
+                                )
+                              : null,
+                        ),
+                        Positioned(
+                          right: 0,
+                          bottom: 0,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.secondary,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 2),
+                            ),
+                            child: _enviandoFoto
+                                ? const SizedBox(
+                                    height: 12,
+                                    width: 12,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : const Icon(Icons.camera_alt, size: 14),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -42,89 +111,55 @@ class ProfileScreen extends ConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        Text(profile.nome, style: Theme.of(context).textTheme.titleLarge),
+                        const SizedBox(height: 2),
                         Text(
-                          profile.nome,
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        Text(
-                          _labelPapel(profile.papel.name),
+                          email ?? '',
                           style: Theme.of(context).textTheme.bodyMedium,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.edit_outlined),
-                    tooltip: 'Editar perfil',
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => EditarPerfilScreen(perfil: profile),
-                      ),
-                    ),
-                  ),
                 ],
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 24),
               ListTile(
                 contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.cake_outlined),
-                title: const Text('Data de nascimento'),
-                subtitle: Text(
-                  profile.dataNascimento != null
-                      ? DateFormat('dd/MM/yyyy').format(profile.dataNascimento!)
-                      : 'Não informado',
-                ),
+                leading: const Icon(Icons.person_outline),
+                title: const Text('Ver meu perfil'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.of(context)
+                    .push(MaterialPageRoute(builder: (_) => const MeuPerfilScreen())),
+              ),
+              const Divider(),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.info_outline),
+                title: const Text('Quem somos nós'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.of(context)
+                    .push(MaterialPageRoute(builder: (_) => const QuemSomosScreen())),
               ),
               ListTile(
                 contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.email_outlined),
-                title: const Text('E-mail'),
-                subtitle: Text(email ?? 'Não informado'),
+                leading: const Icon(Icons.public_outlined),
+                title: const Text('Nossas páginas'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.of(context)
+                    .push(MaterialPageRoute(builder: (_) => const NossasPaginasScreen())),
               ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.phone_outlined),
-                title: const Text('Celular'),
-                subtitle: Text(profile.telefone ?? 'Não informado'),
-              ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.home_outlined),
-                title: const Text('Endereço'),
-                subtitle: Text(profile.endereco ?? 'Não informado'),
-              ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.volunteer_activism_outlined),
-                title: const Text('Ministério(s)'),
-                subtitle: Text(
-                  profile.ministerios.isEmpty
-                      ? 'Não definido'
-                      : profile.ministerios
-                          .map((m) => m.ehLider
-                              ? '${m.ministerio.labelMinisterio} (líder)'
-                              : m.ministerio.labelMinisterio)
-                          .join(', '),
-                ),
-              ),
-              if (profile.pertenceAwake) ...[
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.groups_outlined),
-                  title: const Text('Grupo'),
-                  subtitle: Text(profile.categoria?.label ?? 'Não definido'),
-                ),
-              ],
-              // So aparece aqui dentro do Perfil pra quem e Awake -- os
-              // demais ministerios ja tem "Financas" como aba propria.
+              // So aparece aqui dentro do Menu pra quem e Awake -- os
+              // demais ministerios ja tem "Contribua" como aba propria.
               if (profile.pertenceAwake) ...[
                 const Divider(),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.attach_money),
-                  title: const Text('Financeiro'),
+                  leading: const Icon(Icons.volunteer_activism),
+                  title: const Text('Contribua'),
                   trailing: const Icon(Icons.chevron_right),
-                  onTap: () => context.push('/financeiro'),
+                  onTap: () => Navigator.of(context)
+                      .push(MaterialPageRoute(builder: (_) => const FinanceiroScreen())),
                 ),
               ],
               if (profile.isAdmin) ...[
@@ -137,6 +172,15 @@ class ProfileScreen extends ConsumerWidget {
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => context.push('/admin/calendario'),
                 ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.mark_email_unread_outlined),
+                  title: const Text('Caixa de entrada'),
+                  subtitle: const Text('Pedidos de oração e testemunhos'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(context)
+                      .push(MaterialPageRoute(builder: (_) => const AdminMensagensScreen())),
+                ),
               ],
               const Divider(),
               ListTile(
@@ -145,6 +189,35 @@ class ProfileScreen extends ConsumerWidget {
                 title: const Text('Treinamentos'),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => context.push('/treinamentos'),
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.pan_tool_alt_outlined),
+                title: const Text('Pedido de oração'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => const EnviarMensagemScreen(
+                    tabela: 'pedidos_oracao',
+                    titulo: 'Pedido de oração',
+                    rotuloCampo: 'Seu pedido de oração',
+                    textoExplicativo:
+                        'Compartilhe seu pedido — nossa liderança vai orar por você.',
+                  ),
+                )),
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.celebration_outlined),
+                title: const Text('Testemunho'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => const EnviarMensagemScreen(
+                    tabela: 'testemunhos',
+                    titulo: 'Testemunho',
+                    rotuloCampo: 'Seu testemunho',
+                    textoExplicativo: 'Compartilhe o que Deus tem feito na sua vida.',
+                  ),
+                )),
               ),
               const Divider(),
               SwitchListTile(
@@ -181,16 +254,5 @@ class ProfileScreen extends ConsumerWidget {
         },
       ),
     );
-  }
-
-  String _labelPapel(String papel) {
-    switch (papel) {
-      case 'admin':
-        return 'Administrador';
-      case 'adminFinanceiro':
-        return 'Administrador Financeiro';
-      default:
-        return 'Membro';
-    }
   }
 }

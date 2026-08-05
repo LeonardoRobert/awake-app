@@ -142,6 +142,7 @@ class ProfileModel {
   final EstadoCivil? estadoCivil;
   final Sexo? sexo;
   final GrupoCasais? grupoCasais;
+  final String? fotoUrl;
   final Categoria? categoria;
   final UserRole papel;
   final String qrCodeId;
@@ -160,6 +161,7 @@ class ProfileModel {
     this.estadoCivil,
     this.sexo,
     this.grupoCasais,
+    this.fotoUrl,
     this.categoria,
     required this.papel,
     required this.qrCodeId,
@@ -206,6 +208,7 @@ class ProfileModel {
       estadoCivil: estadoCivilFromString(map['estado_civil'] as String?),
       sexo: sexoFromString(map['sexo'] as String?),
       grupoCasais: grupoCasaisFromString(map['grupo_casais'] as String?),
+      fotoUrl: map['foto_url'] as String?,
       categoria: categoriaFromString(map['categoria'] as String?),
       papel: userRoleFromString(map['papel'] as String? ?? 'membro'),
       qrCodeId: map['qr_code_id'] as String,

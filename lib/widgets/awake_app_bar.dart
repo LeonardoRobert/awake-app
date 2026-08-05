@@ -42,6 +42,12 @@ class AwakeAppBar extends ConsumerWidget implements PreferredSizeWidget {
     return AppBar(
       backgroundColor: ehAwake ? AwakeColors.navy : ShallomColors.azul,
       leading: leading,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(24),
+          bottomRight: Radius.circular(24),
+        ),
+      ),
       title: Row(
         mainAxisSize: MainAxisSize.min,
         children: [

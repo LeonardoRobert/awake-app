@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/profile_model.dart';
 import 'supabase_service.dart';
@@ -133,5 +134,29 @@ class AuthService {
         .toList();
 
     return ProfileModel.fromMap(data, ministerios: ministerios);
+  }
+
+  /// Envia a foto de perfil pro Storage e ja atualiza o perfil com a
+  /// nova URL. Cada pessoa so consegue mexer na propria pasta (RLS),
+  /// por isso o caminho comeca com o proprio id.
+  Future<String> uploadFotoPerfil(Uint8List bytes, String nomeArquivo) async {
+    final userId = currentUser!.id;
+    final extensao = nomeArquivo.contains('.') ? nomeArquivo.split('.').last : 'jpg';
+    final caminho = '$userId/foto.$extensao';
+
+    await _client.storage.from('avatars').uploadBinary(
+          caminho,
+          bytes,
+          fileOptions: const FileOptions(upsert: true),
+        );
+
+    final url = _client.storage.from('avatars').getPublicUrl(caminho);
+    // Anexa um "carimbo" de tempo na URL soh pra forcar o app a buscar
+    // a imagem nova (senao ele pode continuar mostrando a antiga, que
+    // ficou guardada em cache com a mesma URL de sempre).
+    final urlComCarimbo = '$url?t=${DateTime.now().millisecondsSinceEpoch}';
+
+    await _client.from('profiles').update({'foto_url': urlComCarimbo}).eq('id', userId);
+    return urlComCarimbo;
   }
 }
