@@ -30,6 +30,7 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
   DateTime? _dataInicio;
   bool _recorrente = false;
   DateTime? _recorrenciaFim;
+  final Set<int> _semanasSelecionadas = {};
   EventTipo _tipo = EventTipo.outro;
   EventoEscopo _escopo = EventoEscopo.igreja;
   bool _saving = false;
@@ -60,6 +61,7 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
     _dataInicio = evento?.dataInicio;
     _recorrente = evento?.recorrente ?? false;
     _recorrenciaFim = evento?.recorrenciaFim;
+    _semanasSelecionadas.addAll(evento?.semanasDoMes ?? const []);
     _tipo = evento?.tipo ?? EventTipo.outro;
     _escopo = evento?.escopo ?? EventoEscopo.igreja;
     _fotoUrlExistente = evento?.fotoUrl;
@@ -208,6 +210,9 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
         local: _localController.text.trim(),
         recorrente: _recorrente,
         recorrenciaFim: _recorrente ? _recorrenciaFim : null,
+        semanasDoMes: _recorrente && _semanasSelecionadas.isNotEmpty
+            ? (_semanasSelecionadas.toList()..sort())
+            : null,
         tipo: _tipo,
         escopo: _escopo,
         // O sub-filtro de Genesis/Next/One so faz sentido dentro do
@@ -381,6 +386,36 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
                           : DateFormat('dd/MM/yyyy').format(_recorrenciaFim!),
                     ),
                   ),
+                ),
+                const SizedBox(height: 16),
+                const Text('Repetir em quais semanas do mês?',
+                    style: TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 4),
+                Text(
+                  _semanasSelecionadas.isEmpty
+                      ? 'Toda semana (padrão)'
+                      : 'Só nas semanas marcadas — ex: 1ª e 3ª = quinzenal',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: [1, 2, 3, 4, 5].map((numero) {
+                    final selecionada = _semanasSelecionadas.contains(numero);
+                    return FilterChip(
+                      label: Text('${numero}ª semana'),
+                      selected: selecionada,
+                      onSelected: (marcado) {
+                        setState(() {
+                          if (marcado) {
+                            _semanasSelecionadas.add(numero);
+                          } else {
+                            _semanasSelecionadas.remove(numero);
+                          }
+                        });
+                      },
+                    );
+                  }).toList(),
                 ),
               ],
               if (_escopo == EventoEscopo.awake) ...[

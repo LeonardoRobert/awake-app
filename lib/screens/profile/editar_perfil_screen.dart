@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/profile_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/cep_service.dart';
+import '../../widgets/awake_app_bar.dart';
 
 class _CepFormatter extends TextInputFormatter {
   @override
@@ -109,7 +110,7 @@ class _EditarPerfilScreenState extends ConsumerState<EditarPerfilScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Editar perfil')),
+      appBar: const AwakeAppBar(title: 'Editar perfil', showQrButton: false),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(

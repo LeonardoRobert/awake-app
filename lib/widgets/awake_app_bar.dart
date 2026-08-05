@@ -15,12 +15,14 @@ class AwakeAppBar extends ConsumerWidget implements PreferredSizeWidget {
   final String title;
   final List<Widget>? actions;
   final bool showQrButton;
+  final Widget? leading;
 
   const AwakeAppBar({
     super.key,
     required this.title,
     this.actions,
     this.showQrButton = true,
+    this.leading,
   });
 
   @override
@@ -35,14 +37,15 @@ class AwakeAppBar extends ConsumerWidget implements PreferredSizeWidget {
 
     final icone = ehAwake
         ? 'assets/images/awake_flame_white.png'
-        : 'assets/images/shallom_pomba_branca.png';
+        : 'assets/images/shallom_pomba_cabecalho.png';
 
     return AppBar(
       backgroundColor: ehAwake ? AwakeColors.navy : ShallomColors.azul,
+      leading: leading,
       title: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Image.asset(icone, height: 20),
+          Image.asset(icone, height: 28),
           const SizedBox(width: 10),
           Flexible(child: Text(title, overflow: TextOverflow.ellipsis)),
         ],

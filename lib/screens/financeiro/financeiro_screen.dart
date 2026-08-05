@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../models/contribuicao_model.dart';
 import '../../providers/contribuicao_provider.dart';
+import '../../widgets/awake_app_bar.dart';
 
 /// Tela de Financeiro -- comum a qualquer pessoa (nao so Awake). Mostra
 /// o proprio historico de contribuicoes (privado, ninguem ve o de
@@ -20,7 +21,7 @@ class FinanceiroScreen extends ConsumerWidget {
     final formatoMoeda = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Financeiro')),
+      appBar: const AwakeAppBar(title: 'Financeiro', showQrButton: false),
       body: RefreshIndicator(
         onRefresh: () async => ref.invalidate(minhasContribuicoesProvider),
         child: ListView(

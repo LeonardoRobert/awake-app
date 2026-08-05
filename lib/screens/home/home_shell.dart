@@ -5,7 +5,6 @@ import '../../providers/auth_provider.dart';
 import '../calendar/calendar_screen.dart';
 import '../financeiro/financeiro_screen.dart';
 import '../home/inicio_screen.dart';
-import '../home/inicio_shallom_screen.dart';
 import '../metas/metas_screen.dart';
 import '../profile/profile_screen.dart';
 import '../volunteering/shifts_screen.dart';
@@ -49,7 +48,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: ehAwake
               ? const [
-                  _ItemTour(icon: Icons.home_outlined, texto: 'Início — os eventos exclusivos da Awake dessa semana, prontos pra compartilhar.'),
+                  _ItemTour(icon: Icons.home_outlined, texto: 'Início — seus próximos eventos da semana, prontos pra compartilhar.'),
                   _ItemTour(icon: Icons.calendar_month, texto: 'Calendário — veja os próximos eventos e a programação da semana.'),
                   _ItemTour(icon: Icons.volunteer_activism, texto: 'Escala — inscreva-se para servir nos horários disponíveis.'),
                   _ItemTour(icon: Icons.emoji_events, texto: 'Metas — acompanhe sua constância e seus troféus.'),
@@ -57,7 +56,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
                   _ItemTour(icon: Icons.qr_code, texto: 'O ícone no topo da tela é seu QR Code (ou, se você for líder, a câmera de check-in).'),
                 ]
               : const [
-                  _ItemTour(icon: Icons.home_outlined, texto: 'Início — os eventos do seu ministério dessa semana, prontos pra compartilhar.'),
+                  _ItemTour(icon: Icons.home_outlined, texto: 'Início — seus próximos eventos da semana, prontos pra compartilhar.'),
                   _ItemTour(icon: Icons.calendar_month, texto: 'Calendário — veja os próximos eventos e a programação da semana.'),
                   _ItemTour(icon: Icons.attach_money, texto: 'Finanças — seu histórico de contribuições e como contribuir.'),
                   _ItemTour(icon: Icons.person, texto: 'Perfil — seus dados e treinamentos.'),
@@ -98,7 +97,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
                 ProfileScreen(),
               ]
             : const [
-                InicioShallomScreen(),
+                InicioScreen(),
                 CalendarScreen(),
                 FinanceiroScreen(),
                 ProfileScreen(),

@@ -124,6 +124,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           decoration: const InputDecoration(
                             labelText: 'E-mail',
                             floatingLabelBehavior: FloatingLabelBehavior.always,
+                            contentPadding: EdgeInsets.fromLTRB(16, 24, 16, 10),
                           ),
                           keyboardType: TextInputType.emailAddress,
                           validator: (value) => (value == null || !value.contains('@'))
@@ -136,6 +137,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           decoration: const InputDecoration(
                             labelText: 'Senha',
                             floatingLabelBehavior: FloatingLabelBehavior.always,
+                            contentPadding: EdgeInsets.fromLTRB(16, 24, 16, 10),
                           ),
                           obscureText: true,
                           validator: (value) => (value == null || value.length < 6)

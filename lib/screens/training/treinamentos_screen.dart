@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../models/treinamento_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/treinamento_provider.dart';
+import '../../widgets/awake_app_bar.dart';
 
 class TreinamentosScreen extends ConsumerWidget {
   const TreinamentosScreen({super.key});
@@ -15,8 +16,9 @@ class TreinamentosScreen extends ConsumerWidget {
     final isAdmin = profileAsync.value?.isAdmin ?? false;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Treinamentos'),
+      appBar: AwakeAppBar(
+        title: 'Treinamentos',
+        showQrButton: false,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {

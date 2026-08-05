@@ -250,6 +250,10 @@ class EventModel {
   final String? criadoPor;
   final bool recorrente;
   final DateTime? recorrenciaFim;
+  /// Em quais semanas do mes o evento acontece (1=primeira semana,
+  /// 2=segunda, etc). null/vazio = toda semana (padrao). Ex: [1,3] =
+  /// quinzenal; [2] = uma vez por mes, sempre na segunda semana.
+  final List<int>? semanasDoMes;
   final EventTipo tipo;
   final EventoEscopo escopo;
   final List<String>? publicoAlvo;
@@ -267,6 +271,7 @@ class EventModel {
     this.criadoPor,
     this.recorrente = false,
     this.recorrenciaFim,
+    this.semanasDoMes,
     this.tipo = EventTipo.outro,
     this.escopo = EventoEscopo.igreja,
     this.publicoAlvo,
@@ -293,6 +298,7 @@ class EventModel {
       recorrenciaFim: map['recorrencia_fim'] != null
           ? DateTime.parse(map['recorrencia_fim'] as String)
           : null,
+      semanasDoMes: (map['semanas_do_mes'] as List?)?.map((e) => e as int).toList(),
       tipo: eventTipoFromString(map['tipo'] as String?),
       escopo: eventoEscopoFromString(map['escopo'] as String?),
       publicoAlvo: (map['publico_alvo'] as List?)?.map((e) => e.toString()).toList(),
@@ -315,6 +321,7 @@ class EventModel {
       'local': local,
       'recorrente': recorrente,
       'recorrencia_fim': recorrenciaFim?.toIso8601String().split('T').first,
+      'semanas_do_mes': semanasDoMes,
       'tipo': tipo.valorBanco,
       'escopo': escopo.valorBanco,
       'publico_alvo': publicoAlvo,
@@ -335,22 +342,61 @@ class EventModel {
       return [];
     }
 
-    final result = <DateTime>[];
-    var cursor = dataInicio;
+    // Sem semanas especificas escolhidas: repete toda semana, como
+    // sempre funcionou.
+    if (semanasDoMes == null || semanasDoMes!.isEmpty) {
+      final result = <DateTime>[];
+      var cursor = dataInicio;
 
-    while (cursor.isBefore(rangeStart)) {
-      cursor = cursor.add(const Duration(days: 7));
-      if (recorrenciaFim != null && cursor.isAfter(recorrenciaFim!)) {
-        return result;
+      while (cursor.isBefore(rangeStart)) {
+        cursor = cursor.add(const Duration(days: 7));
+        if (recorrenciaFim != null && cursor.isAfter(recorrenciaFim!)) {
+          return result;
+        }
       }
+
+      while (!cursor.isAfter(rangeEnd)) {
+        if (recorrenciaFim != null && cursor.isAfter(recorrenciaFim!)) break;
+        if (!ehExcecao(cursor)) result.add(cursor);
+        cursor = cursor.add(const Duration(days: 7));
+      }
+
+      return result;
     }
 
-    while (!cursor.isAfter(rangeEnd)) {
-      if (recorrenciaFim != null && cursor.isAfter(recorrenciaFim!)) break;
-      if (!ehExcecao(cursor)) result.add(cursor);
-      cursor = cursor.add(const Duration(days: 7));
+    // Com semanas especificas (quinzenal, mensal, etc): percorre mes a
+    // mes, acha todas as ocorrencias daquele dia da semana no mes, e
+    // mantem so as que caem na 1a/2a/3a/4a/5a semana escolhida.
+    final result = <DateTime>[];
+    final weekday = dataInicio.weekday;
+    var mesCursor = DateTime(rangeStart.year, rangeStart.month, 1);
+    final limiteMes = DateTime(rangeEnd.year, rangeEnd.month, 1);
+
+    while (!mesCursor.isAfter(limiteMes)) {
+      var dia = DateTime(mesCursor.year, mesCursor.month, 1);
+      var numeroSemana = 0;
+      while (dia.month == mesCursor.month) {
+        if (dia.weekday == weekday) {
+          numeroSemana++;
+          if (semanasDoMes!.contains(numeroSemana)) {
+            final comHora =
+                DateTime(dia.year, dia.month, dia.day, dataInicio.hour, dataInicio.minute);
+            final depoisDoInicio = !comHora.isBefore(
+                DateTime(dataInicio.year, dataInicio.month, dataInicio.day));
+            final dentroDoIntervalo =
+                !comHora.isBefore(rangeStart) && !comHora.isAfter(rangeEnd);
+            final dentroDoFim = recorrenciaFim == null || !comHora.isAfter(recorrenciaFim!);
+            if (depoisDoInicio && dentroDoIntervalo && dentroDoFim && !ehExcecao(comHora)) {
+              result.add(comHora);
+            }
+          }
+        }
+        dia = dia.add(const Duration(days: 1));
+      }
+      mesCursor = DateTime(mesCursor.year, mesCursor.month + 1, 1);
     }
 
+    result.sort();
     return result;
   }
 }

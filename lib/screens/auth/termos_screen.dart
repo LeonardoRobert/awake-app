@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../widgets/awake_app_bar.dart';
 
-class TermosScreen extends StatelessWidget {
+class TermosScreen extends ConsumerWidget {
   const TermosScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Termos de Uso e Privacidade')),
+      appBar: const AwakeAppBar(title: 'Termos de Uso e Privacidade', showQrButton: false),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
