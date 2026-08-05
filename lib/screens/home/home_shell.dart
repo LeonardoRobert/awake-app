@@ -58,7 +58,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
               : const [
                   _ItemTour(icon: Icons.home_outlined, texto: 'Início — seus próximos eventos da semana, prontos pra compartilhar.'),
                   _ItemTour(icon: Icons.calendar_month, texto: 'Calendário — veja os próximos eventos e a programação da semana.'),
-                  _ItemTour(icon: Icons.attach_money, texto: 'Finanças — seu histórico de contribuições e como contribuir.'),
+                  _ItemTour(icon: Icons.volunteer_activism, texto: 'Contribua — dízimos, ofertas e como ajudar.'),
                   _ItemTour(icon: Icons.person, texto: 'Perfil — seus dados e treinamentos.'),
                 ],
         ),
@@ -113,7 +113,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         final itensShallom = [
           (Icons.home_outlined, 'Início'),
           (Icons.calendar_month, 'Calendário'),
-          (Icons.attach_money, 'Finanças'),
+          (Icons.volunteer_activism, 'Contribua'),
           (Icons.person, 'Perfil'),
         ];
         final itens = ehAwake ? itensAwake : itensShallom;

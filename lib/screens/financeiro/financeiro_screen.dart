@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../models/contribuicao_model.dart';
 import '../../providers/contribuicao_provider.dart';
 import '../../widgets/awake_app_bar.dart';
@@ -106,7 +107,7 @@ class FinanceiroScreen extends ConsumerWidget {
             const SizedBox(height: 16),
             const Text(
               'Escaneie com a câmera do seu banco, ou copie o código abaixo '
-              'e cole na opção "Pix Copia e Cola".',
+              'e cole na opção "Pix Copia e Cola" — o valor você digita lá.',
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
@@ -120,16 +121,14 @@ class FinanceiroScreen extends ConsumerWidget {
               icon: const Icon(Icons.copy),
               label: const Text('Copiar código Pix'),
             ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: () => Share.share(_codigoPix),
+              icon: const Icon(Icons.share_outlined),
+              label: const Text('Compartilhar código'),
+            ),
           ],
         ),
-      ),
-    );
-  }
-
-  void _abrirCartao(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Contribuição por cartão chega em breve por aqui.'),
       ),
     );
   }
@@ -146,24 +145,13 @@ class FinanceiroScreen extends ConsumerWidget {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed: () => _abrirPix(context),
-                    icon: const Icon(Icons.qr_code),
-                    label: const Text('Via Pix'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => _abrirCartao(context),
-                    icon: const Icon(Icons.credit_card),
-                    label: const Text('Via cartão'),
-                  ),
-                ),
-              ],
+            FilledButton.icon(
+              onPressed: () => _abrirPix(context),
+              icon: const Icon(Icons.qr_code),
+              label: const Text('Contribuir via Pix'),
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+              ),
             ),
             const SizedBox(height: 24),
             Text('Como contribuir', style: Theme.of(context).textTheme.titleLarge),
@@ -195,7 +183,7 @@ class FinanceiroScreen extends ConsumerWidget {
                 style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 12),
             SizedBox(
-              height: 150,
+              height: 160,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: _projetosApoiados.length,
@@ -205,35 +193,44 @@ class FinanceiroScreen extends ConsumerWidget {
                   return SizedBox(
                     width: 150,
                     child: Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(10),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Expanded(
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: Image.asset(projeto.imagem, fit: BoxFit.contain),
-                              ),
+                      clipBehavior: Clip.antiAlias,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Fundo branco fixo atras da logo -- os
+                          // logos tem fundo preto opaco, entao sem
+                          // isso eles somem em temas escuros.
+                          Container(
+                            height: 80,
+                            width: double.infinity,
+                            color: Colors.white,
+                            padding: const EdgeInsets.all(8),
+                            child: Image.asset(projeto.imagem, fit: BoxFit.contain),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.all(8),
+                            child: Column(
+                              children: [
+                                Text(
+                                  projeto.nome,
+                                  textAlign: TextAlign.center,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style:
+                                      const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                                ),
+                                if (projeto.responsavel.isNotEmpty)
+                                  Text(
+                                    projeto.responsavel,
+                                    textAlign: TextAlign.center,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontSize: 10),
+                                  ),
+                              ],
                             ),
-                            const SizedBox(height: 6),
-                            Text(
-                              projeto.nome,
-                              textAlign: TextAlign.center,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
-                            ),
-                            if (projeto.responsavel.isNotEmpty)
-                              Text(
-                                projeto.responsavel,
-                                textAlign: TextAlign.center,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontSize: 10),
-                              ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
                   );

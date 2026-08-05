@@ -33,6 +33,12 @@ class NossasPaginasScreen extends StatelessWidget {
           ),
           _paginaTile(
             context,
+            icon: Icons.facebook_outlined,
+            titulo: 'Facebook Shallom',
+            url: 'https://www.facebook.com/share/19MdKoMhtj/?mibextid=wwXIfr',
+          ),
+          _paginaTile(
+            context,
             icon: Icons.play_circle_outline,
             titulo: 'YouTube Shallom',
             url: 'https://youtube.com/@shallomonline?si=qrQh11noUx3nrG5v',
@@ -42,12 +48,6 @@ class NossasPaginasScreen extends StatelessWidget {
             icon: Icons.groups_outlined,
             titulo: 'Comunidade WhatsApp Shallom',
             url: 'https://chat.whatsapp.com/FeYDbZ7Ffn57KwX3zuVmTV',
-          ),
-          _paginaTile(
-            context,
-            icon: Icons.facebook_outlined,
-            titulo: 'Facebook Shallom',
-            url: 'https://www.facebook.com/share/19MdKoMhtj/?mibextid=wwXIfr',
           ),
           const SizedBox(height: 20),
           Padding(
