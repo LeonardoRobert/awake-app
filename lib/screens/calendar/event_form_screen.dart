@@ -41,6 +41,8 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
   final Set<String> _categoriasSelecionadas = {};
   bool _todosOsGeneros = true;
   final Set<String> _generosSelecionados = {};
+  bool _todosOsCasais = true;
+  final Set<String> _casaisSelecionados = {};
 
   Uint8List? _novaFotoBytes;
   String? _novaFotoNome;
@@ -80,6 +82,12 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
     if (generoExistente != null && generoExistente.isNotEmpty) {
       _todosOsGeneros = false;
       _generosSelecionados.addAll(generoExistente);
+    }
+
+    final casaisExistente = evento?.publicoCasais;
+    if (casaisExistente != null && casaisExistente.isNotEmpty) {
+      _todosOsCasais = false;
+      _casaisSelecionados.addAll(casaisExistente);
     }
   }
 
@@ -196,6 +204,14 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
       );
       return;
     }
+    final usaCasais = _escopo == EventoEscopo.casais;
+    if (usaCasais && !_todosOsCasais && _casaisSelecionados.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Selecione pelo menos um grupo, ou marque "Todos os casais".')),
+      );
+      return;
+    }
 
     setState(() => _saving = true);
 
@@ -237,6 +253,7 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
         publicoAlvo: usaSubgrupos && !_paraTodos ? _categoriasSelecionadas.toList() : null,
         publicoGenero:
             usaSubgrupos && !_todosOsGeneros ? _generosSelecionados.toList() : null,
+        publicoCasais: usaCasais && !_todosOsCasais ? _casaisSelecionados.toList() : null,
         fotoUrl: fotoUrl,
         fotoStoryUrl: fotoStoryUrl,
       );
@@ -492,6 +509,32 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
                   ),
                 ],
               ],
+              if (_escopo == EventoEscopo.casais) ...[
+                const SizedBox(height: 24),
+                const Text('Quem pode ver esse evento?',
+                    style: TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                SegmentedButton<bool>(
+                  segments: const [
+                    ButtonSegment(value: true, label: Text('Todos os casais')),
+                    ButtonSegment(value: false, label: Text('Grupo específico')),
+                  ],
+                  selected: {_todosOsCasais},
+                  onSelectionChanged: (value) => setState(() => _todosOsCasais = value.first),
+                ),
+                if (!_todosOsCasais) ...[
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      _casalChip('one', 'One (Awake)'),
+                      _casalChip('henrique_patricia', 'Henrique e Patrícia'),
+                      _casalChip('ivaldo_sonja', 'Ivaldo e Sonja'),
+                      _casalChip('marcelo_andreia', 'Marcelo e Andréia'),
+                    ],
+                  ),
+                ],
+              ],
               if (isAdmin) ...[
                 const SizedBox(height: 24),
                 const Text('Foto do evento (opcional)',
@@ -629,6 +672,23 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
             _generosSelecionados.add(valor);
           } else {
             _generosSelecionados.remove(valor);
+          }
+        });
+      },
+    );
+  }
+
+  Widget _casalChip(String valor, String label) {
+    final selecionado = _casaisSelecionados.contains(valor);
+    return FilterChip(
+      label: Text(label),
+      selected: selecionado,
+      onSelected: (marcado) {
+        setState(() {
+          if (marcado) {
+            _casaisSelecionados.add(valor);
+          } else {
+            _casaisSelecionados.remove(valor);
           }
         });
       },

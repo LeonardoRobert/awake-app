@@ -41,6 +41,7 @@ class _EditarPerfilScreenState extends ConsumerState<EditarPerfilScreen> {
   late final TextEditingController _numeroController;
   EstadoCivil? _estadoCivil;
   Sexo? _sexo;
+  GrupoCasais? _grupoCasais;
   bool _buscandoCep = false;
   bool _saving = false;
 
@@ -50,6 +51,7 @@ class _EditarPerfilScreenState extends ConsumerState<EditarPerfilScreen> {
     _telefoneController = TextEditingController(text: widget.perfil.telefone ?? '');
     _estadoCivil = widget.perfil.estadoCivil;
     _sexo = widget.perfil.sexo;
+    _grupoCasais = widget.perfil.grupoCasais;
 
     // O endereco fica guardado como um texto so ("Rua X, no Y - Bairro Z...").
     // Aqui deixamos os campos em branco pra pessoa preencher de novo se
@@ -84,6 +86,7 @@ class _EditarPerfilScreenState extends ConsumerState<EditarPerfilScreen> {
         'telefone': _telefoneController.text.trim(),
         'estado_civil': _estadoCivil?.name,
         'sexo': _sexo?.name,
+        'grupo_casais': _grupoCasais?.valorBanco,
       };
 
       if (_ruaController.text.trim().isNotEmpty) {
@@ -160,6 +163,29 @@ class _EditarPerfilScreenState extends ConsumerState<EditarPerfilScreen> {
               ],
               onChanged: (v) => setState(() => _sexo = v),
             ),
+            if (_estadoCivil == EstadoCivil.casado && !widget.perfil.pertenceAwake) ...[
+              const SizedBox(height: 16),
+              DropdownButtonFormField<GrupoCasais?>(
+                value: _grupoCasais,
+                decoration: const InputDecoration(labelText: 'Grupo de casais'),
+                items: const [
+                  DropdownMenuItem(value: null, child: Text('Ainda não tenho grupo')),
+                  DropdownMenuItem(
+                    value: GrupoCasais.henriquePatricia,
+                    child: Text('Grupo do Henrique e Patrícia'),
+                  ),
+                  DropdownMenuItem(
+                    value: GrupoCasais.ivaldoSonja,
+                    child: Text('Grupo do Ivaldo e Sonja'),
+                  ),
+                  DropdownMenuItem(
+                    value: GrupoCasais.marceloAndreia,
+                    child: Text('Grupo do Marcelo e Andréia'),
+                  ),
+                ],
+                onChanged: (v) => setState(() => _grupoCasais = v),
+              ),
+            ],
             const SizedBox(height: 24),
             Text('Endereço', style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 4),

@@ -263,6 +263,9 @@ class EventModel {
   /// Se vazio/null, vale pra qualquer genero -- funciona JUNTO com
   /// publicoAlvo (os dois precisam bater, nao um ou outro).
   final List<String>? publicoGenero;
+  /// Filtro extra, so dentro de Casais: 'one', 'henrique_patricia',
+  /// 'ivaldo_sonja', 'marcelo_andreia'. Vazio/null = todos os casais.
+  final List<String>? publicoCasais;
   final List<DateTime> excecoes;
   final String? fotoUrl;
   final String? fotoStoryUrl;
@@ -282,6 +285,7 @@ class EventModel {
     this.escopo = EventoEscopo.igreja,
     this.publicoAlvo,
     this.publicoGenero,
+    this.publicoCasais,
     this.excecoes = const [],
     this.fotoUrl,
     this.fotoStoryUrl,
@@ -310,6 +314,7 @@ class EventModel {
       escopo: eventoEscopoFromString(map['escopo'] as String?),
       publicoAlvo: (map['publico_alvo'] as List?)?.map((e) => e.toString()).toList(),
       publicoGenero: (map['publico_genero'] as List?)?.map((e) => e.toString()).toList(),
+      publicoCasais: (map['publico_casais'] as List?)?.map((e) => e.toString()).toList(),
       excecoes: (map['excecoes'] as List?)
               ?.map((e) => DateTime.parse(e.toString()))
               .toList() ??
@@ -334,6 +339,7 @@ class EventModel {
       'escopo': escopo.valorBanco,
       'publico_alvo': publicoAlvo,
       'publico_genero': publicoGenero,
+      'publico_casais': publicoCasais,
       'foto_url': fotoUrl,
       'foto_story_url': fotoStoryUrl,
     };

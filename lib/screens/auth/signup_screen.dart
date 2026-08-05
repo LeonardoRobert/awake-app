@@ -111,6 +111,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   DateTime? _dataNascimento;
   EstadoCivil? _estadoCivil;
   Sexo? _sexo;
+  GrupoCasais? _grupoCasais;
   bool _temFilhos = false;
   final List<_FilhoRascunho> _filhos = [];
   final Set<String> _ministeriosSelecionados = {}; // 'awake' | 'homens' | 'mulheres'
@@ -336,6 +337,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         dataNascimento: _dataNascimento!,
         estadoCivil: _estadoCivil!,
         sexo: _sexo!,
+        grupoCasais: _grupoCasais,
         telefone: _telefoneController.text.trim(),
         endereco: _enderecoCompleto,
         tempoParticipacao: resumoParticipacao,
@@ -587,6 +589,36 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
               _ministerioChip('mulheres', 'Mulheres'),
             ],
           ),
+          // So pergunta o grupo de casais pra quem e casado e NAO
+          // marcou Awake -- quem e casado e Awake ja cai
+          // automaticamente no grupo "One", sem precisar escolher nada.
+          if (_estadoCivil == EstadoCivil.casado &&
+              !_ministeriosSelecionados.contains('awake')) ...[
+            const SizedBox(height: 24),
+            const Text('Qual grupo de casais vocês participam?',
+                style: TextStyle(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<GrupoCasais?>(
+              value: _grupoCasais,
+              decoration: const InputDecoration(labelText: 'Grupo'),
+              items: const [
+                DropdownMenuItem(value: null, child: Text('Ainda não tenho grupo')),
+                DropdownMenuItem(
+                  value: GrupoCasais.henriquePatricia,
+                  child: Text('Grupo do Henrique e Patrícia'),
+                ),
+                DropdownMenuItem(
+                  value: GrupoCasais.ivaldoSonja,
+                  child: Text('Grupo do Ivaldo e Sonja'),
+                ),
+                DropdownMenuItem(
+                  value: GrupoCasais.marceloAndreia,
+                  child: Text('Grupo do Marcelo e Andréia'),
+                ),
+              ],
+              onChanged: (v) => setState(() => _grupoCasais = v),
+            ),
+          ],
         ],
       ),
     );

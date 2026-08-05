@@ -18,6 +18,7 @@ class AuthService {
     required DateTime dataNascimento,
     required EstadoCivil estadoCivil,
     required Sexo sexo,
+    GrupoCasais? grupoCasais,
     String? telefone,
     String? endereco,
     String? tempoParticipacao,
@@ -42,6 +43,7 @@ class AuthService {
         'tempo_participacao': tempoParticipacao,
         'estado_civil': estadoCivil.name,
         'sexo': sexo.name,
+        'grupo_casais': grupoCasais?.valorBanco,
       }).eq('id', response.user!.id);
 
       for (final ministerio in ministerios) {

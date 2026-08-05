@@ -37,6 +37,47 @@ extension SexoLabel on Sexo {
   String get label => this == Sexo.masculino ? 'Masculino' : 'Feminino';
 }
 
+/// Subgrupos dentro de "Casais" -- so pra quem e casado e NAO e do
+/// Awake (quem e casado e Awake ja cai automaticamente em "One").
+enum GrupoCasais { henriquePatricia, ivaldoSonja, marceloAndreia }
+
+GrupoCasais? grupoCasaisFromString(String? value) {
+  switch (value) {
+    case 'henrique_patricia':
+      return GrupoCasais.henriquePatricia;
+    case 'ivaldo_sonja':
+      return GrupoCasais.ivaldoSonja;
+    case 'marcelo_andreia':
+      return GrupoCasais.marceloAndreia;
+    default:
+      return null;
+  }
+}
+
+extension GrupoCasaisDb on GrupoCasais {
+  String get valorBanco {
+    switch (this) {
+      case GrupoCasais.henriquePatricia:
+        return 'henrique_patricia';
+      case GrupoCasais.ivaldoSonja:
+        return 'ivaldo_sonja';
+      case GrupoCasais.marceloAndreia:
+        return 'marcelo_andreia';
+    }
+  }
+
+  String get label {
+    switch (this) {
+      case GrupoCasais.henriquePatricia:
+        return 'Grupo do Henrique e Patrícia';
+      case GrupoCasais.ivaldoSonja:
+        return 'Grupo do Ivaldo e Sonja';
+      case GrupoCasais.marceloAndreia:
+        return 'Grupo do Marcelo e Andréia';
+    }
+  }
+}
+
 /// Genesis (13-16, solteiro/namorando), Next (17+, solteiro/namorando),
 /// One (noivo ou casado, qualquer idade). Calculado automaticamente
 /// no banco (ver supabase/schema.sql: calcular_categoria) — aqui so
@@ -100,6 +141,7 @@ class ProfileModel {
   final String? tempoParticipacao;
   final EstadoCivil? estadoCivil;
   final Sexo? sexo;
+  final GrupoCasais? grupoCasais;
   final Categoria? categoria;
   final UserRole papel;
   final String qrCodeId;
@@ -117,6 +159,7 @@ class ProfileModel {
     this.tempoParticipacao,
     this.estadoCivil,
     this.sexo,
+    this.grupoCasais,
     this.categoria,
     required this.papel,
     required this.qrCodeId,
@@ -162,6 +205,7 @@ class ProfileModel {
       tempoParticipacao: map['tempo_participacao'] as String?,
       estadoCivil: estadoCivilFromString(map['estado_civil'] as String?),
       sexo: sexoFromString(map['sexo'] as String?),
+      grupoCasais: grupoCasaisFromString(map['grupo_casais'] as String?),
       categoria: categoriaFromString(map['categoria'] as String?),
       papel: userRoleFromString(map['papel'] as String? ?? 'membro'),
       qrCodeId: map['qr_code_id'] as String,
@@ -181,6 +225,7 @@ class ProfileModel {
       'tempo_participacao': tempoParticipacao,
       'estado_civil': estadoCivil?.name,
       'sexo': sexo?.name,
+      'grupo_casais': grupoCasais?.valorBanco,
     };
   }
 }
