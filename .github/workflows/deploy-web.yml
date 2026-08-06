@@ -40,5 +40,11 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add docs/app
-          git diff --staged --quiet || git commit -m "Deploy automatico da versao web ($GITHUB_REF_NAME)"
-          git push
+          git diff --staged --quiet && exit 0
+
+          git commit -m "Deploy automatico da versao web ($GITHUB_REF_NAME)"
+          for i in 1 2 3; do
+            git pull --rebase origin "$(git rev-parse --abbrev-ref HEAD)" && git push && break
+            echo "Tentativa $i falhou, tentando de novo..."
+            sleep 5
+          done

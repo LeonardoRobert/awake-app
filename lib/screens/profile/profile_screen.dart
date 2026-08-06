@@ -13,12 +13,12 @@ import '../../models/profile_model.dart';
 import '../../screens/pages/nossos_conteudos_screen.dart';
 import '../../screens/pages/quem_somos_screen.dart';
 import '../../screens/calendar/escala_mensal_screen.dart';
-import '../../screens/volunteering/admin_questionarios_screen.dart';
+import '../../screens/volunteering/admin_visitantes_screen.dart';
 import '../../screens/volunteering/dashboard_ministerio_screen.dart';
 import '../../services/escala_servico_service.dart';
 import '../../services/notification_service.dart';
 import '../../widgets/awake_app_bar.dart';
-import '../../widgets/link_questionario_novo_servo.dart';
+import '../../widgets/link_formulario_visitante.dart';
 import 'meu_perfil_screen.dart';
 
 /// Essa tela virou um MENU (antes era a lista direta de dados do
@@ -131,7 +131,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ],
               ),
               const SizedBox(height: 24),
-              const LinkQuestionarioNovoServo(),
+              const LinkFormularioVisitante(),
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.person_outline),
@@ -253,11 +253,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.assignment_outlined),
-                  title: const Text('Questionários de novos servos'),
+                  leading: const Icon(Icons.person_add_alt_1_outlined),
+                  title: const Text('Visitantes — Primeira Vez'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                    builder: (_) => const AdminQuestionariosScreen(),
+                    builder: (_) => const AdminVisitantesScreen(),
                   )),
                 ),
               ],
