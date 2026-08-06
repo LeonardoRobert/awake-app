@@ -61,6 +61,7 @@ class ContribuicaoModel {
   final double valor;
   final MeioPagamento meioPagamento;
   final String? observacao;
+  final String? nomePessoa;
 
   ContribuicaoModel({
     required this.id,
@@ -70,9 +71,11 @@ class ContribuicaoModel {
     required this.valor,
     required this.meioPagamento,
     this.observacao,
+    this.nomePessoa,
   });
 
   factory ContribuicaoModel.fromMap(Map<String, dynamic> map) {
+    final perfil = map['profiles'] as Map<String, dynamic>?;
     return ContribuicaoModel(
       id: map['id'] as String,
       profileId: map['profile_id'] as String,
@@ -81,6 +84,7 @@ class ContribuicaoModel {
       valor: (map['valor'] as num).toDouble(),
       meioPagamento: meioPagamentoFromString(map['meio_pagamento'] as String?),
       observacao: map['observacao'] as String?,
+      nomePessoa: perfil?['nome'] as String?,
     );
   }
 }

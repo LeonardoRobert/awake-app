@@ -92,8 +92,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AwakeColors.navy,
+    // O cartao do login e sempre claro (fundo branco fixo) -- por
+    // isso, o texto dentro dele tambem precisa ser sempre do tema
+    // claro, mesmo que a pessoa tenha deixado o modo escuro ligado
+    // antes de sair (senao o texto fica branco sobre fundo branco).
+    return Theme(
+      data: AppTheme.light(ehAwake: false),
+      child: Scaffold(
+        backgroundColor: AwakeColors.navy,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -179,6 +185,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             ),
           ),
         ),
+      ),
       ),
     );
   }

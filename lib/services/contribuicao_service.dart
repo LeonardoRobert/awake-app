@@ -1,6 +1,12 @@
 import '../models/contribuicao_model.dart';
 import 'supabase_service.dart';
 
+class PessoaResumo {
+  final String id;
+  final String nome;
+  const PessoaResumo({required this.id, required this.nome});
+}
+
 class ContribuicaoService {
   final _client = SupabaseService.client;
 
@@ -15,5 +21,84 @@ class ContribuicaoService {
     return (data as List)
         .map((e) => ContribuicaoModel.fromMap(e as Map<String, dynamic>))
         .toList();
+  }
+
+  // ---------------------------------------------------------------
+  // A partir daqui, so o Admin Financeiro tem permissao (RLS garante
+  // isso no banco -- se alguem sem esse cargo chamar, da erro).
+  // ---------------------------------------------------------------
+
+  Future<List<PessoaResumo>> listarPessoas() async {
+    final data = await _client.from('profiles').select('id, nome').order('nome');
+    return (data as List)
+        .map((e) => PessoaResumo(
+              id: (e as Map<String, dynamic>)['id'] as String,
+              nome: e['nome'] as String? ?? '(sem nome)',
+            ))
+        .toList();
+  }
+
+  Future<List<ContribuicaoModel>> listarPorPessoa(String profileId) async {
+    final data = await _client
+        .from('contribuicoes')
+        .select('*, profiles(nome)')
+        .eq('profile_id', profileId)
+        .order('data', ascending: false);
+
+    return (data as List)
+        .map((e) => ContribuicaoModel.fromMap(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<List<ContribuicaoModel>> listarTodasRecentes({int limite = 100}) async {
+    final data = await _client
+        .from('contribuicoes')
+        .select('*, profiles(nome)')
+        .order('data', ascending: false)
+        .limit(limite);
+
+    return (data as List)
+        .map((e) => ContribuicaoModel.fromMap(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<void> lancar({
+    required String profileId,
+    required DateTime data,
+    String? horario,
+    required double valor,
+    required MeioPagamento meioPagamento,
+    String? observacao,
+  }) async {
+    await _client.from('contribuicoes').insert({
+      'profile_id': profileId,
+      'data': data.toIso8601String().split('T').first,
+      'horario': horario,
+      'valor': valor,
+      'meio_pagamento': meioPagamento.valorBanco,
+      'observacao': observacao,
+      'lancado_por': _client.auth.currentUser!.id,
+    });
+  }
+
+  Future<void> editar({
+    required String id,
+    required DateTime data,
+    String? horario,
+    required double valor,
+    required MeioPagamento meioPagamento,
+    String? observacao,
+  }) async {
+    await _client.from('contribuicoes').update({
+      'data': data.toIso8601String().split('T').first,
+      'horario': horario,
+      'valor': valor,
+      'meio_pagamento': meioPagamento.valorBanco,
+      'observacao': observacao,
+    }).eq('id', id);
+  }
+
+  Future<void> excluir(String id) async {
+    await _client.from('contribuicoes').delete().eq('id', id);
   }
 }

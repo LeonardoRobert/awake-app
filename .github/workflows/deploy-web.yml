@@ -1,0 +1,44 @@
+name: Deploy Web
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.8'
+          channel: 'stable'
+
+      - run: flutter pub get
+
+      - run: |
+          flutter build web --release --base-href /awake-app/app/ \
+            --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
+            --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} \
+            --dart-define=ONESIGNAL_APP_ID=${{ secrets.ONESIGNAL_APP_ID }} \
+            --dart-define=YOUTUBE_API_KEY=${{ secrets.YOUTUBE_API_KEY }}
+
+      - name: Copiar build pra docs/app
+        run: |
+          rm -rf docs/app
+          mkdir -p docs/app
+          cp -r build/web/* docs/app/
+
+      - name: Commitar e publicar
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/app
+          git diff --staged --quiet || git commit -m "Deploy automatico da versao web ($GITHUB_REF_NAME)"
+          git push

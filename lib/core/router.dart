@@ -10,6 +10,7 @@ import '../screens/auth/redefinir_senha_screen.dart';
 import '../screens/auth/signup_screen.dart';
 import '../screens/auth/termos_screen.dart';
 import '../screens/calendar/admin_calendario_screen.dart';
+import '../screens/financeiro/admin_financeiro_screen.dart';
 import '../screens/calendar/event_detail_screen.dart';
 import '../screens/calendar/event_form_screen.dart';
 import '../screens/financeiro/financeiro_screen.dart';
@@ -62,6 +63,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/admin/calendario',
         builder: (context, state) => const AdminCalendarioScreen(),
+      ),
+      GoRoute(
+        path: '/admin/financeiro',
+        builder: (context, state) => const AdminFinanceiroScreen(),
       ),
       GoRoute(
         path: '/eventos/novo',

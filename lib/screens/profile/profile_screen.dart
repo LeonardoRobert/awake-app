@@ -142,14 +142,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 onTap: () => Navigator.of(context)
                     .push(MaterialPageRoute(builder: (_) => const QuemSomosScreen())),
               ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.ondemand_video_outlined),
-                title: const Text('Nossos Conteúdos'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => Navigator.of(context)
-                    .push(MaterialPageRoute(builder: (_) => const NossosConteudosScreen())),
-              ),
+              // So aparece aqui pra quem e Awake -- quem e Shallom ja
+              // tem isso como aba propria (Início/Calendário/
+              // Conteúdos/Contribua/Perfil), nao precisa duplicar.
+              if (profile.pertenceAwake) ...[
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.ondemand_video_outlined),
+                  title: const Text('Nossos Conteúdos'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(context)
+                      .push(MaterialPageRoute(builder: (_) => const NossosConteudosScreen())),
+                ),
+              ],
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.public_outlined),
@@ -238,6 +243,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => Navigator.of(context)
                       .push(MaterialPageRoute(builder: (_) => const AdminMensagensScreen())),
+                ),
+              ],
+              if (profile.isAdminFinanceiro) ...[
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.point_of_sale_outlined),
+                  title: const Text('Painel Financeiro (navegador)'),
+                  subtitle: const Text('Lançar dízimos e ofertas'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.push('/admin/financeiro'),
                 ),
               ],
               const Divider(),
