@@ -76,20 +76,39 @@ DateTime? _parseData(String texto) {
   return data;
 }
 
+int _calcularIdade(DateTime nascimento) {
+  final hoje = DateTime.now();
+  var anos = hoje.year - nascimento.year;
+  final aniversarioJaPassou = hoje.month > nascimento.month ||
+      (hoje.month == nascimento.month && hoje.day >= nascimento.day);
+  if (!aniversarioJaPassou) anos--;
+  return anos;
+}
+
 class _FilhoRascunho {
   final String nome;
   final DateTime dataNascimento;
   _FilhoRascunho({required this.nome, required this.dataNascimento});
 
-  int get idade {
-    final hoje = DateTime.now();
-    var anos = hoje.year - dataNascimento.year;
-    final aniversarioJaPassou = hoje.month > dataNascimento.month ||
-        (hoje.month == dataNascimento.month && hoje.day >= dataNascimento.day);
-    if (!aniversarioJaPassou) anos--;
-    return anos;
-  }
+  int get idade => _calcularIdade(dataNascimento);
 }
+
+/// Todos os ministerios que uma pessoa pode liderar -- e uma lista
+/// separada da de "participa"/"serve", porque lideranca nao exige que
+/// a pessoa tenha marcado aquele ministerio antes (ex: alguem pode
+/// liderar o Awake e so "participar" de Homens).
+const _todosMinisteriosLideranca = [
+  ('awake', 'Awake'),
+  ('homens', 'Homens'),
+  ('mulheres', 'Mulheres'),
+  ('coral', 'Coral'),
+  ('danca', 'Dança'),
+  ('diaconos', 'Diáconos'),
+  ('louvor', 'Louvor'),
+  ('midia', 'Mídia'),
+  ('multimidia', 'Multimídia'),
+  ('teatro', 'Teatro'),
+];
 
 class SignupScreen extends ConsumerStatefulWidget {
   const SignupScreen({super.key});
@@ -99,25 +118,29 @@ class SignupScreen extends ConsumerStatefulWidget {
 }
 
 class _SignupScreenState extends ConsumerState<SignupScreen> {
-  int _passo = 0; // 0, 1, 2
+  int _passo = 0; // 0=Quem e voce, 1=Ministerio, 2=Contato, 3=Criar conta
 
+  final _formKeyPasso0 = GlobalKey<FormState>();
   final _formKeyPasso1 = GlobalKey<FormState>();
   final _formKeyPasso2 = GlobalKey<FormState>();
   final _formKeyPasso3 = GlobalKey<FormState>();
 
-  // Passo 1
+  // Passo 0 -- Quem e voce
   final _nomeController = TextEditingController();
   final _dataNascimentoController = TextEditingController();
   DateTime? _dataNascimento;
-  EstadoCivil? _estadoCivil;
   Sexo? _sexo;
-  GrupoCasais? _grupoCasais;
+  EstadoCivil? _estadoCivil;
   bool _temFilhos = false;
   final List<_FilhoRascunho> _filhos = [];
-  final Set<String> _ministeriosSelecionados = {}; // 'awake' | 'homens' | 'mulheres'
-  final Set<String> _areasServico = {}; // 'danca', 'diaconos', 'louvor', etc.
 
-  // Passo 2
+  // Passo 1 -- Ministerio
+  bool _preSelecaoMinisterioAplicada = false;
+  final Set<String> _ministeriosSelecionados = {}; // 'awake' | 'homens' | 'mulheres'
+  GrupoCasais? _grupoCasais;
+  final Set<String> _areasServico = {}; // 'coral', 'danca', 'diaconos', etc.
+
+  // Passo 2 -- Contato
   final _emailController = TextEditingController();
   final _telefoneController = TextEditingController();
   final _senhaController = TextEditingController();
@@ -129,8 +152,9 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   bool _buscandoCep = false;
   String? _erroCep;
 
-  // Passo 3
+  // Passo 3 -- Criar conta
   final Map<String, bool> _ehNovoPorMinisterio = {}; // true = novo(a)
+  bool _querSerLider = false;
   final Map<String, bool> _liderPorMinisterio = {};
   final _codigoLiderController = TextEditingController();
   bool _aceitouTermos = false;
@@ -179,8 +203,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
 
   bool get _isMenorDeIdade {
     if (_dataNascimento == null) return false;
-    final idade = DateTime.now().difference(_dataNascimento!).inDays ~/ 365;
-    return idade < 18;
+    return _calcularIdade(_dataNascimento!) < 18;
   }
 
   String? get _categoriaPreview {
@@ -188,10 +211,31 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       return 'One';
     }
     if (_dataNascimento == null) return null;
-    final idade = DateTime.now().difference(_dataNascimento!).inDays ~/ 365;
+    final idade = _calcularIdade(_dataNascimento!);
     if (idade >= 13 && idade <= 16) return 'Genesis';
     if (idade >= 17) return 'Next';
     return null;
+  }
+
+  /// So roda uma vez, na primeira vez que a pessoa chega no Passo de
+  /// Ministerio -- pre-marca um ministerio com base no que ela
+  /// respondeu no Passo 0, mas ela ainda pode mudar livremente depois.
+  void _aplicarPreSelecaoMinisterioSeNecessario() {
+    if (_preSelecaoMinisterioAplicada) return;
+    _preSelecaoMinisterioAplicada = true;
+
+    final casado = _estadoCivil == EstadoCivil.casado || _estadoCivil == EstadoCivil.noivo;
+    final idade = _dataNascimento != null ? _calcularIdade(_dataNascimento!) : null;
+
+    if (casado) {
+      if (_sexo == Sexo.masculino) _ministeriosSelecionados.add('homens');
+      if (_sexo == Sexo.feminino) _ministeriosSelecionados.add('mulheres');
+    } else if (idade != null && idade > 30) {
+      if (_sexo == Sexo.masculino) _ministeriosSelecionados.add('homens');
+      if (_sexo == Sexo.feminino) _ministeriosSelecionados.add('mulheres');
+    } else {
+      _ministeriosSelecionados.add('awake');
+    }
   }
 
   Future<void> _abrirDialogoAdicionarFilho() async {
@@ -256,7 +300,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   }
 
   void _proximoPasso() {
-    final formAtual = [_formKeyPasso1, _formKeyPasso2, _formKeyPasso3][_passo];
+    final formAtual = [_formKeyPasso0, _formKeyPasso1, _formKeyPasso2, _formKeyPasso3][_passo];
     if (!formAtual.currentState!.validate()) return;
 
     if (_passo == 0) {
@@ -264,14 +308,20 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         setState(() => _errorMessage = 'Informe uma data de nascimento válida (dd/mm/aaaa).');
         return;
       }
-      if (_estadoCivil == null) {
-        setState(() => _errorMessage = 'Informe seu estado civil.');
-        return;
-      }
       if (_sexo == null) {
         setState(() => _errorMessage = 'Selecione o sexo.');
         return;
       }
+      if (_estadoCivil == null) {
+        setState(() => _errorMessage = 'Informe seu estado civil.');
+        return;
+      }
+      // Aplica a pre-selecao de ministerio bem na hora de entrar no
+      // proximo passo, ja com todos os dados do Passo 0 preenchidos.
+      _aplicarPreSelecaoMinisterioSeNecessario();
+    }
+
+    if (_passo == 1) {
       if (_ministeriosSelecionados.isEmpty) {
         setState(() => _errorMessage = 'Selecione pelo menos um ministério.');
         return;
@@ -345,15 +395,16 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         ministerios: [..._ministeriosSelecionados, ..._areasServico],
       );
 
-      // Cadastra os filhos informados no Passo 1 (usa a sessao que
+      // Cadastra os filhos informados no Passo 0 (usa a sessao que
       // acabou de ser criada pelo signUp acima).
       final filhoService = FilhoService();
       for (final filho in _filhos) {
         await filhoService.adicionar(nome: filho.nome, dataNascimento: filho.dataNascimento);
       }
 
-      // Solicita lideranca pra cada ministerio que a pessoa marcou como
-      // "sou lider", usando o mesmo codigo unico.
+      // Solicita lideranca pra cada ministerio marcado, usando o
+      // mesmo codigo unico -- nao precisa ter marcado esse ministerio
+      // antes como "participa"/"serve" pra poder liderar ele.
       final ministeriosOndeQuerSerLider =
           _liderPorMinisterio.entries.where((e) => e.value).map((e) => e.key).toList();
 
@@ -401,14 +452,15 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final titulos = ['Quem é você', 'Contato', 'Criar conta'];
+    final titulos = ['Quem é você', 'Ministério', 'Contato', 'Criar conta'];
+    const totalPassos = 4;
 
     return Scaffold(
-      appBar: AppBar(title: Text('Criar conta — Passo ${_passo + 1} de 3')),
+      appBar: AppBar(title: Text('Criar conta — Passo ${_passo + 1} de $totalPassos')),
       body: SafeArea(
         child: Column(
           children: [
-            LinearProgressIndicator(value: (_passo + 1) / 3),
+            LinearProgressIndicator(value: (_passo + 1) / totalPassos),
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
               child: Align(
@@ -422,9 +474,10 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 child: IndexedStack(
                   index: _passo,
                   children: [
-                    _buildPasso1(),
-                    _buildPasso2(),
-                    _buildPasso3(),
+                    _buildPassoQuemEhVoce(),
+                    _buildPassoMinisterio(),
+                    _buildPassoContato(),
+                    _buildPassoCriarConta(),
                   ],
                 ),
               ),
@@ -451,14 +504,14 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     child: FilledButton(
                       onPressed: _loading
                           ? null
-                          : (_passo < 2 ? _proximoPasso : _submit),
+                          : (_passo < totalPassos - 1 ? _proximoPasso : _submit),
                       child: _loading
                           ? const SizedBox(
                               height: 20,
                               width: 20,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : Text(_passo < 2 ? 'Próximo' : 'Criar conta'),
+                          : Text(_passo < totalPassos - 1 ? 'Próximo' : 'Criar conta'),
                     ),
                   ),
                 ],
@@ -475,9 +528,12 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     );
   }
 
-  Widget _buildPasso1() {
+  // ===========================================================
+  // Passo 0 -- Quem e voce
+  // ===========================================================
+  Widget _buildPassoQuemEhVoce() {
     return Form(
-      key: _formKeyPasso1,
+      key: _formKeyPasso0,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -510,6 +566,17 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
             ),
           ],
           const SizedBox(height: 16),
+          DropdownButtonFormField<Sexo>(
+            value: _sexo,
+            decoration: const InputDecoration(labelText: 'Sexo'),
+            items: const [
+              DropdownMenuItem(value: Sexo.masculino, child: Text('Masculino')),
+              DropdownMenuItem(value: Sexo.feminino, child: Text('Feminino')),
+            ],
+            onChanged: (v) => setState(() => _sexo = v),
+            validator: (v) => v == null ? 'Selecione uma opção' : null,
+          ),
+          const SizedBox(height: 16),
           DropdownButtonFormField<EstadoCivil>(
             value: _estadoCivil,
             decoration: const InputDecoration(labelText: 'Estado civil'),
@@ -523,24 +590,6 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
             onChanged: (v) => setState(() => _estadoCivil = v),
             validator: (v) => v == null ? 'Selecione uma opção' : null,
           ),
-          const SizedBox(height: 16),
-          DropdownButtonFormField<Sexo>(
-            value: _sexo,
-            decoration: const InputDecoration(labelText: 'Sexo'),
-            items: const [
-              DropdownMenuItem(value: Sexo.masculino, child: Text('Masculino')),
-              DropdownMenuItem(value: Sexo.feminino, child: Text('Feminino')),
-            ],
-            onChanged: (v) => setState(() => _sexo = v),
-            validator: (v) => v == null ? 'Selecione uma opção' : null,
-          ),
-          if (_categoriaPreview != null) ...[
-            const SizedBox(height: 8),
-            Text(
-              'Se marcar Awake, seu grupo lá será: $_categoriaPreview',
-              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-            ),
-          ],
           const SizedBox(height: 24),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
@@ -573,12 +622,25 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
               label: const Text('Adicionar filho(a)'),
             ),
           ],
-          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  // ===========================================================
+  // Passo 1 -- Ministerio
+  // ===========================================================
+  Widget _buildPassoMinisterio() {
+    return Form(
+      key: _formKeyPasso1,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
           const Text('Qual ministério você faz parte?',
               style: TextStyle(fontWeight: FontWeight.w600)),
           const SizedBox(height: 4),
           Text(
-            'Pode marcar até 2',
+            'Já deixamos marcado o mais provável — pode mudar à vontade. Pode marcar até 2',
             style: Theme.of(context).textTheme.bodySmall,
           ),
           const SizedBox(height: 8),
@@ -590,6 +652,13 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
               _ministerioChip('mulheres', 'Mulheres'),
             ],
           ),
+          if (_categoriaPreview != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Se marcar Awake, seu grupo lá será: $_categoriaPreview',
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+            ),
+          ],
           // So pergunta o grupo de casais pra quem e casado e NAO
           // marcou Awake -- quem e casado e Awake ja cai
           // automaticamente no grupo "One", sem precisar escolher nada.
@@ -686,7 +755,10 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     );
   }
 
-  Widget _buildPasso2() {
+  // ===========================================================
+  // Passo 2 -- Contato
+  // ===========================================================
+  Widget _buildPassoContato() {
     return Form(
       key: _formKeyPasso2,
       child: Column(
@@ -771,7 +843,10 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     );
   }
 
-  Widget _buildPasso3() {
+  // ===========================================================
+  // Passo 3 -- Criar conta
+  // ===========================================================
+  Widget _buildPassoCriarConta() {
     return Form(
       key: _formKeyPasso3,
       child: Column(
@@ -798,41 +873,31 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
             ),
             const SizedBox(height: 20),
           ],
-          if (_ministeriosSelecionados.length == 1) ...[
-            const Text('Você é líder?', style: TextStyle(fontWeight: FontWeight.w600)),
-            const SizedBox(height: 8),
-            SegmentedButton<bool>(
-              segments: const [
-                ButtonSegment(value: false, label: Text('Não')),
-                ButtonSegment(value: true, label: Text('Sim')),
-              ],
-              selected: {_liderPorMinisterio[_ministeriosSelecionados.first] ?? false},
-              onSelectionChanged: (value) => setState(
-                () => _liderPorMinisterio[_ministeriosSelecionados.first] = value.first,
-              ),
-            ),
-          ] else ...[
-            const Text('Você é líder de qual ministério?',
-                style: TextStyle(fontWeight: FontWeight.w600)),
-            const SizedBox(height: 4),
+          const Text('Você é líder?', style: TextStyle(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          if (!_querSerLider)
+            OutlinedButton.icon(
+              onPressed: () => setState(() => _querSerLider = true),
+              icon: const Icon(Icons.add_moderator_outlined),
+              label: const Text('Clique aqui se você lidera'),
+            )
+          else ...[
             Text(
-              'Deixe tudo desmarcado se você é membro em todos',
+              'De qual ministério? Pode marcar mais de um',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
-              children: _ministeriosSelecionados
+              children: _todosMinisteriosLideranca
                   .map((m) => FilterChip(
-                        label: Text(m.labelMinisterio),
-                        selected: _liderPorMinisterio[m] ?? false,
+                        label: Text(m.$2),
+                        selected: _liderPorMinisterio[m.$1] ?? false,
                         onSelected: (marcado) =>
-                            setState(() => _liderPorMinisterio[m] = marcado),
+                            setState(() => _liderPorMinisterio[m.$1] = marcado),
                       ))
                   .toList(),
             ),
-          ],
-          if (_liderPorMinisterio.values.any((v) => v)) ...[
             const SizedBox(height: 16),
             TextFormField(
               controller: _codigoLiderController,

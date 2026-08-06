@@ -5,9 +5,12 @@ import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../models/event_model.dart';
+import '../../models/profile_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/event_provider.dart';
+import '../../services/escala_servico_service.dart';
 import '../../widgets/awake_app_bar.dart';
+import 'escala_servico_screen.dart';
 
 class EventDetailScreen extends ConsumerWidget {
   final String eventId;
@@ -24,6 +27,10 @@ class EventDetailScreen extends ConsumerWidget {
     final eventsAsync = ref.watch(upcomingEventsProvider);
     final profileAsync = ref.watch(currentProfileProvider);
     final isLider = profileAsync.value?.isLider ?? false;
+    final ministeriosServicoLiderados = (profileAsync.value?.ministerios ?? [])
+        .where((m) => m.ehLider && ministeriosComEscalaServico.contains(m.ministerio))
+        .map((m) => m.ministerio)
+        .toList();
 
     return Scaffold(
       appBar: const AwakeAppBar(title: 'Detalhes do evento', showQrButton: false),
@@ -135,6 +142,24 @@ class EventDetailScreen extends ConsumerWidget {
                       ),
                     ],
                   ),
+                ],
+                if (event.escopo == EventoEscopo.igreja && ministeriosServicoLiderados.isNotEmpty) ...[
+                  const SizedBox(height: 24),
+                  ...ministeriosServicoLiderados.map((ministerio) => Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: FilledButton.icon(
+                          onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                            builder: (_) => EscalaServicoScreen(
+                              ministerio: ministerio,
+                              eventoId: event.id,
+                              eventoTitulo: event.titulo,
+                              dataOcorrencia: dataExibida,
+                            ),
+                          )),
+                          icon: const Icon(Icons.assignment_ind_outlined),
+                          label: Text('Criar escala de ${ministerio.labelMinisterio}'),
+                        ),
+                      )),
                 ],
                 if (isLider) ...[
                   const SizedBox(height: 24),

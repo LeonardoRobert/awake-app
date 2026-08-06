@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../models/escala_servico_model.dart';
 import '../../providers/event_provider.dart';
+import '../../services/escala_servico_service.dart';
 import '../../widgets/awake_app_bar.dart';
 import '../../widgets/evento_semana_card.dart';
 
@@ -35,25 +37,47 @@ class InicioScreen extends ConsumerWidget {
             }
             ocorrencias.sort(compararOcorrencias);
 
-            return ListView(
-              padding: const EdgeInsets.fromLTRB(16, 20, 16, 96),
-              children: [
-                Text('Próximos eventos:', style: Theme.of(context).textTheme.headlineSmall),
-                const SizedBox(height: 20),
-                if (ocorrencias.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 32),
-                    child: Center(
-                      child: Text(
-                        'Nenhum evento nos próximos 7 dias.',
-                        style: Theme.of(context).textTheme.bodyMedium,
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  )
-                else
-                  ...ocorrencias.map((oc) => EventoSemanaCard(ocorrencia: oc)),
-              ],
+            return FutureBuilder<List<MinhaEscalaResumo>>(
+              future: EscalaServicoService().buscarMinhaEscala(hoje, fim),
+              builder: (context, snapshotEscalas) {
+                final minhasEscalas = snapshotEscalas.data ?? [];
+
+                MinhaEscalaResumo? escalaPara(Ocorrencia oc) {
+                  for (final e in minhasEscalas) {
+                    if (e.eventoId == oc.event.id &&
+                        e.dataOcorrencia.year == oc.data.year &&
+                        e.dataOcorrencia.month == oc.data.month &&
+                        e.dataOcorrencia.day == oc.data.day) {
+                      return e;
+                    }
+                  }
+                  return null;
+                }
+
+                return ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 20, 16, 96),
+                  children: [
+                    Text('Próximos eventos:', style: Theme.of(context).textTheme.headlineSmall),
+                    const SizedBox(height: 20),
+                    if (ocorrencias.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 32),
+                        child: Center(
+                          child: Text(
+                            'Nenhum evento nos próximos 7 dias.',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      )
+                    else
+                      ...ocorrencias.map((oc) => EventoSemanaCard(
+                            ocorrencia: oc,
+                            escalaAqui: escalaPara(oc),
+                          )),
+                  ],
+                );
+              },
             );
           },
         ),

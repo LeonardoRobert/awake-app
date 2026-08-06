@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
+import '../models/escala_servico_model.dart';
 import '../models/event_model.dart';
+import '../models/profile_model.dart';
 
 class Ocorrencia {
   final EventModel event;
@@ -35,7 +37,10 @@ int compararOcorrencias(Ocorrencia a, Ocorrencia b) {
 /// compartilhar no WhatsApp / Instagram.
 class EventoSemanaCard extends StatefulWidget {
   final Ocorrencia ocorrencia;
-  const EventoSemanaCard({super.key, required this.ocorrencia});
+  /// Se a pessoa logada estiver escalada nesse evento, isso vem
+  /// preenchido -- mostra a "tarja" no topo do card.
+  final MinhaEscalaResumo? escalaAqui;
+  const EventoSemanaCard({super.key, required this.ocorrencia, this.escalaAqui});
 
   @override
   State<EventoSemanaCard> createState() => _EventoSemanaCardState();
@@ -125,19 +130,46 @@ class _EventoSemanaCardState extends State<EventoSemanaCard> {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 20),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(evento.titulo, style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 8),
-            Row(
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (widget.escalaAqui != null)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              color: Colors.green.withOpacity(0.85),
+              child: Row(
+                children: [
+                  const Icon(Icons.event_available, color: Colors.white, size: 16),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Você está escalado(a): ${widget.escalaAqui!.funcao} '
+                      '(${widget.escalaAqui!.ministerio.labelMinisterio})',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.schedule, size: 16),
-                const SizedBox(width: 6),
-                Text(DateFormat("EEEE, dd/MM 'às' HH:mm", 'pt_BR').format(data)),
-              ],
+                Text(evento.titulo, style: Theme.of(context).textTheme.titleLarge),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    const Icon(Icons.schedule, size: 16),
+                    const SizedBox(width: 6),
+                    Text(DateFormat("EEEE, dd/MM 'às' HH:mm", 'pt_BR').format(data)),
+                  ],
             ),
             if (evento.local != null && evento.local!.trim().isNotEmpty) ...[
               const SizedBox(height: 4),
@@ -193,6 +225,8 @@ class _EventoSemanaCardState extends State<EventoSemanaCard> {
             ],
           ],
         ),
+      ),
+    ],
       ),
     );
   }
