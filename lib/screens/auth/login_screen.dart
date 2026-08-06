@@ -129,7 +129,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         const SizedBox(height: 6),
                         TextFormField(
                           controller: _emailController,
-                          decoration: const InputDecoration(hintText: 'seu@email.com'),
+                          decoration: const InputDecoration(),
                           keyboardType: TextInputType.emailAddress,
                           validator: (value) => (value == null || !value.contains('@'))
                               ? 'Informe um e-mail válido'
@@ -140,7 +140,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         const SizedBox(height: 6),
                         TextFormField(
                           controller: _senhaController,
-                          decoration: const InputDecoration(hintText: '••••••'),
+                          decoration: const InputDecoration(),
                           obscureText: true,
                           validator: (value) => (value == null || value.length < 6)
                               ? 'Mínimo de 6 caracteres'

@@ -57,7 +57,16 @@ class _NossosConteudosScreenState extends State<NossosConteudosScreen> {
                   const Text(
                     'Não foi possível carregar os vídeos agora.',
                     textAlign: TextAlign.center,
+                    style: TextStyle(fontWeight: FontWeight.w600),
                   ),
+                  if (snapshot.hasError) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      '${snapshot.error}',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
                   const SizedBox(height: 16),
                   Center(
                     child: OutlinedButton.icon(

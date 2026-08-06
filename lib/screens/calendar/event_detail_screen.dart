@@ -10,7 +10,20 @@ import '../../providers/auth_provider.dart';
 import '../../providers/event_provider.dart';
 import '../../services/escala_servico_service.dart';
 import '../../widgets/awake_app_bar.dart';
+import '../../widgets/quem_esta_escalado.dart';
 import 'escala_servico_screen.dart';
+
+/// Acha a proxima ocorrencia de um evento a partir de hoje (ou a data
+/// de criacao dele, se nao houver nenhuma futura) -- usado so como
+/// ultimo recurso, quando a data exata clicada nao foi informada.
+DateTime _proximaOcorrencia(EventModel event) {
+  final hoje = DateTime.now();
+  final futuras = event.occurrencesBetween(
+    DateTime(hoje.year, hoje.month, hoje.day),
+    hoje.add(const Duration(days: 60)),
+  );
+  return futuras.isNotEmpty ? futuras.first : event.dataInicio;
+}
 
 class EventDetailScreen extends ConsumerWidget {
   final String eventId;
@@ -26,11 +39,29 @@ class EventDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final eventsAsync = ref.watch(upcomingEventsProvider);
     final profileAsync = ref.watch(currentProfileProvider);
-    final isLider = profileAsync.value?.isLider ?? false;
-    final ministeriosServicoLiderados = (profileAsync.value?.ministerios ?? [])
-        .where((m) => m.ehLider && ministeriosComEscalaServico.contains(m.ministerio))
-        .map((m) => m.ministerio)
-        .toList();
+    // Editar/excluir um evento e permitido pro admin, ou pro lider do
+    // MINISTERIO DAQUELE EVENTO especificamente (nao so lider do
+    // Awake) -- mesma regra que ja vale no banco (pode_gerenciar_evento).
+    bool podeEditarEsteEvento(EventModel evento) {
+      final profile = profileAsync.value;
+      if (profile == null) return false;
+      if (profile.isAdmin) return true;
+      final ministerio = evento.escopo.ministerioCorrespondente;
+      if (ministerio == null) return false;
+      return profile.ministerios.any((m) => m.ehLider && m.ministerio == ministerio);
+    }
+    final profile = profileAsync.value;
+    // Admin pode criar escala de QUALQUER ministerio de servico
+    // (igual ja acontece no banco) -- os demais so veem os que
+    // realmente lideram.
+    final ministeriosServicoLiderados = profile == null
+        ? <String>[]
+        : profile.isAdmin
+            ? ministeriosComEscalaServico
+            : profile.ministerios
+                .where((m) => m.ehLider && ministeriosComEscalaServico.contains(m.ministerio))
+                .map((m) => m.ministerio)
+                .toList();
 
     return Scaffold(
       appBar: const AwakeAppBar(title: 'Detalhes do evento', showQrButton: false),
@@ -44,7 +75,13 @@ class EventDetailScreen extends ConsumerWidget {
             return const Center(child: Text('Evento nao encontrado.'));
           }
 
-          final dataExibida = occurrenceDate ?? event.dataInicio;
+          // Se por algum motivo a data exata da ocorrencia nao foi
+          // passada (ex: acesso direto por link), NUNCA cai no
+          // dataInicio puro -- pra evento recorrente isso pode ser a
+          // primeira vez que ele foi criado, meses atras, o que fazia
+          // a escala aparecer em branco (checava a data errada). Em
+          // vez disso, acha a proxima ocorrencia real a partir de hoje.
+          final dataExibida = occurrenceDate ?? _proximaOcorrencia(event);
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(24),
@@ -143,6 +180,9 @@ class EventDetailScreen extends ConsumerWidget {
                     ],
                   ),
                 ],
+                if (event.escopo == EventoEscopo.igreja) ...[
+                  QuemEstaEscalado(eventoId: event.id, dataOcorrencia: dataExibida),
+                ],
                 if (event.escopo == EventoEscopo.igreja && ministeriosServicoLiderados.isNotEmpty) ...[
                   const SizedBox(height: 24),
                   ...ministeriosServicoLiderados.map((ministerio) => Padding(
@@ -157,11 +197,11 @@ class EventDetailScreen extends ConsumerWidget {
                             ),
                           )),
                           icon: const Icon(Icons.assignment_ind_outlined),
-                          label: Text('Criar escala de ${ministerio.labelMinisterio}'),
+                          label: Text('Criar/editar escala de ${ministerio.labelMinisterio}'),
                         ),
                       )),
                 ],
-                if (isLider) ...[
+                if (podeEditarEsteEvento(event)) ...[
                   const SizedBox(height: 24),
                   Row(
                     children: [

@@ -68,6 +68,27 @@ class EscalaServicoService {
     return escalaId;
   }
 
+  /// Diferente de buscarOuCriarEscala, esse SO LE -- nao cria nada.
+  /// Usado pra mostrar "quem esta escalado" pra quem so esta
+  /// espiando (nao e o lider editando).
+  Future<List<PosicaoEscala>> listarPosicoesSeExistir({
+    required String ministerio,
+    required String eventoId,
+    required DateTime dataOcorrencia,
+  }) async {
+    final dataStr = dataOcorrencia.toIso8601String().split('T').first;
+    final existente = await _client
+        .from('escalas_servico')
+        .select('id')
+        .eq('ministerio', ministerio)
+        .eq('evento_id', eventoId)
+        .eq('data_ocorrencia', dataStr)
+        .maybeSingle();
+
+    if (existente == null) return [];
+    return listarPosicoes(existente['id'] as String);
+  }
+
   Future<List<PosicaoEscala>> listarPosicoes(String escalaId) async {
     final data = await _client
         .from('escala_servico_posicoes')

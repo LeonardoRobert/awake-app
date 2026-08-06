@@ -6,7 +6,9 @@ import 'package:table_calendar/table_calendar.dart';
 import '../../models/event_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/event_provider.dart';
+import '../../services/escala_servico_service.dart';
 import '../../widgets/awake_app_bar.dart';
+import '../../widgets/escala_fluxo.dart';
 
 class CalendarScreen extends ConsumerStatefulWidget {
   const CalendarScreen({super.key});
@@ -29,16 +31,55 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     // evento no calendario e permitido pra lider de QUALQUER ministerio
     // (ou admin) -- por isso usa esse getter, nao o "isLider" comum.
     final podeGerenciarEventos = profileAsync.value?.ehLiderDeAlgumMinisterio ?? false;
+    final ministeriosLideradosServico = (profileAsync.value?.ministerios ?? [])
+        .where((m) => m.ehLider && ministeriosComEscalaServico.contains(m.ministerio))
+        .toList();
+    final eventosIgreja =
+        (eventsAsync.value ?? []).where((e) => e.escopo == EventoEscopo.igreja).toList();
 
     return Scaffold(
-      appBar: const AwakeAppBar(title: 'Calendário'),
-      floatingActionButton: podeGerenciarEventos
-          ? FloatingActionButton.small(
+      appBar: AwakeAppBar(
+        title: 'Calendário',
+        actions: [
+          IconButton(
+            tooltip: 'Ir para hoje',
+            icon: const CircleAvatar(
+              radius: 12,
+              child: Icon(Icons.today, size: 14),
+            ),
+            onPressed: () {
+              setState(() {
+                _focusedDay = DateTime.now();
+                _diaSelecionado = null;
+              });
+            },
+          ),
+        ],
+      ),
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (ministeriosLideradosServico.isNotEmpty) ...[
+            FloatingActionButton.small(
+              heroTag: 'fab-escala',
+              tooltip: 'Escala',
+              onPressed: () => abrirFluxoEscala(
+                context,
+                ministeriosLiderados: ministeriosLideradosServico,
+                eventosIgreja: eventosIgreja,
+              ),
+              child: const Icon(Icons.event_note_outlined),
+            ),
+            const SizedBox(height: 12),
+          ],
+          if (podeGerenciarEventos)
+            FloatingActionButton.small(
               heroTag: 'fab-calendario',
               onPressed: () => context.push('/eventos/novo'),
               child: const Icon(Icons.add),
-            )
-          : null,
+            ),
+        ],
+      ),
       body: RefreshIndicator(
         onRefresh: () => ref.refresh(upcomingEventsProvider.future),
         child: eventsAsync.when(

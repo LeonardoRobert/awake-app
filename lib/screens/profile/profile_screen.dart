@@ -9,10 +9,16 @@ import '../../screens/financeiro/financeiro_screen.dart';
 import '../../screens/messages/admin_mensagens_screen.dart';
 import '../../screens/messages/enviar_mensagem_screen.dart';
 import '../../screens/pages/nossas_paginas_screen.dart';
+import '../../models/profile_model.dart';
 import '../../screens/pages/nossos_conteudos_screen.dart';
 import '../../screens/pages/quem_somos_screen.dart';
+import '../../screens/calendar/escala_mensal_screen.dart';
+import '../../screens/volunteering/admin_questionarios_screen.dart';
+import '../../screens/volunteering/dashboard_ministerio_screen.dart';
+import '../../services/escala_servico_service.dart';
 import '../../services/notification_service.dart';
 import '../../widgets/awake_app_bar.dart';
+import '../../widgets/link_questionario_novo_servo.dart';
 import 'meu_perfil_screen.dart';
 
 /// Essa tela virou um MENU (antes era a lista direta de dados do
@@ -125,6 +131,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ],
               ),
               const SizedBox(height: 24),
+              const LinkQuestionarioNovoServo(),
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.person_outline),
@@ -244,6 +251,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   onTap: () => Navigator.of(context)
                       .push(MaterialPageRoute(builder: (_) => const AdminMensagensScreen())),
                 ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.assignment_outlined),
+                  title: const Text('Questionários de novos servos'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => const AdminQuestionariosScreen(),
+                  )),
+                ),
               ],
               if (profile.isAdminFinanceiro) ...[
                 ListTile(
@@ -254,6 +270,31 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => context.push('/admin/financeiro'),
                 ),
+              ],
+              if (profile.ministerios
+                  .any((m) => m.ehLider && ministeriosComEscalaServico.contains(m.ministerio))) ...[
+                ...profile.ministerios
+                    .where((m) => m.ehLider && ministeriosComEscalaServico.contains(m.ministerio))
+                    .map((m) => ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: const Icon(Icons.event_note_outlined),
+                          title: Text('Escala mensal — ${m.ministerio.labelMinisterio}'),
+                          trailing: const Icon(Icons.chevron_right),
+                          onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                            builder: (_) => EscalaMensalScreen(ministerio: m.ministerio),
+                          )),
+                        )),
+              ],
+              if (profile.ministerios.any((m) => m.ehLider)) ...[
+                ...profile.ministerios.where((m) => m.ehLider).map((m) => ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.bar_chart_outlined),
+                      title: Text('Dashboard — ${m.ministerio.labelMinisterio}'),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                        builder: (_) => DashboardMinisterioScreen(ministerio: m.ministerio),
+                      )),
+                    )),
               ],
               const Divider(),
               ListTile(
