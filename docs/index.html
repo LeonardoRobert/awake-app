@@ -1,146 +1,202 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Awake — App do Ministério</title>
-  <link rel="icon" href="assets/awake_flame_white.png" />
-  <style>
-    :root {
-      --navy: #0C192E;
-      --yellow: #FFD21F;
-      --off-white: #F7F7F6;
-      --grey: #D9DFE6;
-    }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shallom — Baixe o app</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;1,700;1,800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy: #0C192E;
+    --navy-deep: #081120;
+    --azul: #9BB0C7;
+    --azul-claro: #C3D2E0;
+    --creme: #F7F2DD;
+    --branco: #FFFFFF;
+  }
 
-    * { box-sizing: border-box; }
+  * { box-sizing: border-box; }
 
-    body {
-      margin: 0;
-      min-height: 100vh;
-      background: var(--navy);
-      color: var(--off-white);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 24px;
-    }
+  body {
+    margin: 0;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    background: linear-gradient(180deg, var(--navy) 0%, var(--navy-deep) 100%);
+    color: var(--branco);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
 
-    .card {
-      max-width: 420px;
-      width: 100%;
-      text-align: center;
+  @media (prefers-reduced-motion: no-preference) {
+    .dove-wing { animation: flutter 3.2s ease-in-out infinite; transform-origin: 62px 58px; }
+    @keyframes flutter {
+      0%, 100% { transform: rotate(0deg); }
+      50% { transform: rotate(-4deg); }
     }
+  }
 
-    .logo {
-      height: 48px;
-      margin-bottom: 32px;
-    }
+  .topo {
+    width: 100%;
+    max-width: 640px;
+    padding: 64px 24px 40px;
+    text-align: center;
+  }
 
-    .flame {
-      height: 64px;
-      margin-bottom: 24px;
-      opacity: 0.9;
-    }
+  .logo-dove {
+    width: 76px;
+    height: 76px;
+    margin-bottom: 20px;
+  }
 
-    h1 {
-      font-size: 22px;
-      font-weight: 700;
-      margin: 0 0 12px;
-    }
+  .wordmark {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-style: italic;
+    font-weight: 800;
+    font-size: 44px;
+    letter-spacing: -0.02em;
+    margin: 0;
+    color: var(--branco);
+  }
 
-    p {
-      color: var(--grey);
-      line-height: 1.5;
-      margin: 0 0 32px;
-    }
+  .tagline {
+    color: var(--azul-claro);
+    font-size: 16px;
+    margin: 10px 0 0;
+    font-weight: 500;
+  }
 
-    .btn {
-      display: block;
-      width: 100%;
-      text-decoration: none;
-      padding: 16px 24px;
-      border-radius: 12px;
-      font-size: 16px;
-      font-weight: 700;
-      margin-bottom: 12px;
-      transition: opacity 0.15s ease;
-    }
+  .cartoes {
+    width: 100%;
+    max-width: 640px;
+    padding: 0 24px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
 
-    .btn:active {
-      opacity: 0.85;
-    }
+  .cartao {
+    background: var(--creme);
+    color: var(--navy);
+    border-radius: 20px;
+    padding: 28px 26px;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    text-align: left;
+  }
 
-    .btn-android {
-      background: var(--yellow);
-      color: var(--navy);
-    }
+  .cartao-icone {
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    color: var(--navy);
+  }
 
-    .btn-ios {
-      background: transparent;
-      color: var(--off-white);
-      border: 2px solid var(--grey);
-    }
+  .cartao-texto { flex: 1; min-width: 0; }
 
-    .note {
-      margin-top: 16px;
-      font-size: 12px;
-      color: var(--grey);
-      opacity: 0.8;
-      text-align: left;
-    }
+  .cartao-titulo {
+    font-size: 18px;
+    font-weight: 700;
+    margin: 0 0 4px;
+  }
 
-    .note a {
-      color: var(--yellow);
-    }
+  .cartao-desc {
+    font-size: 14px;
+    margin: 0 0 16px;
+    color: #45566E;
+    line-height: 1.45;
+  }
 
-    .note strong {
-      color: var(--off-white);
-    }
-  </style>
+  .botao {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--navy);
+    color: var(--branco);
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 15px;
+    padding: 12px 20px;
+    border-radius: 12px;
+    transition: transform 0.15s ease, background 0.15s ease;
+  }
+
+  .botao:hover { background: var(--navy-deep); transform: translateY(-1px); }
+  .botao:focus-visible { outline: 3px solid var(--azul); outline-offset: 2px; }
+
+  .rodape {
+    width: 100%;
+    max-width: 640px;
+    padding: 8px 24px 56px;
+    text-align: center;
+  }
+
+  .rodape p {
+    color: var(--azul-claro);
+    font-size: 13px;
+    line-height: 1.6;
+    opacity: 0.85;
+  }
+
+  .rodape a { color: var(--azul-claro); }
+
+  @media (max-width: 480px) {
+    .wordmark { font-size: 36px; }
+    .cartao { flex-direction: column; align-items: flex-start; }
+  }
+</style>
 </head>
 <body>
-  <div class="card">
-    <img class="logo" src="assets/awake_logo_white.png" alt="Awake" />
-    <img class="flame" src="assets/awake_flame_white.png" alt="" />
-    <h1>Baixe o app do Awake</h1>
-    <p>
-      Calendário, escalas de voluntariado, metas, troféus e treinamentos —
-      tudo num só lugar.
-    </p>
 
-    <a id="download-btn" class="btn btn-android" href="#">Baixar para Android</a>
-    <a class="btn btn-ios" href="app/">Usar no iPhone</a>
-
-    <p class="note">
-      <strong>Android:</strong> ao instalar, seu celular pode avisar que o app
-      é de "fonte desconhecida" — isso é esperado para apps fora da Play
-      Store. Toque em "Instalar assim mesmo".
-      <br /><br />
-      <strong>iPhone:</strong> o botão abre o app no Safari. Pra usar como um
-      aplicativo de verdade (com ícone na tela e sem as barras do
-      navegador), toque no botão de <strong>Compartilhar</strong> (o
-      quadrado com uma seta pra cima) e depois em
-      <strong>"Adicionar à Tela de Início"</strong>.
-      <br /><br />
-      Problemas para baixar o Android? Confira a
-      <a id="releases-link" href="#" target="_blank" rel="noopener">página de releases</a>
-      diretamente.
-    </p>
+  <div class="topo">
+    <svg class="logo-dove" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <circle cx="60" cy="60" r="57" stroke="#9BB0C7" stroke-width="3"/>
+      <g class="dove-wing">
+        <path d="M62 30 C58 45 66 52 78 40 C70 55 60 56 55 62 C48 70 34 76 24 70 C36 72 45 66 50 58 C40 60 30 56 28 48 C38 52 46 48 50 40 C54 34 58 30 62 30Z" fill="#F7F2DD"/>
+      </g>
+      <path d="M55 62 C48 70 34 76 24 70" stroke="#F7F2DD" stroke-width="2.5" stroke-linecap="round"/>
+    </svg>
+    <h1 class="wordmark">shallom</h1>
+    <p class="tagline">Baixe o app da nossa comunidade</p>
   </div>
 
-  <script>
-    const host = window.location.hostname;
-    const owner = host.split('.')[0];
-    const pathParts = window.location.pathname.split('/').filter(Boolean);
-    const repo = pathParts[0] || '';
+  <div class="cartoes">
 
-    const apkUrl = `https://github.com/${owner}/${repo}/releases/latest/download/awake-app.apk`;
-    const releasesUrl = `https://github.com/${owner}/${repo}/releases`;
+    <div class="cartao">
+      <svg class="cartao-icone" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M17.6 9.48l1.84-3.18a.5.5 0 0 0-.87-.5l-1.86 3.22a10.6 10.6 0 0 0-9.42 0L5.43 5.8a.5.5 0 0 0-.87.5L6.4 9.48A9.98 9.98 0 0 0 2 17.5h20A9.98 9.98 0 0 0 17.6 9.48ZM8.5 14.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2Zm7 0a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"/>
+      </svg>
+      <div class="cartao-texto">
+        <p class="cartao-titulo">Android</p>
+        <p class="cartao-desc">Baixa o instalador (.apk) e toca nele pra instalar. Pode pedir pra liberar "fontes desconhecidas" — é normal, é só o Android confirmando que você mesmo autorizou.</p>
+        <a class="botao" href="https://github.com/LeonardoRobert/awake-app/releases/latest">
+          Baixar para Android
+        </a>
+      </div>
+    </div>
 
-    document.getElementById('download-btn').href = apkUrl;
-    document.getElementById('releases-link').href = releasesUrl;
-  </script>
+    <div class="cartao">
+      <svg class="cartao-icone" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M17.5 2h-11A2.5 2.5 0 0 0 4 4.5v15A2.5 2.5 0 0 0 6.5 22h11a2.5 2.5 0 0 0 2.5-2.5v-15A2.5 2.5 0 0 0 17.5 2ZM12 21a1.25 1.25 0 1 1 0-2.5A1.25 1.25 0 0 1 12 21ZM17 17H7V5h10Z"/>
+      </svg>
+      <div class="cartao-texto">
+        <p class="cartao-titulo">iPhone</p>
+        <p class="cartao-desc">Abre o link abaixo no Safari, toca em Compartilhar e depois em "Adicionar à Tela de Início" — o app fica salvo no seu iPhone como qualquer outro.</p>
+        <a class="botao" href="https://leonardorobert.github.io/awake-app/app/">
+          Abrir no iPhone
+        </a>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="rodape">
+    <p>Comunidade Batista Shallom em Meriti<br>
+    Dúvidas? Fala com a liderança da sua área.</p>
+  </div>
+
 </body>
 </html>
