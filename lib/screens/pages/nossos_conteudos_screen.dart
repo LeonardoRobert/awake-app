@@ -18,7 +18,7 @@ class _NossosConteudosScreenState extends State<NossosConteudosScreen> {
   @override
   void initState() {
     super.initState();
-    _futuro = YoutubeService().buscarVideosRecentes(limite: 5);
+    _futuro = YoutubeService().buscarVideosRecentes(limite: 6);
   }
 
   Future<void> _abrirVideo(String url) async {
@@ -38,7 +38,7 @@ class _NossosConteudosScreenState extends State<NossosConteudosScreen> {
       appBar: const AwakeAppBar(title: 'Nossos Conteúdos', showQrButton: false),
       body: RefreshIndicator(
         onRefresh: () async {
-          setState(() => _futuro = YoutubeService().buscarVideosRecentes(limite: 5));
+          setState(() => _futuro = YoutubeService().buscarVideosRecentes(limite: 6));
           await _futuro;
         },
         child: FutureBuilder<List<VideoYoutube>>(
@@ -81,7 +81,10 @@ class _NossosConteudosScreenState extends State<NossosConteudosScreen> {
 
             final videos = snapshot.data!;
             final destaque = videos.first;
-            final outros = videos.skip(1).toList();
+            // Filtra pelo ID, nao so pela posicao -- assim, mesmo se a
+            // API mandar o mesmo video duas vezes por algum motivo, ele
+            // nunca aparece repetido em "Mais videos".
+            final outros = videos.where((v) => v.id != destaque.id).take(4).toList();
 
             return ListView(
               padding: const EdgeInsets.all(16),
