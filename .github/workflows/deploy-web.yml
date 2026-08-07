@@ -47,7 +47,7 @@ jobs:
             git commit -m "Deploy automatico da versao web ($GITHUB_REF_NAME)"
             sucesso=0
             for i in 1 2 3; do
-              if git pull --rebase origin "$(git rev-parse --abbrev-ref HEAD)" && git push; then
+              if git pull --rebase origin main && git push origin HEAD:main; then
                 sucesso=1
                 break
               fi
