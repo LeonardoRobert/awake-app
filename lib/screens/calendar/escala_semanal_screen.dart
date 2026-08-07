@@ -205,6 +205,17 @@ class _SecaoEscalaCultoState extends State<_SecaoEscalaCulto> {
     _carregar();
   }
 
+  /// Tira a pessoa escalada, mas MANTEM a posicao/funcao -- fica
+  /// disponivel pra escalar outra pessoa depois.
+  Future<void> _desescalarPessoa(PosicaoEscala posicao, {int slot = 1}) async {
+    if (slot == 1) {
+      await _service.definirPessoa(posicao.id, null);
+    } else {
+      await _service.definirSegundaPessoa(posicao.id, null);
+    }
+    _carregar();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -229,10 +240,29 @@ class _SecaoEscalaCultoState extends State<_SecaoEscalaCulto> {
                     : ListTile(
                         title: Text(posicao.funcao),
                         subtitle: Text(posicao.nomePessoa ?? 'Ninguém escalado ainda'),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.close, size: 18),
-                          tooltip: 'Remover essa posição da escala',
-                          onPressed: () => _removerPosicao(posicao),
+                        trailing: PopupMenuButton<String>(
+                          icon: const Icon(Icons.more_vert, size: 20),
+                          onSelected: (opcao) {
+                            if (opcao == 'tirar') {
+                              _desescalarPessoa(posicao);
+                            } else if (opcao == 'excluir') {
+                              _removerPosicao(posicao);
+                            }
+                          },
+                          itemBuilder: (context) => [
+                            if (posicao.profileId != null)
+                              const PopupMenuItem(
+                                value: 'tirar',
+                                child: Text('Tirar essa pessoa'),
+                              ),
+                            const PopupMenuItem(
+                              value: 'excluir',
+                              child: Text(
+                                'Excluir posição',
+                                style: TextStyle(color: Colors.red),
+                              ),
+                            ),
+                          ],
                         ),
                         leading: CircleAvatar(
                           backgroundColor: posicao.profileId != null
@@ -291,6 +321,13 @@ class _SecaoEscalaCultoState extends State<_SecaoEscalaCulto> {
               ),
             ),
             title: Text(posicao.nomePessoa ?? 'Escolher 1ª pessoa do casal'),
+            trailing: posicao.profileId != null
+                ? IconButton(
+                    icon: const Icon(Icons.person_remove_outlined, size: 16),
+                    tooltip: 'Tirar essa pessoa (mantém a posição)',
+                    onPressed: () => _desescalarPessoa(posicao, slot: 1),
+                  )
+                : null,
             onTap: () => _escolherPessoa(posicao, slot: 1),
           ),
           ListTile(
@@ -306,6 +343,13 @@ class _SecaoEscalaCultoState extends State<_SecaoEscalaCulto> {
               ),
             ),
             title: Text(posicao.nomePessoa2 ?? 'Escolher 2ª pessoa do casal'),
+            trailing: posicao.profileId2 != null
+                ? IconButton(
+                    icon: const Icon(Icons.person_remove_outlined, size: 16),
+                    tooltip: 'Tirar essa pessoa (mantém a posição)',
+                    onPressed: () => _desescalarPessoa(posicao, slot: 2),
+                  )
+                : null,
             onTap: () => _escolherPessoa(posicao, slot: 2),
           ),
           const SizedBox(height: 4),

@@ -5,16 +5,9 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import '../../models/event_model.dart';
-import '../../models/profile_model.dart';
-import '../../providers/auth_provider.dart';
 import '../../providers/event_provider.dart';
-import '../../widgets/awake_app_bar.dart';
 
-/// Tela de criacao/edicao de evento.
-///
-/// O que a pessoa pode escolher em "esse evento e..." depende de quem
-/// ela e: admin ve as 8 categorias; lider de ministerio so ve (e ja
-/// vem pre-selecionada) a categoria do proprio ministerio.
+/// Tela de criacao/edicao de evento, disponivel apenas para lider/admin.
 class EventFormScreen extends ConsumerStatefulWidget {
   final EventModel? eventoParaEditar;
   const EventFormScreen({super.key, this.eventoParaEditar});
@@ -31,28 +24,18 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
   DateTime? _dataInicio;
   bool _recorrente = false;
   DateTime? _recorrenciaFim;
-  final Set<int> _semanasSelecionadas = {};
   EventTipo _tipo = EventTipo.outro;
-  EventoEscopo _escopo = EventoEscopo.igreja;
   bool _saving = false;
-  bool _escopoInicializado = false;
 
   bool _paraTodos = true;
   final Set<String> _categoriasSelecionadas = {};
-  bool _todosOsGeneros = true;
-  final Set<String> _generosSelecionados = {};
-  bool _todosOsCasais = true;
-  final Set<String> _casaisSelecionados = {};
+  bool _exclusivoAwake = false;
 
+  // Foto opcional
   Uint8List? _novaFotoBytes;
   String? _novaFotoNome;
   String? _fotoUrlExistente;
   bool _removerFoto = false;
-
-  Uint8List? _novaFotoStoryBytes;
-  String? _novaFotoStoryNome;
-  String? _fotoStoryUrlExistente;
-  bool _removerFotoStory = false;
 
   bool get _isEdicao => widget.eventoParaEditar != null;
 
@@ -66,50 +49,15 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
     _dataInicio = evento?.dataInicio;
     _recorrente = evento?.recorrente ?? false;
     _recorrenciaFim = evento?.recorrenciaFim;
-    _semanasSelecionadas.addAll(evento?.semanasDoMes ?? const []);
     _tipo = evento?.tipo ?? EventTipo.outro;
-    _escopo = evento?.escopo ?? EventoEscopo.igreja;
     _fotoUrlExistente = evento?.fotoUrl;
-    _fotoStoryUrlExistente = evento?.fotoStoryUrl;
+    _exclusivoAwake = evento?.exclusivoAwake ?? false;
 
     final publicoExistente = evento?.publicoAlvo;
     if (publicoExistente != null && publicoExistente.isNotEmpty) {
       _paraTodos = false;
       _categoriasSelecionadas.addAll(publicoExistente);
     }
-
-    final generoExistente = evento?.publicoGenero;
-    if (generoExistente != null && generoExistente.isNotEmpty) {
-      _todosOsGeneros = false;
-      _generosSelecionados.addAll(generoExistente);
-    }
-
-    final casaisExistente = evento?.publicoCasais;
-    if (casaisExistente != null && casaisExistente.isNotEmpty) {
-      _todosOsCasais = false;
-      _casaisSelecionados.addAll(casaisExistente);
-    }
-  }
-
-  /// Escopos que essa pessoa pode escolher, na ordem oficial.
-  List<EventoEscopo> _escoposPermitidos(bool isAdmin, List<MinisterioMembership> ministerios) {
-    if (isAdmin) return ordemEscopos;
-
-    final ministeriosLiderados =
-        ministerios.where((m) => m.ehLider).map((m) => m.ministerio).toSet();
-
-    return ordemEscopos.where((escopo) {
-      final ministerio = escopo.ministerioCorrespondente;
-      return ministerio != null && ministeriosLiderados.contains(ministerio);
-    }).toList();
-  }
-
-  void _garantirEscopoValido(List<EventoEscopo> permitidos) {
-    if (_escopoInicializado) return;
-    if (permitidos.isNotEmpty && !permitidos.contains(_escopo)) {
-      _escopo = permitidos.first;
-    }
-    _escopoInicializado = true;
   }
 
   Future<void> _pickDateTime() async {
@@ -143,40 +91,28 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
     if (date != null) setState(() => _recorrenciaFim = date);
   }
 
-  Future<void> _escolherFoto({required bool ehStory}) async {
+  Future<void> _escolherFoto() async {
     final picker = ImagePicker();
     final arquivo = await picker.pickImage(
       source: ImageSource.gallery,
-      maxWidth: ehStory ? 1080 : 1600,
+      maxWidth: 1600,
       imageQuality: 85,
     );
     if (arquivo == null) return;
 
     final bytes = await arquivo.readAsBytes();
     setState(() {
-      if (ehStory) {
-        _novaFotoStoryBytes = bytes;
-        _novaFotoStoryNome = arquivo.name;
-        _removerFotoStory = false;
-      } else {
-        _novaFotoBytes = bytes;
-        _novaFotoNome = arquivo.name;
-        _removerFoto = false;
-      }
+      _novaFotoBytes = bytes;
+      _novaFotoNome = arquivo.name;
+      _removerFoto = false;
     });
   }
 
-  void _removerFotoSelecionada({required bool ehStory}) {
+  void _removerFotoSelecionada() {
     setState(() {
-      if (ehStory) {
-        _novaFotoStoryBytes = null;
-        _novaFotoStoryNome = null;
-        _removerFotoStory = true;
-      } else {
-        _novaFotoBytes = null;
-        _novaFotoNome = null;
-        _removerFoto = true;
-      }
+      _novaFotoBytes = null;
+      _novaFotoNome = null;
+      _removerFoto = true;
     });
   }
 
@@ -189,27 +125,9 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
       }
       return;
     }
-
-    final usaSubgrupos = _escopo == EventoEscopo.awake;
-    final usaGenero = _escopo == EventoEscopo.awake || _escopo == EventoEscopo.coral;
-    if (usaSubgrupos && !_paraTodos && _categoriasSelecionadas.isEmpty) {
+    if (!_paraTodos && _categoriasSelecionadas.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Selecione pelo menos um grupo, ou marque "Para todos".')),
-      );
-      return;
-    }
-    if (usaGenero && !_todosOsGeneros && _generosSelecionados.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Selecione meninos e/ou meninas, ou marque "Meninos e meninas".')),
-      );
-      return;
-    }
-    final usaCasais = _escopo == EventoEscopo.casais;
-    if (usaCasais && !_todosOsCasais && _casaisSelecionados.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Selecione pelo menos um grupo, ou marque "Todos os casais".')),
       );
       return;
     }
@@ -225,16 +143,6 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
         fotoUrl = await service.uploadFotoEvento(_novaFotoBytes!, _novaFotoNome!, eventoId);
       }
 
-      String? fotoStoryUrl = _removerFotoStory ? null : _fotoStoryUrlExistente;
-      if (_novaFotoStoryBytes != null && _novaFotoStoryNome != null) {
-        fotoStoryUrl = await service.uploadFotoEvento(
-          _novaFotoStoryBytes!,
-          _novaFotoStoryNome!,
-          eventoId,
-          sufixo: 'story',
-        );
-      }
-
       final novoEvento = EventModel(
         id: eventoId,
         titulo: _tituloController.text.trim(),
@@ -243,20 +151,10 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
         local: _localController.text.trim(),
         recorrente: _recorrente,
         recorrenciaFim: _recorrente ? _recorrenciaFim : null,
-        semanasDoMes: _recorrente && _semanasSelecionadas.isNotEmpty
-            ? (_semanasSelecionadas.toList()..sort())
-            : null,
         tipo: _tipo,
-        escopo: _escopo,
-        // O sub-filtro de Genesis/Next/One so faz sentido dentro do
-        // Awake -- pros demais escopos, a visibilidade ja e cuidada
-        // inteiramente pelo escopo em si.
-        publicoAlvo: usaSubgrupos && !_paraTodos ? _categoriasSelecionadas.toList() : null,
-        publicoGenero:
-            usaGenero && !_todosOsGeneros ? _generosSelecionados.toList() : null,
-        publicoCasais: usaCasais && !_todosOsCasais ? _casaisSelecionados.toList() : null,
+        publicoAlvo: _paraTodos ? null : _categoriasSelecionadas.toList(),
         fotoUrl: fotoUrl,
-        fotoStoryUrl: fotoStoryUrl,
+        exclusivoAwake: _exclusivoAwake,
       );
 
       if (_isEdicao) {
@@ -279,23 +177,8 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final profileAsync = ref.watch(currentProfileProvider);
-    final profile = profileAsync.value;
-    final isAdmin = profile?.isAdmin ?? false;
-    final permitidos = _escoposPermitidos(isAdmin, profile?.ministerios ?? const []);
-    _garantirEscopoValido(permitidos);
-
-    final tiposDisponiveis = switch (_escopo) {
-      EventoEscopo.igreja => tiposDoEscopoIgreja,
-      EventoEscopo.awake => tiposDoEscopoAwake,
-      _ => const <EventTipo>[],
-    };
-
     return Scaffold(
-      appBar: AwakeAppBar(
-        title: _isEdicao ? 'Editar evento' : 'Novo evento',
-        showQrButton: false,
-      ),
+      appBar: AppBar(title: Text(_isEdicao ? 'Editar evento' : 'Novo evento')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Form(
@@ -309,71 +192,31 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
                 validator: (v) => (v == null || v.trim().isEmpty) ? 'Informe um título' : null,
               ),
               const SizedBox(height: 16),
-              const Text('Esse evento é...', style: TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              if (permitidos.isEmpty)
-                const Text(
-                  'Você não tem permissão pra criar eventos em nenhuma categoria.',
-                  style: TextStyle(color: Colors.red),
-                )
-              else if (permitidos.length == 1)
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: permitidos.first.corReferencia.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 10,
-                        height: 10,
-                        decoration: BoxDecoration(
-                            color: permitidos.first.corReferencia, shape: BoxShape.circle),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(permitidos.first.label, style: const TextStyle(fontWeight: FontWeight.w600)),
-                    ],
-                  ),
-                )
-              else
-                DropdownButtonFormField<EventoEscopo>(
-                  value: _escopo,
-                  decoration: const InputDecoration(labelText: 'Categoria'),
-                  items: permitidos
-                      .map((e) => DropdownMenuItem(
-                            value: e,
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Container(
-                                  width: 10,
-                                  height: 10,
-                                  decoration:
-                                      BoxDecoration(color: e.corReferencia, shape: BoxShape.circle),
-                                ),
-                                const SizedBox(width: 8),
-                                Text(e.label),
-                              ],
-                            ),
-                          ))
-                      .toList(),
-                  onChanged: (v) => setState(() {
-                    _escopo = v ?? _escopo;
-                    _tipo = EventTipo.outro;
-                  }),
+              DropdownButtonFormField<EventTipo>(
+                value: _tipo,
+                decoration: const InputDecoration(
+                  labelText: 'Tipo de evento',
+                  helperText: 'Define a cor no calendário e conta para as metas mensais',
                 ),
-              if (tiposDisponiveis.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                DropdownButtonFormField<EventTipo>(
-                  value: tiposDisponiveis.contains(_tipo) ? _tipo : tiposDisponiveis.first,
-                  decoration: const InputDecoration(labelText: 'Tipo de evento'),
-                  items: tiposDisponiveis
-                      .map((t) => DropdownMenuItem(value: t, child: Text(t.label)))
-                      .toList(),
-                  onChanged: (v) => setState(() => _tipo = v ?? EventTipo.outro),
-                ),
-              ],
+                items: EventTipo.values
+                    .map((t) => DropdownMenuItem(
+                          value: t,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 12,
+                                height: 12,
+                                decoration: BoxDecoration(color: t.cor, shape: BoxShape.circle),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(t.label),
+                            ],
+                          ),
+                        ))
+                    .toList(),
+                onChanged: (v) => setState(() => _tipo = v ?? EventTipo.outro),
+              ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _descricaoController,
@@ -426,161 +269,54 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
-                const Text('Repetir em quais semanas do mês?',
-                    style: TextStyle(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 4),
-                Text(
-                  _semanasSelecionadas.isEmpty
-                      ? 'Toda semana (padrão)'
-                      : 'Só nas semanas marcadas — ex: 1ª e 3ª = quinzenal',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                const SizedBox(height: 8),
+              ],
+              const SizedBox(height: 24),
+              const Text('Esse evento é...', style: TextStyle(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 4),
+              Text(
+                'Eventos exclusivos da Awake às sextas aparecem na tela de Início',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 8),
+              SegmentedButton<bool>(
+                segments: const [
+                  ButtonSegment(value: false, label: Text('Da igreja')),
+                  ButtonSegment(value: true, label: Text('Exclusivo Awake')),
+                ],
+                selected: {_exclusivoAwake},
+                onSelectionChanged: (value) => setState(() => _exclusivoAwake = value.first),
+              ),
+              const SizedBox(height: 24),
+              const Text('Quem pode ver esse evento?',
+                  style: TextStyle(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              SegmentedButton<bool>(
+                segments: const [
+                  ButtonSegment(value: true, label: Text('Todos')),
+                  ButtonSegment(value: false, label: Text('Grupos específicos')),
+                ],
+                selected: {_paraTodos},
+                onSelectionChanged: (value) => setState(() => _paraTodos = value.first),
+              ),
+              if (!_paraTodos) ...[
+                const SizedBox(height: 12),
                 Wrap(
                   spacing: 8,
-                  children: [1, 2, 3, 4, 5].map((numero) {
-                    final selecionada = _semanasSelecionadas.contains(numero);
-                    return FilterChip(
-                      label: Text('${numero}ª semana'),
-                      selected: selecionada,
-                      onSelected: (marcado) {
-                        setState(() {
-                          if (marcado) {
-                            _semanasSelecionadas.add(numero);
-                          } else {
-                            _semanasSelecionadas.remove(numero);
-                          }
-                        });
-                      },
-                    );
-                  }).toList(),
-                ),
-              ],
-              if (_escopo == EventoEscopo.awake) ...[
-                const SizedBox(height: 24),
-                const Text('Quem dentro do Awake pode ver esse evento?',
-                    style: TextStyle(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 8),
-                SegmentedButton<bool>(
-                  segments: const [
-                    ButtonSegment(value: true, label: Text('Todos do Awake')),
-                    ButtonSegment(value: false, label: Text('Grupos específicos')),
+                  children: [
+                    _grupoChip('genesis', 'Genesis'),
+                    _grupoChip('next', 'Next'),
+                    _grupoChip('one', 'One'),
                   ],
-                  selected: {_paraTodos},
-                  onSelectionChanged: (value) => setState(() => _paraTodos = value.first),
-                ),
-                if (!_paraTodos) ...[
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    children: [
-                      _grupoChip('genesis', 'Genesis'),
-                      _grupoChip('next', 'Next'),
-                      _grupoChip('one', 'One'),
-                    ],
-                  ),
-                ],
-              ],
-              if (_escopo == EventoEscopo.awake || _escopo == EventoEscopo.coral) ...[
-                const SizedBox(height: 20),
-                Text(
-                  _escopo == EventoEscopo.coral
-                      ? 'Masculino, feminino, ou os dois?'
-                      : 'Meninos, meninas, ou os dois?',
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  _escopo == EventoEscopo.coral
-                      ? 'Usa o "Sexo" que a pessoa já preencheu no cadastro'
-                      : 'Funciona junto com o filtro de grupo acima — ex: '
-                          '"Genesis" + "Meninas" mostra só pras garotas do Genesis',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                const SizedBox(height: 8),
-                SegmentedButton<bool>(
-                  segments: const [
-                    ButtonSegment(value: true, label: Text('Todos')),
-                    ButtonSegment(value: false, label: Text('Só um dos dois')),
-                  ],
-                  selected: {_todosOsGeneros},
-                  onSelectionChanged: (value) => setState(() => _todosOsGeneros = value.first),
-                ),
-                if (!_todosOsGeneros) ...[
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    children: [
-                      _generoChip('masculino', _escopo == EventoEscopo.coral ? 'Masculino' : 'Meninos'),
-                      _generoChip('feminino', _escopo == EventoEscopo.coral ? 'Feminino' : 'Meninas'),
-                    ],
-                  ),
-                ],
-              ],
-              if (_escopo == EventoEscopo.casais) ...[
-                const SizedBox(height: 24),
-                const Text('Quem pode ver esse evento?',
-                    style: TextStyle(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 8),
-                SegmentedButton<bool>(
-                  segments: const [
-                    ButtonSegment(value: true, label: Text('Todos os casais')),
-                    ButtonSegment(value: false, label: Text('Grupo específico')),
-                  ],
-                  selected: {_todosOsCasais},
-                  onSelectionChanged: (value) => setState(() => _todosOsCasais = value.first),
-                ),
-                if (!_todosOsCasais) ...[
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    children: [
-                      _casalChip('one', 'One (Awake)'),
-                      _casalChip('henrique_patricia', 'Henrique e Patrícia'),
-                      _casalChip('ivaldo_sonja', 'Ivaldo e Sonja'),
-                      _casalChip('marcelo_andreia', 'Marcelo e Andréia'),
-                    ],
-                  ),
-                ],
-              ],
-              if (isAdmin) ...[
-                const SizedBox(height: 24),
-                const Text('Foto do evento (opcional)',
-                    style: TextStyle(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 4),
-                Text(
-                  'Aparece na tela de Início e nos detalhes do evento',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                const SizedBox(height: 8),
-                _buildFotoPreview(
-                  ehStory: false,
-                  aspectRatio: 16 / 9,
-                  novaFotoBytes: _novaFotoBytes,
-                  fotoUrlExistente: _fotoUrlExistente,
-                  removida: _removerFoto,
-                ),
-                const SizedBox(height: 24),
-                const Text('Foto formato Story (opcional)',
-                    style: TextStyle(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 4),
-                Text(
-                  'Vertical (tipo Stories) — usada no botão "Adicionar ao Instagram"',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                const SizedBox(height: 8),
-                _buildFotoPreview(
-                  ehStory: true,
-                  aspectRatio: 9 / 16,
-                  novaFotoBytes: _novaFotoStoryBytes,
-                  fotoUrlExistente: _fotoStoryUrlExistente,
-                  removida: _removerFotoStory,
                 ),
               ],
               const SizedBox(height: 24),
+              const Text('Foto do evento (opcional)',
+                  style: TextStyle(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              _buildFotoPreview(),
+              const SizedBox(height: 24),
               FilledButton(
-                onPressed: (_saving || permitidos.isEmpty) ? null : _submit,
+                onPressed: _saving ? null : _submit,
                 child: _saving
                     ? const SizedBox(
                         height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
@@ -593,19 +329,13 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
     );
   }
 
-  Widget _buildFotoPreview({
-    required bool ehStory,
-    required double aspectRatio,
-    required Uint8List? novaFotoBytes,
-    required String? fotoUrlExistente,
-    required bool removida,
-  }) {
-    final temFotoNova = novaFotoBytes != null;
-    final temFotoExistente = fotoUrlExistente != null && !removida && !temFotoNova;
+  Widget _buildFotoPreview() {
+    final temFotoNova = _novaFotoBytes != null;
+    final temFotoExistente = _fotoUrlExistente != null && !_removerFoto && !temFotoNova;
 
     if (!temFotoNova && !temFotoExistente) {
       return OutlinedButton.icon(
-        onPressed: () => _escolherFoto(ehStory: ehStory),
+        onPressed: _escolherFoto,
         icon: const Icon(Icons.add_photo_alternate_outlined),
         label: const Text('Adicionar foto'),
       );
@@ -614,18 +344,13 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Center(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: ehStory ? 200 : double.infinity),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: AspectRatio(
-                aspectRatio: aspectRatio,
-                child: temFotoNova
-                    ? Image.memory(novaFotoBytes, fit: BoxFit.cover)
-                    : Image.network(fotoUrlExistente!, fit: BoxFit.cover),
-              ),
-            ),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: AspectRatio(
+            aspectRatio: 16 / 9,
+            child: temFotoNova
+                ? Image.memory(_novaFotoBytes!, fit: BoxFit.cover)
+                : Image.network(_fotoUrlExistente!, fit: BoxFit.cover),
           ),
         ),
         const SizedBox(height: 8),
@@ -633,7 +358,7 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
           children: [
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: () => _escolherFoto(ehStory: ehStory),
+                onPressed: _escolherFoto,
                 icon: const Icon(Icons.edit),
                 label: const Text('Trocar'),
               ),
@@ -642,7 +367,7 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
             Expanded(
               child: OutlinedButton.icon(
                 style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
-                onPressed: () => _removerFotoSelecionada(ehStory: ehStory),
+                onPressed: _removerFotoSelecionada,
                 icon: const Icon(Icons.delete_outline),
                 label: const Text('Remover'),
               ),
@@ -669,44 +394,4 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
       },
     );
   }
-
-  Widget _generoChip(String valor, String label) {
-    final selecionado = _generosSelecionados.contains(valor);
-    return FilterChip(
-      label: Text(label),
-      selected: selecionado,
-      onSelected: (marcado) {
-        setState(() {
-          if (marcado) {
-            _generosSelecionados.add(valor);
-          } else {
-            _generosSelecionados.remove(valor);
-          }
-        });
-      },
-    );
-  }
-
-  Widget _casalChip(String valor, String label) {
-    final selecionado = _casaisSelecionados.contains(valor);
-    return FilterChip(
-      label: Text(label),
-      selected: selecionado,
-      onSelected: (marcado) {
-        setState(() {
-          if (marcado) {
-            _casaisSelecionados.add(valor);
-          } else {
-            _casaisSelecionados.remove(valor);
-          }
-        });
-      },
-    );
-  }
-}
-
-/// Cor de referencia pra mostrar no seletor de categoria (sem depender
-/// do tipo, ja que aqui a pessoa ainda esta escolhendo o escopo).
-extension _CorReferenciaEscopo on EventoEscopo {
-  Color get corReferencia => corDoEvento(EventTipo.outro, this);
 }

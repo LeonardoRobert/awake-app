@@ -3,7 +3,7 @@ import 'package:intl/intl.dart';
 import '../models/event_model.dart';
 import '../models/profile_model.dart';
 import '../screens/calendar/escala_mensal_screen.dart';
-import '../screens/calendar/escala_semanal_screen.dart';
+import '../screens/calendar/escala_servico_screen.dart';
 import '../services/escala_servico_service.dart';
 
 /// Abre o fluxo de "Escala" pra um lider de ministerio de servico:
@@ -13,6 +13,7 @@ Future<void> abrirFluxoEscala(
   BuildContext context, {
   required List<MinisterioMembership> ministeriosLiderados,
   required List<EventModel> eventosIgreja,
+  DateTime? diaSelecionado,
 }) async {
   final ministeriosServico = ministeriosLiderados
       .where((m) => m.ehLider && ministeriosComEscalaServico.contains(m.ministerio))
@@ -80,9 +81,9 @@ Future<void> abrirFluxoEscala(
   if (tipo == null || !context.mounted) return;
 
   if (tipo == 'semanal') {
-    await _abrirEscalaSemanal(context, ministerio, eventosIgreja);
+    await _abrirEscalaSemanal(context, ministerio, eventosIgreja, diaSelecionado);
   } else {
-    await _abrirEscalaMensal(context, ministerio);
+    await _abrirEscalaMensal(context, ministerio, diaSelecionado);
   }
 }
 
@@ -90,9 +91,14 @@ Future<void> _abrirEscalaSemanal(
   BuildContext context,
   String ministerio,
   List<EventModel> eventosIgreja,
+  DateTime? diaSelecionado,
 ) async {
+  // Se veio de um dia clicado no calendario, comeca a busca dali --
+  // senao, comeca de hoje, como sempre foi.
   final now = DateTime.now();
-  final hoje = DateTime(now.year, now.month, now.day);
+  final hoje = diaSelecionado != null
+      ? DateTime(diaSelecionado.year, diaSelecionado.month, diaSelecionado.day)
+      : DateTime(now.year, now.month, now.day);
   final fim = hoje.add(const Duration(days: 7));
 
   final ocorrencias = <(DateTime, EventModel)>[];
@@ -110,14 +116,45 @@ Future<void> _abrirEscalaSemanal(
     return;
   }
 
+  final escolhida = await showModalBottomSheet<(DateTime, EventModel)>(
+    context: context,
+    builder: (dialogContext) => SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Padding(
+            padding: EdgeInsets.all(16),
+            child: Text('Qual culto?', style: TextStyle(fontWeight: FontWeight.w600)),
+          ),
+          ...ocorrencias.map((oc) => ListTile(
+                title: Text(oc.$2.titulo),
+                subtitle: Text(DateFormat("dd/MM (EEEE) HH:mm", 'pt_BR').format(oc.$1)),
+                onTap: () => Navigator.of(dialogContext).pop(oc),
+              )),
+        ],
+      ),
+    ),
+  );
+
+  if (escolhida == null || !context.mounted) return;
+
   await Navigator.of(context).push(MaterialPageRoute(
-    builder: (_) => EscalaSemanalScreen(ministerio: ministerio, ocorrencias: ocorrencias),
+    builder: (_) => EscalaServicoScreen(
+      ministerio: ministerio,
+      eventoId: escolhida.$2.id,
+      eventoTitulo: escolhida.$2.titulo,
+      dataOcorrencia: escolhida.$1,
+    ),
   ));
 }
 
-Future<void> _abrirEscalaMensal(BuildContext context, String ministerio) async {
-  final agora = DateTime.now();
-  var mesEscolhido = DateTime(agora.year, agora.month, 1);
+Future<void> _abrirEscalaMensal(
+  BuildContext context,
+  String ministerio,
+  DateTime? diaSelecionado,
+) async {
+  final base = diaSelecionado ?? DateTime.now();
+  var mesEscolhido = DateTime(base.year, base.month, 1);
 
   final confirmado = await showDialog<DateTime>(
     context: context,
