@@ -22,15 +22,6 @@ jobs:
 
       - run: flutter pub get
 
-      # ------------------------------------------------------------
-      # PASSO TEMPORARIO DE DIAGNOSTICO -- so mostra o TAMANHO da
-      # chave (nunca o valor). Depois que resolvermos, tira esse passo.
-      # ------------------------------------------------------------
-      - name: Diagnostico - tamanho da chave do YouTube
-        env:
-          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
-        run: echo "Tamanho da YOUTUBE_API_KEY recebida:" ${#YOUTUBE_API_KEY}
-
       - run: |
           flutter build web --release --base-href /awake-app/app/ \
             --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
@@ -49,11 +40,22 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add docs/app
-          git diff --staged --quiet && exit 0
 
-          git commit -m "Deploy automatico da versao web ($GITHUB_REF_NAME)"
-          for i in 1 2 3; do
-            git pull --rebase origin "$(git rev-parse --abbrev-ref HEAD)" && git push && break
-            echo "Tentativa $i falhou, tentando de novo..."
-            sleep 5
-          done
+          if git diff --staged --quiet; then
+            echo "Nada mudou em docs/app, nada pra publicar."
+          else
+            git commit -m "Deploy automatico da versao web ($GITHUB_REF_NAME)"
+            sucesso=0
+            for i in 1 2 3; do
+              if git pull --rebase origin "$(git rev-parse --abbrev-ref HEAD)" && git push; then
+                sucesso=1
+                break
+              fi
+              echo "Tentativa $i falhou, tentando de novo..."
+              sleep 5
+            done
+            if [ "$sucesso" -ne 1 ]; then
+              echo "Nao conseguiu publicar depois de 3 tentativas."
+              exit 1
+            fi
+          fi
