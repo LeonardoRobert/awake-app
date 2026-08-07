@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shallom</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;1,700;1,800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy: #0C192E;
+    --navy-deep: #081120;
+    --azul: #9BB0C7;
+    --azul-claro: #C3D2E0;
+    --creme: #F7F2DD;
+    --branco: #FFFFFF;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    background: var(--navy);
+    color: var(--branco);
+    min-height: 100vh;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 18px 24px;
+    border-bottom: 1px solid rgba(155,176,199,0.25);
+  }
+  .logo-circulo {
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    border: 2px solid var(--azul);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .logo-circulo img { width: 28px; height: auto; }
+  header h1 {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-style: italic; font-weight: 800;
+    font-size: 22px; margin: 0;
+  }
+
+  nav {
+    display: flex;
+    overflow-x: auto;
+    border-bottom: 1px solid rgba(155,176,199,0.25);
+    position: sticky; top: 0; background: var(--navy); z-index: 10;
+  }
+  nav button {
+    background: none; border: none; color: var(--azul-claro);
+    font-family: inherit; font-size: 14px; font-weight: 600;
+    padding: 16px 20px; cursor: pointer; white-space: nowrap;
+    border-bottom: 3px solid transparent;
+  }
+  nav button.ativo { color: var(--branco); border-bottom-color: var(--azul); }
+
+  main { max-width: 720px; margin: 0 auto; padding: 28px 20px 60px; }
+  .painel { display: none; }
+  .painel.ativo { display: block; }
+
+  h2 { font-size: 22px; margin: 0 0 16px; }
+  p { line-height: 1.6; color: var(--azul-claro); font-size: 15px; }
+
+  .card-evento {
+    display: flex; gap: 14px;
+    background: rgba(155,176,199,0.08);
+    border-radius: 16px;
+    padding: 14px;
+    margin-bottom: 12px;
+    align-items: center;
+  }
+  .card-evento img {
+    width: 84px; height: 84px; border-radius: 10px;
+    object-fit: cover; flex-shrink: 0; background: var(--navy-deep);
+  }
+  .card-evento .sem-foto {
+    width: 84px; height: 84px; border-radius: 10px;
+    background: var(--navy-deep); flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 26px;
+  }
+  .card-evento .info { min-width: 0; }
+  .card-evento .titulo { font-weight: 700; font-size: 15px; margin: 0 0 4px; }
+  .card-evento .quando { font-size: 13px; color: var(--azul-claro); margin: 0 0 2px; }
+  .card-evento .onde { font-size: 12px; color: var(--azul-claro); opacity: 0.8; margin: 0; }
+
+  .video-destaque { border-radius: 14px; overflow: hidden; margin-bottom: 16px; cursor: pointer; position: relative; }
+  .video-destaque img { width: 100%; display: block; }
+  .video-destaque .titulo-video { margin-top: 8px; font-weight: 600; font-size: 15px; }
+
+  .card-video {
+    display: flex; gap: 12px; margin-bottom: 10px; cursor: pointer;
+    background: rgba(155,176,199,0.08); border-radius: 12px; padding: 8px;
+  }
+  .card-video img { width: 100px; height: 60px; object-fit: cover; border-radius: 8px; flex-shrink: 0; }
+  .card-video .titulo { font-size: 13px; font-weight: 600; margin: 0; }
+
+  .login-cartao {
+    background: var(--creme); color: var(--navy);
+    border-radius: 20px; padding: 32px 24px; text-align: center;
+  }
+  .login-cartao p { color: #45566E; }
+  .botao {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--navy); color: var(--branco);
+    text-decoration: none; font-weight: 700; font-size: 15px;
+    padding: 14px 24px; border-radius: 12px; margin-top: 16px;
+  }
+
+  .vazio { color: var(--azul-claro); font-size: 14px; padding: 24px 0; text-align: center; }
+</style>
+</head>
+<body>
+
+  <header>
+    <div class="logo-circulo"><img src="pomba_shallom.png" alt=""></div>
+    <h1>shallom</h1>
+  </header>
+
+  <nav>
+    <button class="ativo" data-aba="quemsomos">Quem somos nós</button>
+    <button data-aba="videos">Vídeos</button>
+    <button data-aba="calendario">Calendário</button>
+    <button data-aba="login">Login</button>
+  </nav>
+
+  <main>
+
+    <section id="painel-quemsomos" class="painel ativo">
+      <h2>Quem somos nós</h2>
+      <p>
+        Somos a Comunidade Batista Shallom, uma igreja que existe para levar
+        as pessoas a um encontro genuíno com Deus, formando uma comunidade de
+        fé, amor e propósito.
+      </p>
+      <p>
+        Dentro da Shallom, ministramos a diferentes públicos: o Awake reúne
+        os jovens; os ministérios de Homens e Mulheres cuidam da caminhada de
+        cada um nessa fase da vida; e cuidamos com carinho também das
+        crianças e das famílias da nossa igreja.
+      </p>
+      <p>
+        Acreditamos que a igreja é, antes de tudo, gente cuidando de gente —
+        por isso, seja muito bem-vindo(a). Este é o seu lugar.
+      </p>
+    </section>
+
+    <section id="painel-videos" class="painel">
+      <h2>Nossos vídeos</h2>
+      <div id="videos-conteudo"><p>Carregando...</p></div>
+    </section>
+
+    <section id="painel-calendario" class="painel">
+      <h2>Próximos eventos</h2>
+      <div id="calendario-conteudo"><p>Carregando...</p></div>
+    </section>
+
+    <section id="painel-login" class="painel">
+      <div class="login-cartao">
+        <h2 style="color: var(--navy);">Área do membro</h2>
+        <p>
+          Se você já faz parte da nossa comunidade, entre com sua conta para
+          ver a agenda completa, suas escalas, contribuições e muito mais.
+          Líderes e administração também encontram aqui os painéis completos
+          de gestão (calendário, financeiro e mais).
+        </p>
+        <a class="botao" href="app/">Entrar / Criar conta</a>
+      </div>
+    </section>
+
+  </main>
+
+<script>
+  const SUPABASE_URL = "https://eetethnvupitlquhdjkx.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVldGV0aG52dXBpdGxxdWhkamt4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU1NDI4MjksImV4cCI6MjEwMTExODgyOX0.QL1dNFxoRuHJwf_pwAzFou34oA0cSAkUguND0l9b4z8";
+  const YOUTUBE_API_KEY = "AIzaSyAIZsi0RzzDncWGMK4YLoDA_znkwgwSb5g";
+  const YOUTUBE_PLAYLIST = "UUJjMlNpqp4JmorV6bCLprXg";
+
+  // --- navegacao entre abas ---
+  document.querySelectorAll('nav button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('nav button').forEach(b => b.classList.remove('ativo'));
+      document.querySelectorAll('.painel').forEach(p => p.classList.remove('ativo'));
+      btn.classList.add('ativo');
+      document.getElementById('painel-' + btn.dataset.aba).classList.add('ativo');
+    });
+  });
+
+  // --- videos ---
+  async function carregarVideos() {
+    const el = document.getElementById('videos-conteudo');
+    try {
+      const resp = await fetch(
+        `https://www.googleapis.com/youtube/v3/playlistItems?key=${YOUTUBE_API_KEY}&playlistId=${YOUTUBE_PLAYLIST}&part=snippet&maxResults=5`
+      );
+      const dados = await resp.json();
+      const itens = dados.items || [];
+      if (itens.length === 0) { el.innerHTML = '<p>Nenhum vídeo encontrado.</p>'; return; }
+
+      const [destaque, ...outros] = itens;
+      const idDestaque = destaque.snippet.resourceId.videoId;
+
+      let html = `
+        <a class="video-destaque" href="https://www.youtube.com/watch?v=${idDestaque}" target="_blank" rel="noopener">
+          <img src="https://i.ytimg.com/vi/${idDestaque}/hqdefault.jpg">
+        </a>
+        <div class="titulo-video">${escaparHtml(destaque.snippet.title)}</div>
+        <div style="height:20px"></div>
+      `;
+      outros.forEach(v => {
+        const id = v.snippet.resourceId.videoId;
+        html += `
+          <a class="card-video" href="https://www.youtube.com/watch?v=${id}" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;">
+            <img src="https://i.ytimg.com/vi/${id}/hqdefault.jpg">
+            <p class="titulo">${escaparHtml(v.snippet.title)}</p>
+          </a>
+        `;
+      });
+      el.innerHTML = html;
+    } catch (e) {
+      el.innerHTML = '<p>Não foi possível carregar os vídeos agora.</p>';
+    }
+  }
+
+  // --- calendario publico ---
+  function ocorrenciasNoIntervalo(evento, inicio, fim) {
+    const ocorrencias = [];
+    const dataBase = new Date(evento.data_inicio);
+    if (!evento.recorrente) {
+      if (dataBase >= inicio && dataBase <= fim) ocorrencias.push(dataBase);
+      return ocorrencias;
+    }
+    const fimRecorrencia = evento.recorrencia_fim ? new Date(evento.recorrencia_fim + 'T23:59:59') : null;
+    let cursor = new Date(dataBase);
+    while (cursor < inicio) cursor.setDate(cursor.getDate() + 7);
+    while (cursor <= fim) {
+      if (!fimRecorrencia || cursor <= fimRecorrencia) {
+        const semanasDoMes = evento.semanas_do_mes;
+        if (!semanasDoMes || semanasDoMes.length === 0) {
+          ocorrencias.push(new Date(cursor));
+        } else {
+          const semana = Math.floor((cursor.getDate() - 1) / 7) + 1;
+          if (semanasDoMes.includes(semana)) ocorrencias.push(new Date(cursor));
+        }
+      }
+      cursor.setDate(cursor.getDate() + 7);
+    }
+    return ocorrencias;
+  }
+
+  async function carregarCalendario() {
+    const el = document.getElementById('calendario-conteudo');
+    try {
+      const resp = await fetch(
+        `${SUPABASE_URL}/rest/v1/eventos_publicos?select=*`,
+        { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
+      );
+      const eventos = await resp.json();
+
+      const agora = new Date();
+      const fim = new Date(agora); fim.setDate(fim.getDate() + 45);
+
+      let todasOcorrencias = [];
+      eventos.forEach(ev => {
+        ocorrenciasNoIntervalo(ev, agora, fim).forEach(data => {
+          todasOcorrencias.push({ evento: ev, data });
+        });
+      });
+      todasOcorrencias.sort((a, b) => a.data - b.data);
+      todasOcorrencias = todasOcorrencias.slice(0, 12);
+
+      if (todasOcorrencias.length === 0) {
+        el.innerHTML = '<div class="vazio">Nenhum evento nos próximos dias.</div>';
+        return;
+      }
+
+      const formatador = new Intl.DateTimeFormat('pt-BR', {
+        weekday: 'long', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
+      });
+
+      el.innerHTML = todasOcorrencias.map(({ evento, data }) => `
+        <div class="card-evento">
+          ${evento.foto_url
+            ? `<img src="${evento.foto_url}">`
+            : `<div class="sem-foto">📅</div>`}
+          <div class="info">
+            <p class="titulo">${escaparHtml(evento.titulo)}</p>
+            <p class="quando">${capitalizar(formatador.format(data))}</p>
+            ${evento.local ? `<p class="onde">${escaparHtml(evento.local)}</p>` : ''}
+          </div>
+        </div>
+      `).join('');
+    } catch (e) {
+      el.innerHTML = '<div class="vazio">Não foi possível carregar os eventos agora.</div>';
+    }
+  }
+
+  function escaparHtml(texto) {
+    const div = document.createElement('div');
+    div.textContent = texto;
+    return div.innerHTML;
+  }
+  function capitalizar(texto) {
+    return texto.charAt(0).toUpperCase() + texto.slice(1);
+  }
+
+  carregarVideos();
+  carregarCalendario();
+</script>
+
+</body>
+</html>
