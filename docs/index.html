@@ -31,10 +31,10 @@
   }
 
   @media (prefers-reduced-motion: no-preference) {
-    .dove-wing { animation: flutter 3.2s ease-in-out infinite; transform-origin: 62px 58px; }
+    .logo-circulo { animation: flutter 3.2s ease-in-out infinite; }
     @keyframes flutter {
       0%, 100% { transform: rotate(0deg); }
-      50% { transform: rotate(-4deg); }
+      50% { transform: rotate(-3deg); }
     }
   }
 
@@ -45,10 +45,20 @@
     text-align: center;
   }
 
-  .logo-dove {
-    width: 76px;
-    height: 76px;
-    margin-bottom: 20px;
+  .logo-circulo {
+    width: 96px;
+    height: 96px;
+    margin: 0 auto 20px;
+    border-radius: 50%;
+    border: 3px solid #9BB0C7;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .logo-dove-img {
+    width: 64px;
+    height: auto;
   }
 
   .wordmark {
@@ -152,13 +162,9 @@
 <body>
 
   <div class="topo">
-    <svg class="logo-dove" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <circle cx="60" cy="60" r="57" stroke="#9BB0C7" stroke-width="3"/>
-      <g class="dove-wing">
-        <path d="M62 30 C58 45 66 52 78 40 C70 55 60 56 55 62 C48 70 34 76 24 70 C36 72 45 66 50 58 C40 60 30 56 28 48 C38 52 46 48 50 40 C54 34 58 30 62 30Z" fill="#F7F2DD"/>
-      </g>
-      <path d="M55 62 C48 70 34 76 24 70" stroke="#F7F2DD" stroke-width="2.5" stroke-linecap="round"/>
-    </svg>
+    <div class="logo-circulo">
+      <img src="pomba_shallom.png" alt="" class="logo-dove-img">
+    </div>
     <h1 class="wordmark">shallom</h1>
     <p class="tagline">Baixe o app da nossa comunidade</p>
   </div>
