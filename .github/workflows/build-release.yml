@@ -32,11 +32,12 @@ jobs:
         run: flutter pub get
 
       - name: Build do APK (release)
-        run: |
+        - run: |
           flutter build apk --release \
             --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
             --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} \
-            --dart-define=ONESIGNAL_APP_ID=${{ secrets.ONESIGNAL_APP_ID }}
+            --dart-define=ONESIGNAL_APP_ID=${{ secrets.ONESIGNAL_APP_ID }} \
+            --dart-define=YOUTUBE_API_KEY=${{ secrets.YOUTUBE_API_KEY }}
 
       - name: Renomear APK
         run: cp build/app/outputs/flutter-apk/app-release.apk awake-app.apk

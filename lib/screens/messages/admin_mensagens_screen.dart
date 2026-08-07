@@ -109,18 +109,29 @@ class _ListaMensagensState extends State<_ListaMensagens> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
+                      Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 6,
+                        runSpacing: 2,
                         children: [
-                          Icon(
-                            m.anonimo ? Icons.visibility_off_outlined : Icons.person_outline,
-                            size: 16,
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                m.anonimo ? Icons.visibility_off_outlined : Icons.person_outline,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 6),
+                              ConstrainedBox(
+                                constraints: const BoxConstraints(maxWidth: 220),
+                                child: Text(
+                                  m.anonimo ? 'Anônimo' : (m.nomeAutor ?? 'Sem nome'),
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontWeight: FontWeight.w600),
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 6),
-                          Text(
-                            m.anonimo ? 'Anônimo' : (m.nomeAutor ?? 'Sem nome'),
-                            style: const TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                          const Spacer(),
                           Text(
                             DateFormat('dd/MM/yyyy HH:mm').format(m.criadoEm),
                             style: Theme.of(context).textTheme.bodySmall,
