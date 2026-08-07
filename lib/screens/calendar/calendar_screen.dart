@@ -102,11 +102,17 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
             final String tituloLista;
 
             if (_diaSelecionado == null) {
+              final agora = DateTime.now();
               final fim = hoje.add(const Duration(days: 6));
               listaExibida = [];
               for (final event in events) {
                 for (final occ in event.occurrencesBetween(hoje, fim)) {
-                  listaExibida.add(_Occurrence(event, occ));
+                  // So entra se ainda nao passou do horario -- um
+                  // evento de hoje de manha nao deve continuar
+                  // aparecendo aqui a tarde.
+                  if (occ.isAfter(agora)) {
+                    listaExibida.add(_Occurrence(event, occ));
+                  }
                 }
               }
               tituloLista = 'Próximos 7 dias';

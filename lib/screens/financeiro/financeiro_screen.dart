@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../models/contribuicao_model.dart';
 import '../../providers/contribuicao_provider.dart';
 import '../../widgets/awake_app_bar.dart';
@@ -21,6 +21,16 @@ const _codigoPix =
     '00020101021126500014br.gov.bcb.pix0128shallom.financeiro@gmail.com'
     '5204000053039865802BR5918COMUNIDADE SHALLOM6015SAO JOAO DE MER'
     '62070503***630438AA';
+
+// Links de pagamento do PagBank -- um por valor fixo (o PagBank nao
+// deixa a pessoa editar o valor na hora, entao criamos varias opcoes
+// em vez de um valor so).
+const _opcoesCartao = [
+  (valor: 'R\$ 10', link: 'https://pag.ae/822FezHEv'),
+  (valor: 'R\$ 20', link: 'https://pag.ae/822FdrAba'),
+  (valor: 'R\$ 50', link: 'https://pag.ae/822FdPysH'),
+  (valor: 'R\$ 100', link: 'https://pag.ae/822Feg44v'),
+];
 
 const _imagensProjetos = [
   'assets/images/projetos/shallom_humaita_amazonia.png',
@@ -67,32 +77,83 @@ class FinanceiroScreen extends ConsumerWidget {
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: QrImageView(data: _codigoPix, size: 220),
+              child: QrImageView(data: _codigoPix, size: 200),
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Escaneie com a câmera do seu banco, ou copie o código abaixo '
               'e cole na opção "Pix Copia e Cola" — o valor você digita lá.',
               textAlign: TextAlign.center,
+              style: Theme.of(dialogContext).textTheme.bodySmall,
             ),
             const SizedBox(height: 16),
-            FilledButton.icon(
-              onPressed: () {
-                Clipboard.setData(const ClipboardData(text: _codigoPix));
-                ScaffoldMessenger.of(dialogContext).showSnackBar(
-                  const SnackBar(content: Text('Código Pix copiado!')),
-                );
-              },
-              icon: const Icon(Icons.copy),
-              label: const Text('Copiar código Pix'),
-            ),
-            const SizedBox(height: 8),
-            OutlinedButton.icon(
-              onPressed: () => Share.share(_codigoPix),
-              icon: const Icon(Icons.share_outlined),
-              label: const Text('Compartilhar código'),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: () {
+                  Clipboard.setData(const ClipboardData(text: _codigoPix));
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                    const SnackBar(content: Text('Código Pix copiado!')),
+                  );
+                },
+                icon: const Icon(Icons.copy),
+                label: const Text('Copiar código Pix'),
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+              ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _abrirCartao(BuildContext context, String link) async {
+    await launchUrl(
+      Uri.parse(link),
+      mode: LaunchMode.externalApplication,
+    );
+  }
+
+  void _abrirMenuCartao(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (dialogContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Contribuir via cartão', style: Theme.of(dialogContext).textTheme.titleLarge),
+              const SizedBox(height: 8),
+              Text(
+                'Escolhe o valor — abre no PagBank, com toda a segurança deles',
+                textAlign: TextAlign.center,
+                style: Theme.of(dialogContext).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 16),
+              ..._opcoesCartao.map((opcao) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        onPressed: () {
+                          Navigator.of(dialogContext).pop();
+                          _abrirCartao(context, opcao.link);
+                        },
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        child: Text(opcao.valor),
+                      ),
+                    ),
+                  )),
+            ],
+          ),
         ),
       ),
     );
@@ -114,6 +175,15 @@ class FinanceiroScreen extends ConsumerWidget {
               onPressed: () => _abrirPix(context),
               icon: const Icon(Icons.qr_code),
               label: const Text('Contribuir via Pix'),
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+            ),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              onPressed: () => _abrirMenuCartao(context),
+              icon: const Icon(Icons.credit_card),
+              label: const Text('Contribuir via cartão'),
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),

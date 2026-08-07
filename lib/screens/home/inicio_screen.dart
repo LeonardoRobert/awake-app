@@ -32,7 +32,12 @@ class InicioScreen extends ConsumerWidget {
             final ocorrencias = <Ocorrencia>[];
             for (final event in events) {
               for (final occ in event.occurrencesBetween(hoje, fim)) {
-                ocorrencias.add(Ocorrencia(event, occ));
+                // So entra se ainda nao passou do horario de inicio --
+                // um evento de hoje de manha nao deve continuar
+                // aparecendo como "proximo" a tarde.
+                if (occ.isAfter(now)) {
+                  ocorrencias.add(Ocorrencia(event, occ));
+                }
               }
             }
             ocorrencias.sort(compararOcorrencias);
