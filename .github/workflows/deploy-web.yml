@@ -22,6 +22,16 @@ jobs:
 
       - run: flutter pub get
 
+      # ------------------------------------------------------------
+      # PASSO TEMPORARIO DE DIAGNOSTICO -- so mostra o TAMANHO da
+      # chave (nunca o valor), so pra confirmar se ela chegou vazia
+      # ou nao. Depois que resolvermos o problema, tira esse passo.
+      # ------------------------------------------------------------
+      - name: Diagnostico - tamanho da chave do YouTube
+        run: echo "Tamanho da YOUTUBE_API_KEY recebida: ${#YOUTUBE_API_KEY}"
+        env:
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+
       - run: |
           flutter build web --release --base-href /awake-app/app/ \
             --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
