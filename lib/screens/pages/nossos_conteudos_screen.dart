@@ -79,12 +79,19 @@ class _NossosConteudosScreenState extends State<NossosConteudosScreen> {
               );
             }
 
-            final videos = snapshot.data!;
-            final destaque = videos.first;
-            // Filtra pelo ID, nao so pela posicao -- assim, mesmo se a
-            // API mandar o mesmo video duas vezes por algum motivo, ele
-            // nunca aparece repetido em "Mais videos".
-            final outros = videos.where((v) => v.id != destaque.id).take(4).toList();
+            // Ordena e tira duplicatas -- lives geram, as vezes, uma
+            // segunda entrada (a "sala" que fica offline depois),
+            // com o MESMO titulo do video de verdade mas ID diferente.
+            // Por isso filtramos por titulo tambem, nao so por ID.
+            final titulosVistos = <String>{};
+            final videosUnicos = snapshot.data!.where((v) {
+              final jaVisto = titulosVistos.contains(v.titulo);
+              titulosVistos.add(v.titulo);
+              return !jaVisto;
+            }).toList();
+
+            final destaque = videosUnicos.first;
+            final outros = videosUnicos.skip(1).take(4).toList();
 
             return ListView(
               padding: const EdgeInsets.all(16),
