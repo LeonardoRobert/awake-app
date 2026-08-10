@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../models/contribuicao_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/contribuicao_provider.dart';
@@ -116,6 +117,14 @@ class _AdminFinanceiroScreenState extends ConsumerState<AdminFinanceiroScreen> {
   }
 }
 
+/// Evento ingressado, versao resumida (so o que o seletor precisa).
+class _EventoIngressadoResumo {
+  final String id;
+  final String titulo;
+  final double valorTotal;
+  _EventoIngressadoResumo({required this.id, required this.titulo, required this.valorTotal});
+}
+
 class _PainelLancamento extends ConsumerStatefulWidget {
   final PessoaResumo pessoa;
   const _PainelLancamento({super.key, required this.pessoa});
@@ -126,17 +135,35 @@ class _PainelLancamento extends ConsumerStatefulWidget {
 
 class _PainelLancamentoState extends ConsumerState<_PainelLancamento> {
   late Future<List<ContribuicaoModel>> _futuroContribuicoes;
+  late Future<List<_EventoIngressadoResumo>> _futuroEventosIngressados;
 
   final _valorController = TextEditingController();
   final _observacaoController = TextEditingController();
   DateTime _data = DateTime.now();
   MeioPagamento _meioPagamento = MeioPagamento.pix;
+  String? _eventoIdSelecionado;
   bool _salvando = false;
 
   @override
   void initState() {
     super.initState();
     _recarregar();
+    _futuroEventosIngressados = _carregarEventosIngressados();
+  }
+
+  Future<List<_EventoIngressadoResumo>> _carregarEventosIngressados() async {
+    final resposta = await Supabase.instance.client
+        .from('eventos')
+        .select('id, titulo, valor_total')
+        .eq('ingressado', true)
+        .order('data_inicio');
+    return (resposta as List)
+        .map((e) => _EventoIngressadoResumo(
+              id: e['id'] as String,
+              titulo: e['titulo'] as String,
+              valorTotal: (e['valor_total'] as num?)?.toDouble() ?? 0,
+            ))
+        .toList();
   }
 
   void _recarregar() {
@@ -162,10 +189,12 @@ class _PainelLancamentoState extends ConsumerState<_PainelLancamento> {
             observacao: _observacaoController.text.trim().isEmpty
                 ? null
                 : _observacaoController.text.trim(),
+            eventoId: _eventoIdSelecionado,
           );
       _valorController.clear();
       _observacaoController.clear();
       setState(() {
+        _eventoIdSelecionado = null;
         _recarregar();
       });
       if (mounted) {
@@ -276,6 +305,33 @@ class _PainelLancamentoState extends ConsumerState<_PainelLancamento> {
                       controller: _observacaoController,
                       decoration: const InputDecoration(labelText: 'Observação (opcional)'),
                     ),
+                    const SizedBox(height: 12),
+                    FutureBuilder<List<_EventoIngressadoResumo>>(
+                      future: _futuroEventosIngressados,
+                      builder: (context, snapshot) {
+                        final eventos = snapshot.data ?? [];
+                        if (eventos.isEmpty) return const SizedBox.shrink();
+                        return DropdownButtonFormField<String?>(
+                          value: _eventoIdSelecionado,
+                          decoration: const InputDecoration(
+                            labelText: 'Vincular a um evento ingressado (opcional)',
+                            helperText:
+                                'Ex: parcela do retiro — atualiza a barra de progresso da pessoa',
+                          ),
+                          items: [
+                            const DropdownMenuItem<String?>(
+                              value: null,
+                              child: Text('Nenhum (dízimo/oferta comum)'),
+                            ),
+                            ...eventos.map((e) => DropdownMenuItem<String?>(
+                                  value: e.id,
+                                  child: Text(e.titulo),
+                                )),
+                          ],
+                          onChanged: (v) => setState(() => _eventoIdSelecionado = v),
+                        );
+                      },
+                    ),
                     const SizedBox(height: 16),
                     FilledButton.icon(
                       onPressed: _salvando ? null : _lancar,
@@ -321,9 +377,11 @@ class _PainelLancamentoState extends ConsumerState<_PainelLancamento> {
                             title: Text(formatoMoeda.format(c.valor)),
                             subtitle: Text(
                               '${DateFormat("dd/MM/yyyy").format(c.data)} • ${c.meioPagamento.label}'
+                              '${c.eventoId != null ? '\n🎟️ Evento ingressado' : ''}'
                               '${c.observacao != null && c.observacao!.isNotEmpty ? '\n${c.observacao}' : ''}',
                             ),
-                            isThreeLine: c.observacao != null && c.observacao!.isNotEmpty,
+                            isThreeLine: (c.observacao != null && c.observacao!.isNotEmpty) ||
+                                c.eventoId != null,
                             trailing: IconButton(
                               icon: const Icon(Icons.delete_outline, color: Colors.red),
                               onPressed: () => _excluir(c.id),

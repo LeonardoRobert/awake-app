@@ -23,7 +23,8 @@ class CheckinScannerScreen extends ConsumerStatefulWidget {
   ConsumerState<CheckinScannerScreen> createState() => _CheckinScannerScreenState();
 }
 
-class _CheckinScannerScreenState extends ConsumerState<CheckinScannerScreen> {
+class _CheckinScannerScreenState extends ConsumerState<CheckinScannerScreen>
+    with WidgetsBindingObserver {
   String? _qrCodeId;
   bool _processing = false;
   String? _feedback;
@@ -31,6 +32,40 @@ class _CheckinScannerScreenState extends ConsumerState<CheckinScannerScreen> {
 
   List<String>? _escalaIdsDisponiveis;
   List<String>? _eventoIdsConfirmados;
+
+  // Controlamos a camera na mao (em vez de deixar o MobileScanner criar
+  // uma sozinho) -- assim conseguimos reiniciar ela quando o app volta
+  // de segundo plano, que e a causa mais comum da tela travar com o
+  // icone de erro (o Android as vezes "mata" a camera sozinho quando o
+  // app fica em segundo plano, pra economizar bateria).
+  late final MobileScannerController _scannerController;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _scannerController = MobileScannerController();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _scannerController.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Reinicia a camera sempre que o app volta a ficar visivel --
+    // resolve a maior parte dos casos de "tela travada com o icone
+    // de erro" sem a pessoa precisar sair e entrar de novo na tela.
+    if (!_scannerController.value.isInitialized) return;
+    if (state == AppLifecycleState.resumed) {
+      _scannerController.start();
+    } else if (state == AppLifecycleState.inactive) {
+      _scannerController.stop();
+    }
+  }
 
   Future<void> _selecionarPessoa(String qrCodeId) async {
     if (_qrCodeId != null) return;
@@ -184,7 +219,14 @@ class _CheckinScannerScreenState extends ConsumerState<CheckinScannerScreen> {
       ),
       body: Stack(
         children: [
-          if (_qrCodeId == null) MobileScanner(onDetect: _onDetect),
+          if (_qrCodeId == null)
+            MobileScanner(
+              controller: _scannerController,
+              onDetect: _onDetect,
+              errorBuilder: (context, error, child) => _CameraErroView(
+                onTentarNovamente: () => _scannerController.start(),
+              ),
+            ),
           if (_qrCodeId != null)
             _TargetPicker(
               targets: targets,
@@ -207,6 +249,50 @@ class _CheckinScannerScreenState extends ConsumerState<CheckinScannerScreen> {
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// Tela mostrada quando a camera falha ao abrir -- em vez do icone
+/// travado sem explicacao, oferece um botao pra tentar de novo (que
+/// resolve a maioria dos casos) e a alternativa de buscar por nome.
+class _CameraErroView extends StatelessWidget {
+  final VoidCallback onTentarNovamente;
+  const _CameraErroView({required this.onTentarNovamente});
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: Colors.black,
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.camera_alt_outlined, color: Colors.white, size: 40),
+              const SizedBox(height: 16),
+              const Text(
+                'Não foi possível abrir a câmera agora.',
+                style: TextStyle(color: Colors.white),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                onPressed: onTentarNovamente,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Tentar novamente'),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Ou use a busca por nome, no topo da tela.',
+                style: TextStyle(color: Colors.white70, fontSize: 12),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

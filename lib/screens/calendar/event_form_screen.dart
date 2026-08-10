@@ -55,6 +55,12 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
   String? _fotoStoryUrlExistente;
   bool _removerFotoStory = false;
 
+  // ---- Evento ingressado ----
+  bool _ingressado = false;
+  final _valorTotalController = TextEditingController();
+  final _parcelasController = TextEditingController();
+  final Set<String> _metodosPagamentoSelecionados = {};
+
   bool get _isEdicao => widget.eventoParaEditar != null;
 
   @override
@@ -92,6 +98,12 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
       _todosOsCasais = false;
       _casaisSelecionados.addAll(casaisExistente);
     }
+
+    _ingressado = evento?.ingressado ?? false;
+    _valorTotalController.text =
+        evento?.valorTotal != null ? evento!.valorTotal!.toStringAsFixed(2) : '';
+    _parcelasController.text = evento?.parcelasSugeridas?.toString() ?? '';
+    _metodosPagamentoSelecionados.addAll(evento?.metodosPagamento ?? const []);
   }
 
   /// Escopos que essa pessoa pode escolher, na ordem oficial.
@@ -217,6 +229,17 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
       return;
     }
 
+    double? valorTotal;
+    if (_ingressado) {
+      valorTotal = double.tryParse(_valorTotalController.text.replaceAll(',', '.'));
+      if (valorTotal == null || valorTotal <= 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Informe o valor total do evento ingressado.')),
+        );
+        return;
+      }
+    }
+
     setState(() => _saving = true);
 
     try {
@@ -260,6 +283,12 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
         publicoCasais: usaCasais && !_todosOsCasais ? _casaisSelecionados.toList() : null,
         fotoUrl: fotoUrl,
         fotoStoryUrl: fotoStoryUrl,
+        ingressado: _ingressado,
+        valorTotal: _ingressado ? valorTotal : null,
+        parcelasSugeridas: _ingressado ? int.tryParse(_parcelasController.text) : null,
+        metodosPagamento: _ingressado && _metodosPagamentoSelecionados.isNotEmpty
+            ? _metodosPagamentoSelecionados.toList()
+            : null,
       );
 
       if (_isEdicao) {
@@ -547,6 +576,60 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
                   ),
                 ],
               ],
+              const SizedBox(height: 24),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                value: _ingressado,
+                onChanged: (v) => setState(() => _ingressado = v),
+                title: const Text('Evento ingressado'),
+                subtitle: const Text('Tem valor de inscrição (ex: retiro, conferência)'),
+              ),
+              if (_ingressado) ...[
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _valorTotalController,
+                  decoration: const InputDecoration(
+                    labelText: 'Valor total',
+                    prefixText: 'R\$ ',
+                  ),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _parcelasController,
+                  decoration: const InputDecoration(
+                    labelText: 'Parcelas sugeridas (opcional)',
+                    helperText: 'Ex: 3 — vira só uma sugestão pra pessoa se organizar',
+                  ),
+                  keyboardType: TextInputType.number,
+                ),
+                const SizedBox(height: 12),
+                const Text('Métodos de pagamento aceitos',
+                    style: TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    _metodoChip('pix', 'Pix'),
+                    _metodoChip('cartao', 'Cartão'),
+                    _metodoChip('dinheiro', 'Dinheiro'),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Text(
+                    'A partir de agora, os pagamentos dessa pessoa pra esse evento são '
+                    'lançados no Painel Financeiro (igual dízimo/oferta), vinculando ao '
+                    'evento. A barra de progresso na tela de Início atualiza sozinha.',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                ),
+              ],
               if (isAdmin) ...[
                 const SizedBox(height: 24),
                 const Text('Foto do evento (opcional)',
@@ -701,6 +784,23 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
             _casaisSelecionados.add(valor);
           } else {
             _casaisSelecionados.remove(valor);
+          }
+        });
+      },
+    );
+  }
+
+  Widget _metodoChip(String valor, String label) {
+    final selecionado = _metodosPagamentoSelecionados.contains(valor);
+    return FilterChip(
+      label: Text(label),
+      selected: selecionado,
+      onSelected: (marcado) {
+        setState(() {
+          if (marcado) {
+            _metodosPagamentoSelecionados.add(valor);
+          } else {
+            _metodosPagamentoSelecionados.remove(valor);
           }
         });
       },

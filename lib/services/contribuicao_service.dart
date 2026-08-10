@@ -69,6 +69,7 @@ class ContribuicaoService {
     required double valor,
     required MeioPagamento meioPagamento,
     String? observacao,
+    String? eventoId,
   }) async {
     await _client.from('contribuicoes').insert({
       'profile_id': profileId,
@@ -78,7 +79,19 @@ class ContribuicaoService {
       'meio_pagamento': meioPagamento.valorBanco,
       'observacao': observacao,
       'lancado_por': _client.auth.currentUser!.id,
+      'evento_id': eventoId,
     });
+  }
+
+  /// Quanto a pessoa logada ja pagou de um evento ingressado especifico
+  /// -- usado na tarja de progresso da tela de Inicio.
+  Future<double> totalPagoEvento(String eventoId) async {
+    final userId = _client.auth.currentUser!.id;
+    final resultado = await _client.rpc('total_pago_evento', params: {
+      'p_profile_id': userId,
+      'p_evento_id': eventoId,
+    });
+    return (resultado as num?)?.toDouble() ?? 0;
   }
 
   Future<void> editar({

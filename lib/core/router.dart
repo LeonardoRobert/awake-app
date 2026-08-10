@@ -6,15 +6,21 @@ import '../models/shift_model.dart';
 import '../models/treinamento_model.dart';
 import '../providers/auth_provider.dart';
 import '../screens/auth/login_screen.dart';
+import '../screens/auth/redefinir_senha_screen.dart';
 import '../screens/auth/signup_screen.dart';
+import '../screens/auth/termos_screen.dart';
+import '../screens/calendar/admin_calendario_screen.dart';
+import '../screens/financeiro/admin_financeiro_screen.dart';
 import '../screens/calendar/event_detail_screen.dart';
 import '../screens/calendar/event_form_screen.dart';
+import '../screens/financeiro/financeiro_screen.dart';
 import '../screens/home/home_shell.dart';
 import '../screens/training/treinamento_detail_screen.dart';
 import '../screens/training/treinamento_form_screen.dart';
 import '../screens/training/treinamentos_screen.dart';
 import '../screens/volunteering/checkin_scanner_screen.dart';
 import '../screens/volunteering/leader_shift_detail_screen.dart';
+import '../screens/volunteering/my_qrcode_screen.dart';
 import '../screens/volunteering/shift_form_screen.dart';
 
 /// Ouvinte simples que permite ao GoRouter reagir a mudancas
@@ -35,20 +41,42 @@ final routerProvider = Provider<GoRouter>((ref) {
       final session = ref.read(authStateProvider).value?.session;
       final isLoggedIn = session != null;
       final isAuthRoute = state.matchedLocation == '/login' ||
-          state.matchedLocation == '/cadastro';
+          state.matchedLocation == '/cadastro' ||
+          state.matchedLocation == '/redefinir-senha';
 
       if (!isLoggedIn && !isAuthRoute) return '/login';
-      if (isLoggedIn && isAuthRoute) return '/';
+      if (isLoggedIn && isAuthRoute && state.matchedLocation != '/redefinir-senha') {
+        return '/';
+      }
       return null;
     },
     routes: [
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(path: '/cadastro', builder: (context, state) => const SignupScreen()),
+      GoRoute(
+        path: '/redefinir-senha',
+        builder: (context, state) => const RedefinirSenhaScreen(),
+      ),
+      GoRoute(path: '/termos', builder: (context, state) => const TermosScreen()),
+      GoRoute(path: '/financeiro', builder: (context, state) => const FinanceiroScreen()),
       GoRoute(path: '/', builder: (context, state) => const HomeShell()),
       GoRoute(
+        path: '/admin/calendario',
+        builder: (context, state) => const AdminCalendarioScreen(),
+      ),
+      GoRoute(
+        path: '/admin/financeiro',
+        builder: (context, state) => const AdminFinanceiroScreen(),
+      ),
+      GoRoute(
         path: '/eventos/novo',
-        builder: (context, state) =>
-            EventFormScreen(eventoParaEditar: state.extra as EventModel?),
+        builder: (context, state) {
+          final dataParam = state.uri.queryParameters['data'];
+          return EventFormScreen(
+            eventoParaEditar: state.extra as EventModel?,
+            dataInicial: dataParam != null ? DateTime.tryParse(dataParam) : null,
+          );
+        },
       ),
       GoRoute(
         path: '/eventos/:id',
@@ -72,6 +100,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/checkin',
         builder: (context, state) => const CheckinScannerScreen(),
+      ),
+      GoRoute(
+        path: '/meu-qrcode',
+        builder: (context, state) => const MyQrCodeScreen(),
       ),
       GoRoute(
         path: '/treinamentos',

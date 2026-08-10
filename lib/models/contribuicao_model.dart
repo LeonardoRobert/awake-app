@@ -62,6 +62,10 @@ class ContribuicaoModel {
   final MeioPagamento meioPagamento;
   final String? observacao;
   final String? nomePessoa;
+  /// Se preenchido, esse lancamento e um pagamento de inscricao pra
+  /// um evento ingressado especifico (ex: parcela do retiro) -- em
+  /// vez de um dizimo/oferta comum.
+  final String? eventoId;
 
   ContribuicaoModel({
     required this.id,
@@ -72,6 +76,7 @@ class ContribuicaoModel {
     required this.meioPagamento,
     this.observacao,
     this.nomePessoa,
+    this.eventoId,
   });
 
   factory ContribuicaoModel.fromMap(Map<String, dynamic> map) {
@@ -85,6 +90,7 @@ class ContribuicaoModel {
       meioPagamento: meioPagamentoFromString(map['meio_pagamento'] as String?),
       observacao: map['observacao'] as String?,
       nomePessoa: perfil?['nome'] as String?,
+      eventoId: map['evento_id'] as String?,
     );
   }
 }

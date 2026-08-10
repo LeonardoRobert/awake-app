@@ -350,6 +350,12 @@ class EventModel {
   final String? fotoUrl;
   final String? fotoStoryUrl;
 
+  // ---- Evento ingressado (retiro, conferencia com inscricao paga) ----
+  final bool ingressado;
+  final double? valorTotal;
+  final int? parcelasSugeridas;
+  final List<String>? metodosPagamento;
+
   EventModel({
     required this.id,
     required this.titulo,
@@ -369,6 +375,10 @@ class EventModel {
     this.excecoes = const [],
     this.fotoUrl,
     this.fotoStoryUrl,
+    this.ingressado = false,
+    this.valorTotal,
+    this.parcelasSugeridas,
+    this.metodosPagamento,
   });
 
   Color get cor => corDoEvento(tipo, escopo);
@@ -401,6 +411,10 @@ class EventModel {
           const [],
       fotoUrl: map['foto_url'] as String?,
       fotoStoryUrl: map['foto_story_url'] as String?,
+      ingressado: map['ingressado'] as bool? ?? false,
+      valorTotal: (map['valor_total'] as num?)?.toDouble(),
+      parcelasSugeridas: map['parcelas_sugeridas'] as int?,
+      metodosPagamento: (map['metodos_pagamento'] as List?)?.map((e) => e.toString()).toList(),
     );
   }
 
@@ -422,6 +436,10 @@ class EventModel {
       'publico_casais': publicoCasais,
       'foto_url': fotoUrl,
       'foto_story_url': fotoStoryUrl,
+      'ingressado': ingressado,
+      'valor_total': valorTotal,
+      'parcelas_sugeridas': parcelasSugeridas,
+      'metodos_pagamento': metodosPagamento,
     };
   }
 
