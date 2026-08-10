@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shallom — Gestão</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;1,700;1,800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --navy: #0C192E;
+    --azul: #9BB0C7;
+    --azul-claro: #EEF2F6;
+    --creme: #F7F2DD;
+    --cinza-texto: #45566E;
+    --branco: #FFFFFF;
+    --vermelho: #C0392B;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    background: var(--branco);
+    color: var(--navy);
+    min-height: 100vh;
+  }
+
+  /* ---------- tela de login ---------- */
+  .tela-login {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .cartao-login {
+    width: 100%;
+    max-width: 360px;
+    text-align: center;
+  }
+  .cartao-login h1 {
+    font-style: italic;
+    font-weight: 800;
+    font-size: 30px;
+    margin: 0 0 4px;
+  }
+  .cartao-login .subtitulo {
+    color: var(--cinza-texto);
+    font-size: 14px;
+    margin: 0 0 32px;
+  }
+  .campo { text-align: left; margin-bottom: 16px; }
+  .campo label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .campo input {
+    width: 100%;
+    padding: 11px 12px;
+    border: 1px solid #D7DEE6;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 14px;
+  }
+  .campo input:focus {
+    outline: none;
+    border-color: var(--navy);
+  }
+  .botao-primario {
+    width: 100%;
+    padding: 12px;
+    background: var(--navy);
+    color: var(--branco);
+    border: none;
+    border-radius: 8px;
+    font-family: inherit;
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+    margin-top: 8px;
+  }
+  .botao-primario:disabled { opacity: 0.6; cursor: default; }
+  .erro-login {
+    color: var(--vermelho);
+    font-size: 13px;
+    margin-top: 12px;
+    min-height: 16px;
+  }
+
+  /* ---------- shell logado ---------- */
+  .app { display: none; min-height: 100vh; }
+  header.topo {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 24px;
+    border-bottom: 1px solid #E5EAEF;
+  }
+  header.topo .marca {
+    font-style: italic;
+    font-weight: 800;
+    font-size: 18px;
+  }
+  header.topo .usuario {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    font-size: 13px;
+    color: var(--cinza-texto);
+  }
+  header.topo button.sair {
+    background: none;
+    border: 1px solid #D7DEE6;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-family: inherit;
+    font-size: 13px;
+    cursor: pointer;
+    color: var(--navy);
+  }
+
+  main.conteudo { padding: 32px 24px; max-width: 1100px; margin: 0 auto; }
+
+  .em-construcao {
+    background: var(--azul-claro);
+    border-radius: 12px;
+    padding: 40px;
+    text-align: center;
+    color: var(--cinza-texto);
+  }
+  .em-construcao h2 { color: var(--navy); margin-top: 0; }
+
+  .tela-negada {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 24px;
+  }
+</style>
+</head>
+<body>
+
+  <!-- ===== Tela de login ===== -->
+  <div class="tela-login" id="tela-login">
+    <div class="cartao-login">
+      <h1>shallom</h1>
+      <p class="subtitulo">Painel de gestão</p>
+      <form id="form-login">
+        <div class="campo">
+          <label for="email">E-mail</label>
+          <input type="email" id="email" autocomplete="username" required>
+        </div>
+        <div class="campo">
+          <label for="senha">Senha</label>
+          <input type="password" id="senha" autocomplete="current-password" required>
+        </div>
+        <button type="submit" class="botao-primario" id="botao-entrar">Entrar</button>
+        <p class="erro-login" id="erro-login"></p>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===== Acesso negado (logado, mas nao e admin/financeiro) ===== -->
+  <div class="tela-negada" id="tela-negada" style="display:none;">
+    <div>
+      <h2>Esse painel é restrito à administração.</h2>
+      <p style="color:var(--cinza-texto)">Sua conta não tem esse tipo de acesso.</p>
+      <button class="botao-primario" style="width:auto;padding:10px 20px;" id="botao-sair-negado">Sair</button>
+    </div>
+  </div>
+
+  <!-- ===== App logado ===== -->
+  <div class="app" id="app">
+    <header class="topo">
+      <div class="marca">shallom — gestão</div>
+      <div class="usuario">
+        <span id="nome-usuario"></span>
+        <button class="sair" id="botao-sair">Sair</button>
+      </div>
+    </header>
+    <main class="conteudo" id="conteudo">
+      <!-- preenchido via JS conforme o papel (admin / admin_financeiro) -->
+    </main>
+  </div>
+
+<script>
+  const SUPABASE_URL = "https://eetethnvupitlquhdjkx.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVldGV0aG52dXBpdGxxdWhkamt4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU1NDI4MjksImV4cCI6MjEwMTExODgyOX0.QL1dNFxoRuHJwf_pwAzFou34oA0cSAkUguND0l9b4z8";
+  const supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const telaLogin = document.getElementById('tela-login');
+  const telaNegada = document.getElementById('tela-negada');
+  const appEl = document.getElementById('app');
+  const conteudoEl = document.getElementById('conteudo');
+  const nomeUsuarioEl = document.getElementById('nome-usuario');
+
+  function mostrarSomente(el) {
+    [telaLogin, telaNegada, appEl].forEach(e => e.style.display = 'none');
+    el.style.display = el === appEl ? 'block' : 'flex';
+  }
+
+  async function verificarSessao() {
+    const { data: { session } } = await supa.auth.getSession();
+    if (!session) { mostrarSomente(telaLogin); return; }
+    await carregarPainel(session);
+  }
+
+  async function carregarPainel(session) {
+    const { data: perfil, error } = await supa
+      .from('profiles')
+      .select('nome, papel')
+      .eq('id', session.user.id)
+      .single();
+
+    if (error || !perfil || (perfil.papel !== 'admin' && perfil.papel !== 'admin_financeiro')) {
+      mostrarSomente(telaNegada);
+      return;
+    }
+
+    nomeUsuarioEl.textContent = `${perfil.nome} — ${perfil.papel === 'admin' ? 'Admin' : 'Admin Financeiro'}`;
+    renderizarConteudo(perfil.papel);
+    mostrarSomente(appEl);
+  }
+
+  function renderizarConteudo(papel) {
+    if (papel === 'admin') {
+      conteudoEl.innerHTML = `
+        <div class="em-construcao">
+          <h2>Painel de Calendário</h2>
+          <p>Essa parte está sendo construída — chega na próxima atualização.</p>
+        </div>`;
+    } else {
+      conteudoEl.innerHTML = `
+        <div class="em-construcao">
+          <h2>Painel Financeiro</h2>
+          <p>Essa parte está sendo construída — chega na próxima atualização.</p>
+        </div>`;
+    }
+  }
+
+  document.getElementById('form-login').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('email').value.trim();
+    const senha = document.getElementById('senha').value;
+    const botao = document.getElementById('botao-entrar');
+    const erroEl = document.getElementById('erro-login');
+
+    erroEl.textContent = '';
+    botao.disabled = true;
+    botao.textContent = 'Entrando...';
+
+    const { data, error } = await supa.auth.signInWithPassword({ email, password: senha });
+
+    botao.disabled = false;
+    botao.textContent = 'Entrar';
+
+    if (error) {
+      erroEl.textContent = 'E-mail ou senha incorretos.';
+      return;
+    }
+
+    await carregarPainel(data.session);
+  });
+
+  async function sair() {
+    await supa.auth.signOut();
+    mostrarSomente(telaLogin);
+  }
+  document.getElementById('botao-sair').addEventListener('click', sair);
+  document.getElementById('botao-sair-negado').addEventListener('click', sair);
+
+  verificarSessao();
+</script>
+
+</body>
+</html>
