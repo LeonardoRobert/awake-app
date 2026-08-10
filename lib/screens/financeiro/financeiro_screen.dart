@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../models/contribuicao_model.dart';
 import '../../providers/contribuicao_provider.dart';
@@ -13,14 +14,9 @@ const _dadosBancarios = 'Banco Santander\n'
     'Favorecido: Comunidade Batista Shallom em Meriti\n'
     'CNPJ: 28.786.515.0001-88';
 
-// Codigo Pix "copia e cola" (BR Code) gerado a partir da chave
-// shallom.financeiro@gmail.com. E um codigo ESTATICO/reutilizavel,
-// sem valor fixo -- a pessoa que contribui digita o valor no proprio
-// banco. Se um dia a chave Pix mudar, so trocar essa constante.
-const _codigoPix =
-    '00020101021126500014br.gov.bcb.pix0128shallom.financeiro@gmail.com'
-    '5204000053039865802BR5918COMUNIDADE SHALLOM6015SAO JOAO DE MER'
-    '62070503***630438AA';
+const _chavePix = 'shallom.financeiro@gmail.com';
+const _nomeRecebedor = 'COMUNIDADE SHALLOM';
+const _cidadeRecebedor = 'SAO JOAO DE MER';
 
 // Links de pagamento do PagBank -- um por valor fixo (o PagBank nao
 // deixa a pessoa editar o valor na hora, entao criamos varias opcoes
@@ -42,6 +38,55 @@ const _imagensProjetos = [
   'assets/images/projetos/carreta_missionaria.png',
 ];
 
+// =========================================================
+// Gerador de codigo Pix (BR Code / EMV) -- monta um codigo novo,
+// com o VALOR ja embutido nele, seguindo o padrao oficial do Banco
+// Central. Sem valor embutido (generico), a pessoa digita o valor
+// no proprio banco; com valor, o banco dela ja abre com o valor
+// certo, só falta confirmar.
+// =========================================================
+String _tlv(String id, String value) {
+  final tamanho = value.length.toString().padLeft(2, '0');
+  return '$id$tamanho$value';
+}
+
+int _crc16CcittFalse(String payload) {
+  int crc = 0xFFFF;
+  for (final unidade in payload.codeUnits) {
+    crc ^= (unidade << 8);
+    for (var i = 0; i < 8; i++) {
+      if ((crc & 0x8000) != 0) {
+        crc = ((crc << 1) ^ 0x1021) & 0xFFFF;
+      } else {
+        crc = (crc << 1) & 0xFFFF;
+      }
+    }
+  }
+  return crc & 0xFFFF;
+}
+
+/// Gera um codigo Pix "Copia e Cola" com o valor ja embutido.
+String gerarCodigoPixComValor(double valor) {
+  final valorFormatado = valor.toStringAsFixed(2);
+  final infoConta = _tlv('00', 'br.gov.bcb.pix') + _tlv('01', _chavePix);
+
+  final buffer = StringBuffer()
+    ..write(_tlv('00', '01')) // Payload Format Indicator
+    ..write(_tlv('01', '12')) // Point of Initiation -- 12 = uso unico (valor fixo)
+    ..write(_tlv('26', infoConta)) // Info da conta (GUI + chave Pix)
+    ..write(_tlv('52', '0000')) // Categoria do comerciante
+    ..write(_tlv('53', '986')) // Moeda (986 = BRL)
+    ..write(_tlv('54', valorFormatado)) // Valor da transacao
+    ..write(_tlv('58', 'BR')) // Pais
+    ..write(_tlv('59', _nomeRecebedor)) // Nome do recebedor
+    ..write(_tlv('60', _cidadeRecebedor)) // Cidade do recebedor
+    ..write(_tlv('62', _tlv('05', '***'))); // Identificador da transacao (generico)
+
+  final semCrc = '${buffer.toString()}6304';
+  final crc = _crc16CcittFalse(semCrc).toRadixString(16).toUpperCase().padLeft(4, '0');
+  return '$semCrc$crc';
+}
+
 class FinanceiroScreen extends ConsumerWidget {
   const FinanceiroScreen({super.key});
 
@@ -52,58 +97,208 @@ class FinanceiroScreen extends ConsumerWidget {
     );
   }
 
-  void _abrirPix(BuildContext context) {
+  // ---------------------------------------------------------
+  // Fluxo Pix: Dizimo ou Oferta -> valor -> QR Code dinamico
+  // ---------------------------------------------------------
+  void _abrirEscolhaPix(BuildContext context) {
     showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (dialogContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Contribuir via Pix', style: Theme.of(dialogContext).textTheme.titleLarge),
+              const SizedBox(height: 4),
+              Text(
+                'É dízimo ou oferta?',
+                style: Theme.of(dialogContext).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: const Icon(Icons.church_outlined),
+                title: const Text('Dízimo'),
+                subtitle: const Text('Pode salvar um valor fixo pras próximas vezes'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  Navigator.of(dialogContext).pop();
+                  _abrirValorPix(context, ehDizimo: true);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.volunteer_activism_outlined),
+                title: const Text('Oferta'),
+                subtitle: const Text('Valor livre, cada vez que quiser'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  Navigator.of(dialogContext).pop();
+                  _abrirValorPix(context, ehDizimo: false);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _abrirValorPix(BuildContext context, {required bool ehDizimo}) async {
+    final client = Supabase.instance.client;
+    final userId = client.auth.currentUser?.id;
+
+    double? valorSalvo;
+    if (ehDizimo && userId != null) {
+      final resposta = await client
+          .from('profiles')
+          .select('valor_dizimo_padrao')
+          .eq('id', userId)
+          .maybeSingle();
+      final valorBruto = resposta?['valor_dizimo_padrao'];
+      if (valorBruto != null) valorSalvo = (valorBruto as num).toDouble();
+    }
+
+    if (!context.mounted) return;
+
+    final valorController = TextEditingController(
+      text: valorSalvo != null ? valorSalvo.toStringAsFixed(2).replaceAll('.', ',') : '',
+    );
+    var salvarComoFixo = ehDizimo;
+
+    final valorConfirmado = await showModalBottomSheet<double>(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (dialogContext) => Padding(
-        padding: EdgeInsets.only(
-          left: 24,
-          right: 24,
-          top: 24,
-          bottom: MediaQuery.of(dialogContext).viewInsets.bottom + 24,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Contribuir via Pix', style: Theme.of(dialogContext).textTheme.titleLarge),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setModalState) => Padding(
+          padding: EdgeInsets.only(
+            left: 24,
+            right: 24,
+            top: 24,
+            bottom: MediaQuery.of(dialogContext).viewInsets.bottom + 24,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                ehDizimo ? 'Valor do dízimo' : 'Valor da oferta',
+                style: Theme.of(dialogContext).textTheme.titleLarge,
               ),
-              child: QrImageView(data: _codigoPix, size: 200),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Escaneie com a câmera do seu banco, ou copie o código abaixo '
-              'e cole na opção "Pix Copia e Cola" — o valor você digita lá.',
-              textAlign: TextAlign.center,
-              style: Theme.of(dialogContext).textTheme.bodySmall,
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
+              if (ehDizimo && valorSalvo != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  'Preenchido com o valor que você salvou — pode editar se quiser.',
+                  style: Theme.of(dialogContext).textTheme.bodySmall,
+                ),
+              ],
+              const SizedBox(height: 16),
+              TextField(
+                controller: valorController,
+                autofocus: true,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(labelText: 'Valor', prefixText: 'R\$ '),
+              ),
+              if (ehDizimo) ...[
+                const SizedBox(height: 8),
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  value: salvarComoFixo,
+                  onChanged: (v) => setModalState(() => salvarComoFixo = v ?? false),
+                  title: const Text('Salvar esse valor como meu dízimo fixo'),
+                  subtitle: const Text('Já vem preenchido da próxima vez'),
+                ),
+              ],
+              const SizedBox(height: 8),
+              FilledButton(
                 onPressed: () {
-                  Clipboard.setData(const ClipboardData(text: _codigoPix));
-                  ScaffoldMessenger.of(dialogContext).showSnackBar(
-                    const SnackBar(content: Text('Código Pix copiado!')),
-                  );
+                  final valor = double.tryParse(valorController.text.replaceAll(',', '.'));
+                  if (valor == null || valor <= 0) {
+                    ScaffoldMessenger.of(dialogContext).showSnackBar(
+                      const SnackBar(content: Text('Informe um valor válido.')),
+                    );
+                    return;
+                  }
+                  Navigator.of(dialogContext).pop(valor);
                 },
-                icon: const Icon(Icons.copy),
-                label: const Text('Copiar código Pix'),
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
+                child: const Text('Gerar código Pix'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (valorConfirmado == null) return;
+
+    if (ehDizimo && salvarComoFixo && userId != null) {
+      await client
+          .from('profiles')
+          .update({'valor_dizimo_padrao': valorConfirmado})
+          .eq('id', userId);
+    }
+
+    if (!context.mounted) return;
+    _mostrarQrPix(context, valorConfirmado);
+  }
+
+  void _mostrarQrPix(BuildContext context, double valor) {
+    final codigo = gerarCodigoPixComValor(valor);
+    final formatoMoeda = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (dialogContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(formatoMoeda.format(valor), style: Theme.of(dialogContext).textTheme.headlineSmall),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: QrImageView(data: codigo, size: 200),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Escaneie com a câmera do seu banco, ou copie o código abaixo — '
+                'o valor já vem preenchido certinho.',
+                textAlign: TextAlign.center,
+                style: Theme.of(dialogContext).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: codigo));
+                    ScaffoldMessenger.of(dialogContext).showSnackBar(
+                      const SnackBar(content: Text('Código Pix copiado!')),
+                    );
+                  },
+                  icon: const Icon(Icons.copy),
+                  label: const Text('Copiar código Pix'),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -172,7 +367,7 @@ class FinanceiroScreen extends ConsumerWidget {
           padding: const EdgeInsets.all(16),
           children: [
             FilledButton.icon(
-              onPressed: () => _abrirPix(context),
+              onPressed: () => _abrirEscolhaPix(context),
               icon: const Icon(Icons.qr_code),
               label: const Text('Contribuir via Pix'),
               style: FilledButton.styleFrom(

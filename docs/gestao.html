@@ -296,6 +296,62 @@
   .campo-form.check { display: flex; align-items: center; gap: 8px; }
   .campo-form.check label { margin: 0; }
   .erro-form { color: var(--vermelho); font-size: 12px; margin-top: 4px; min-height: 14px; }
+  .grupo-checkbox { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+  .grupo-checkbox label {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px; font-weight: 500; color: var(--navy);
+    background: var(--azul-claro); padding: 6px 10px; border-radius: 20px;
+    cursor: pointer;
+  }
+  .radio-simples { display: flex; gap: 16px; margin-top: 4px; }
+  .radio-simples label { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; }
+
+  /* ---------- financeiro ---------- */
+  .item-pessoa {
+    padding: 10px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  .item-pessoa:hover { background: var(--azul-claro); }
+  .item-pessoa.selecionada { background: var(--navy); color: var(--branco); }
+
+  .cartao-lancamento {
+    background: var(--azul-claro);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 24px;
+  }
+  .cartao-lancamento h3 { margin-top: 0; font-size: 15px; }
+
+  .item-historico {
+    background: var(--branco);
+    border: 1px solid #E5EAEF;
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .item-historico .valor-historico { font-weight: 700; }
+  .item-historico .meta-historico { font-size: 12px; color: var(--cinza-texto); }
+  .item-historico .excluir-lancamento {
+    background: none; border: none; color: var(--vermelho);
+    cursor: pointer; font-size: 12px;
+  }
+
+  .item-pendente {
+    background: var(--branco);
+    border: 1px solid #F0C6C0;
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+  }
+  .item-pendente .topo-pendente { display: flex; justify-content: space-between; font-size: 13px; }
+  .item-pendente .valor-pendente { font-weight: 700; }
+  .item-pendente select { margin-top: 8px; width: 100%; padding: 7px; border-radius: 6px; border: 1px solid #D7DEE6; font-family: inherit; font-size: 12px; }
+  .item-pendente button { margin-top: 8px; width: 100%; }
 </style>
 </head>
 <body>
@@ -408,10 +464,25 @@
       iniciarCalendarioAdmin();
     } else {
       conteudoEl.innerHTML = `
-        <div class="em-construcao">
-          <h2>Painel Financeiro</h2>
-          <p>Essa parte está sendo construída — chega na próxima atualização.</p>
+        <div class="calendario-layout" style="grid-template-columns: 320px 1fr;">
+          <div>
+            <div class="campo-form">
+              <label>Buscar pessoa</label>
+              <input type="text" id="busca-pessoa" placeholder="Nome...">
+            </div>
+            <div id="lista-pessoas" style="max-height:560px; overflow-y:auto;"></div>
+          </div>
+          <div>
+            <div id="painel-financeiro-direita">
+              <div class="vazio-lateral" style="padding:40px 0;">Selecione uma pessoa à esquerda.</div>
+            </div>
+            <div style="margin-top:24px;">
+              <h3>Transações do PagBank sem vínculo</h3>
+              <div id="lista-pendentes"></div>
+            </div>
+          </div>
         </div>`;
+      iniciarPainelFinanceiro();
     }
   }
 
@@ -705,6 +776,51 @@
           <input type="date" id="f-recorrencia-fim" value="${ev.recorrencia_fim || ''}">
         </div>
       </div>
+
+      <div id="campos-filtro-awake" style="display:none;">
+        <div class="campo-form">
+          <label>Quem dentro do Awake pode ver esse evento?</label>
+          <div class="radio-simples">
+            <label><input type="radio" name="f-awake-modo" value="todos" ${!(ev.publico_alvo && ev.publico_alvo.length) ? 'checked' : ''}> Todos do Awake</label>
+            <label><input type="radio" name="f-awake-modo" value="grupos" ${(ev.publico_alvo && ev.publico_alvo.length) ? 'checked' : ''}> Grupos específicos</label>
+          </div>
+          <div class="grupo-checkbox" id="grupo-subgrupos" style="display:${(ev.publico_alvo && ev.publico_alvo.length) ? 'flex' : 'none'};">
+            ${['genesis', 'next', 'one'].map(g => `
+              <label><input type="checkbox" class="chk-subgrupo" value="${g}" ${(ev.publico_alvo || []).includes(g) ? 'checked' : ''}> ${g[0].toUpperCase() + g.slice(1)}</label>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+
+      <div id="campos-filtro-genero" style="display:none;">
+        <div class="campo-form">
+          <label id="label-genero">Meninos, meninas, ou os dois?</label>
+          <div class="radio-simples">
+            <label><input type="radio" name="f-genero-modo" value="todos" ${!(ev.publico_genero && ev.publico_genero.length) ? 'checked' : ''}> Todos</label>
+            <label><input type="radio" name="f-genero-modo" value="um" ${(ev.publico_genero && ev.publico_genero.length) ? 'checked' : ''}> Só um dos dois</label>
+          </div>
+          <div class="grupo-checkbox" id="grupo-generos" style="display:${(ev.publico_genero && ev.publico_genero.length) ? 'flex' : 'none'};">
+            <label><input type="checkbox" class="chk-genero" value="masculino" ${(ev.publico_genero || []).includes('masculino') ? 'checked' : ''}> Masculino</label>
+            <label><input type="checkbox" class="chk-genero" value="feminino" ${(ev.publico_genero || []).includes('feminino') ? 'checked' : ''}> Feminino</label>
+          </div>
+        </div>
+      </div>
+
+      <div id="campos-filtro-casais" style="display:none;">
+        <div class="campo-form">
+          <label>Quem pode ver esse evento?</label>
+          <div class="radio-simples">
+            <label><input type="radio" name="f-casais-modo" value="todos" ${!(ev.publico_casais && ev.publico_casais.length) ? 'checked' : ''}> Todos os casais</label>
+            <label><input type="radio" name="f-casais-modo" value="grupos" ${(ev.publico_casais && ev.publico_casais.length) ? 'checked' : ''}> Grupo específico</label>
+          </div>
+          <div class="grupo-checkbox" id="grupo-casais" style="display:${(ev.publico_casais && ev.publico_casais.length) ? 'flex' : 'none'};">
+            ${[['one', 'One (Awake)'], ['henrique_patricia', 'Henrique e Patrícia'], ['ivaldo_sonja', 'Ivaldo e Sonja'], ['marcelo_andreia', 'Marcelo e Andréia']].map(([v, l]) => `
+              <label><input type="checkbox" class="chk-casal" value="${v}" ${(ev.publico_casais || []).includes(v) ? 'checked' : ''}> ${l}</label>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+
       <p class="erro-form" id="erro-form"></p>
       <div class="acoes-modal">
         <button class="botao-secundario" id="btn-cancelar-form">Cancelar</button>
@@ -720,15 +836,36 @@
       const escopoSelecionado = document.getElementById('f-escopo').value;
       const wrapper = document.getElementById('campo-tipo-wrapper');
       const tipos = TIPOS_POR_ESCOPO[escopoSelecionado];
-      if (!tipos) { wrapper.style.display = 'none'; return; }
-      wrapper.style.display = 'block';
-      const tipoSel = document.getElementById('f-tipo');
-      tipoSel.innerHTML = Object.entries(tipos)
-        .map(([valor, label]) => `<option value="${valor}" ${ev.tipo === valor ? 'selected' : ''}>${label}</option>`)
-        .join('');
+      if (!tipos) { wrapper.style.display = 'none'; } else {
+        wrapper.style.display = 'block';
+        const tipoSel = document.getElementById('f-tipo');
+        tipoSel.innerHTML = Object.entries(tipos)
+          .map(([valor, label]) => `<option value="${valor}" ${ev.tipo === valor ? 'selected' : ''}>${label}</option>`)
+          .join('');
+      }
+
+      document.getElementById('campos-filtro-awake').style.display = escopoSelecionado === 'awake' ? 'block' : 'none';
+      document.getElementById('campos-filtro-genero').style.display =
+        (escopoSelecionado === 'awake' || escopoSelecionado === 'coral') ? 'block' : 'none';
+      document.getElementById('label-genero').textContent =
+        escopoSelecionado === 'coral' ? 'Masculino, feminino, ou os dois?' : 'Meninos, meninas, ou os dois?';
+      document.getElementById('campos-filtro-casais').style.display = escopoSelecionado === 'casais' ? 'block' : 'none';
     }
     document.getElementById('f-escopo').addEventListener('change', atualizarTipos);
     atualizarTipos();
+
+    document.querySelectorAll('input[name="f-awake-modo"]').forEach(r =>
+      r.addEventListener('change', (e) => {
+        document.getElementById('grupo-subgrupos').style.display = e.target.value === 'grupos' ? 'flex' : 'none';
+      }));
+    document.querySelectorAll('input[name="f-genero-modo"]').forEach(r =>
+      r.addEventListener('change', (e) => {
+        document.getElementById('grupo-generos').style.display = e.target.value === 'um' ? 'flex' : 'none';
+      }));
+    document.querySelectorAll('input[name="f-casais-modo"]').forEach(r =>
+      r.addEventListener('change', (e) => {
+        document.getElementById('grupo-casais').style.display = e.target.value === 'grupos' ? 'flex' : 'none';
+      }));
 
     document.getElementById('f-recorrente').addEventListener('change', (e) => {
       document.getElementById('campos-recorrencia').style.display = e.target.checked ? 'block' : 'none';
@@ -750,6 +887,21 @@
     const recorrente = document.getElementById('f-recorrente').checked;
     const recorrenciaFim = document.getElementById('f-recorrencia-fim').value || null;
 
+    const awakeModo = document.querySelector('input[name="f-awake-modo"]:checked')?.value;
+    const publicoAlvo = (escopo === 'awake' && awakeModo === 'grupos')
+      ? Array.from(document.querySelectorAll('.chk-subgrupo:checked')).map(el => el.value)
+      : null;
+
+    const generoModo = document.querySelector('input[name="f-genero-modo"]:checked')?.value;
+    const publicoGenero = ((escopo === 'awake' || escopo === 'coral') && generoModo === 'um')
+      ? Array.from(document.querySelectorAll('.chk-genero:checked')).map(el => el.value)
+      : null;
+
+    const casaisModo = document.querySelector('input[name="f-casais-modo"]:checked')?.value;
+    const publicoCasais = (escopo === 'casais' && casaisModo === 'grupos')
+      ? Array.from(document.querySelectorAll('.chk-casal:checked')).map(el => el.value)
+      : null;
+
     const payload = {
       titulo,
       escopo,
@@ -759,6 +911,9 @@
       descricao: document.getElementById('f-descricao').value.trim() || null,
       recorrente,
       recorrencia_fim: recorrente ? recorrenciaFim : null,
+      publico_alvo: (publicoAlvo && publicoAlvo.length) ? publicoAlvo : null,
+      publico_genero: (publicoGenero && publicoGenero.length) ? publicoGenero : null,
+      publico_casais: (publicoCasais && publicoCasais.length) ? publicoCasais : null,
     };
 
     const botao = document.getElementById('btn-salvar-form');
@@ -799,6 +954,199 @@
 
   function escaparAtributo(texto) {
     return escaparHtml(texto).replace(/"/g, '&quot;');
+  }
+
+  // =========================================================
+  // Painel financeiro
+  // =========================================================
+  let todasPessoas = [];
+  let pessoaSelecionada = null;
+
+  async function iniciarPainelFinanceiro() {
+    const { data: pessoas } = await supa.from('profiles').select('id, nome').order('nome');
+    todasPessoas = pessoas || [];
+    renderizarListaPessoas();
+
+    document.getElementById('busca-pessoa').addEventListener('input', renderizarListaPessoas);
+    await carregarPendentes();
+  }
+
+  function renderizarListaPessoas() {
+    const busca = document.getElementById('busca-pessoa').value.trim().toLowerCase();
+    const filtradas = busca
+      ? todasPessoas.filter(p => (p.nome || '').toLowerCase().includes(busca))
+      : todasPessoas;
+
+    document.getElementById('lista-pessoas').innerHTML = filtradas.map(p => `
+      <div class="item-pessoa ${pessoaSelecionada?.id === p.id ? 'selecionada' : ''}" data-id="${p.id}">
+        ${escaparHtml(p.nome || '(sem nome)')}
+      </div>
+    `).join('');
+
+    document.querySelectorAll('.item-pessoa').forEach(el => {
+      el.addEventListener('click', () => {
+        pessoaSelecionada = todasPessoas.find(p => p.id === el.dataset.id);
+        renderizarListaPessoas();
+        renderizarPainelPessoa();
+      });
+    });
+  }
+
+  async function renderizarPainelPessoa() {
+    const el = document.getElementById('painel-financeiro-direita');
+
+    el.innerHTML = `
+      <h2 style="margin-top:0;">${escaparHtml(pessoaSelecionada.nome)}</h2>
+      <div class="cartao-lancamento">
+        <h3>Novo lançamento</h3>
+        <div class="linha-form">
+          <div class="campo-form">
+            <label>Valor</label>
+            <input type="text" id="lc-valor" placeholder="0,00">
+          </div>
+          <div class="campo-form">
+            <label>Data</label>
+            <input type="date" id="lc-data" value="${new Date().toISOString().split('T')[0]}">
+          </div>
+        </div>
+        <div class="campo-form">
+          <label>Meio de pagamento</label>
+          <select id="lc-meio">
+            <option value="pix">Pix</option>
+            <option value="dinheiro">Dinheiro</option>
+            <option value="cartao">Cartão</option>
+            <option value="transferencia">Transferência</option>
+            <option value="boleto">Boleto</option>
+            <option value="outro">Outro</option>
+          </select>
+        </div>
+        <div class="campo-form">
+          <label>Observação (opcional)</label>
+          <input type="text" id="lc-observacao">
+        </div>
+        <p class="erro-form" id="erro-lancamento"></p>
+        <button class="botao-primario" style="width:auto;padding:9px 20px;" id="btn-lancar">Lançar</button>
+      </div>
+      <h3>Histórico</h3>
+      <div id="lista-historico"><div class="vazio-lateral">Carregando...</div></div>
+    `;
+
+    document.getElementById('btn-lancar').addEventListener('click', lancarContribuicao);
+    await carregarHistorico();
+  }
+
+  async function carregarHistorico() {
+    const { data } = await supa
+      .from('contribuicoes')
+      .select('*')
+      .eq('profile_id', pessoaSelecionada.id)
+      .order('data', { ascending: false });
+
+    const historicoEl = document.getElementById('lista-historico');
+    if (!data || data.length === 0) {
+      historicoEl.innerHTML = '<div class="vazio-lateral">Nenhum lançamento ainda.</div>';
+      return;
+    }
+
+    const LABEL_MEIO = { pix: 'Pix', dinheiro: 'Dinheiro', cartao: 'Cartão', transferencia: 'Transferência', boleto: 'Boleto', outro: 'Outro' };
+    historicoEl.innerHTML = data.map(c => `
+      <div class="item-historico">
+        <div>
+          <div class="valor-historico">R$ ${Number(c.valor).toFixed(2)}</div>
+          <div class="meta-historico">${new Date(c.data).toLocaleDateString('pt-BR')} • ${LABEL_MEIO[c.meio_pagamento] || c.meio_pagamento}${c.observacao ? ' • ' + escaparHtml(c.observacao) : ''}</div>
+        </div>
+        <button class="excluir-lancamento" data-id="${c.id}">Excluir</button>
+      </div>
+    `).join('');
+
+    document.querySelectorAll('.excluir-lancamento').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Excluir esse lançamento?')) return;
+        await supa.from('contribuicoes').delete().eq('id', btn.dataset.id);
+        await carregarHistorico();
+      });
+    });
+  }
+
+  async function lancarContribuicao() {
+    const valorTexto = document.getElementById('lc-valor').value.replace(',', '.');
+    const valor = parseFloat(valorTexto);
+    const erroEl = document.getElementById('erro-lancamento');
+    if (!valor || valor <= 0) { erroEl.textContent = 'Informe um valor válido.'; return; }
+
+    const { error } = await supa.from('contribuicoes').insert({
+      profile_id: pessoaSelecionada.id,
+      data: document.getElementById('lc-data').value,
+      valor,
+      meio_pagamento: document.getElementById('lc-meio').value,
+      observacao: document.getElementById('lc-observacao').value.trim() || null,
+    });
+
+    if (error) { erroEl.textContent = 'Erro: ' + error.message; return; }
+
+    document.getElementById('lc-valor').value = '';
+    document.getElementById('lc-observacao').value = '';
+    await carregarHistorico();
+  }
+
+  async function carregarPendentes() {
+    const { data } = await supa
+      .from('transacoes_bancarias')
+      .select('*')
+      .is('profile_id', null)
+      .order('data_transacao', { ascending: false });
+
+    const listaEl = document.getElementById('lista-pendentes');
+    if (!data || data.length === 0) {
+      listaEl.innerHTML = '<div class="vazio-lateral">Nenhuma transação pendente. 🎉</div>';
+      return;
+    }
+
+    listaEl.innerHTML = data.map(t => `
+      <div class="item-pendente" data-id="${t.id}" data-valor="${t.valor}">
+        <div class="topo-pendente">
+          <span>${escaparHtml(t.nome_pagador || '(sem nome)')}</span>
+          <span class="valor-pendente">R$ ${Number(t.valor).toFixed(2)}</span>
+        </div>
+        <div class="meta-historico">${new Date(t.data_transacao).toLocaleDateString('pt-BR')} • ${escaparHtml(t.meio || '')}</div>
+        <select class="select-vincular">
+          <option value="">Vincular a quem?</option>
+          ${todasPessoas.map(p => `<option value="${p.id}">${escaparHtml(p.nome)}</option>`).join('')}
+        </select>
+        <button class="botao-secundario btn-confirmar-vinculo">Vincular e lançar</button>
+      </div>
+    `).join('');
+
+    listaEl.querySelectorAll('.item-pendente').forEach(item => {
+      item.querySelector('.btn-confirmar-vinculo').addEventListener('click', async () => {
+        const profileId = item.querySelector('.select-vincular').value;
+        if (!profileId) { alert('Escolha uma pessoa primeiro.'); return; }
+        await vincularTransacaoPendente(item.dataset.id, profileId, Number(item.dataset.valor));
+      });
+    });
+  }
+
+  async function vincularTransacaoPendente(transacaoId, profileId, valor) {
+    const { data: contribuicaoInserida, error } = await supa
+      .from('contribuicoes')
+      .insert({
+        profile_id: profileId,
+        data: new Date().toISOString().split('T')[0],
+        valor,
+        meio_pagamento: 'pix',
+        observacao: 'Vinculado manualmente a partir do PagBank',
+      })
+      .select('id')
+      .single();
+
+    if (error) { alert('Erro ao lançar: ' + error.message); return; }
+
+    await supa.from('transacoes_bancarias')
+      .update({ profile_id: profileId, contribuicao_id: contribuicaoInserida.id })
+      .eq('id', transacaoId);
+
+    await carregarPendentes();
+    if (pessoaSelecionada && pessoaSelecionada.id === profileId) await carregarHistorico();
   }
 
   function escaparHtml(texto) {

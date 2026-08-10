@@ -1,6 +1,5 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
@@ -237,14 +236,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 const Divider(),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.dashboard_outlined),
-                  title: const Text('Painel de Calendário (navegador)'),
-                  subtitle: const Text('Copia o link — abre melhor no computador'),
-                  trailing: const Icon(Icons.copy),
-                  onTap: () => _copiarLinkAdmin(context, '/admin/calendario'),
-                ),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.mark_email_unread_outlined),
                   title: const Text('Caixa de entrada'),
                   subtitle: const Text('Pedidos de oração e testemunhos'),
@@ -260,16 +251,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   onTap: () => Navigator.of(context).push(MaterialPageRoute(
                     builder: (_) => const AdminVisitantesScreen(),
                   )),
-                ),
-              ],
-              if (profile.isAdminFinanceiro) ...[
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.point_of_sale_outlined),
-                  title: const Text('Painel Financeiro (navegador)'),
-                  subtitle: const Text('Copia o link — abre melhor no computador'),
-                  trailing: const Icon(Icons.copy),
-                  onTap: () => _copiarLinkAdmin(context, '/admin/financeiro'),
                 ),
               ],
               if (profile.ministerios
@@ -319,14 +300,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           );
         },
       ),
-    );
-  }
-
-  void _copiarLinkAdmin(BuildContext context, String rota) {
-    final link = 'https://leonardorobert.github.io/awake-app/app/#$rota';
-    Clipboard.setData(ClipboardData(text: link));
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Link copiado! Cole no navegador do computador.')),
     );
   }
 }
