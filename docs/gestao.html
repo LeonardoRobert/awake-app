@@ -142,6 +142,160 @@
     text-align: center;
     padding: 24px;
   }
+
+  /* ---------- calendario admin ---------- */
+  .calendario-layout {
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    gap: 24px;
+    align-items: start;
+  }
+  .cabecalho-mes {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .cabecalho-mes h2 { margin: 0; font-size: 20px; text-transform: capitalize; }
+  .cabecalho-mes .navegacao button {
+    background: none;
+    border: 1px solid #D7DEE6;
+    border-radius: 6px;
+    width: 32px;
+    height: 32px;
+    cursor: pointer;
+    font-size: 15px;
+    color: var(--navy);
+  }
+  .cabecalho-mes .navegacao button:hover { background: var(--azul-claro); }
+
+  .grade-calendario {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+  }
+  .dia-semana-label {
+    text-align: center;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--cinza-texto);
+    padding-bottom: 6px;
+    text-transform: uppercase;
+  }
+  .dia-celula {
+    aspect-ratio: 1;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 6px 4px;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  .dia-celula:hover { background: var(--azul-claro); }
+  .dia-celula.fora-do-mes { color: #C3CCD6; }
+  .dia-celula.hoje { border-color: var(--navy); font-weight: 700; }
+  .dia-celula.selecionado { background: var(--navy); color: var(--branco); }
+  .dia-celula .pontos { display: flex; gap: 2px; margin-top: 4px; flex-wrap: wrap; justify-content: center; }
+  .dia-celula .ponto { width: 5px; height: 5px; border-radius: 50%; }
+
+  .painel-lateral {
+    background: var(--azul-claro);
+    border-radius: 12px;
+    padding: 16px;
+    max-height: 640px;
+    overflow-y: auto;
+  }
+  .painel-lateral h3 { margin: 0 0 12px; font-size: 15px; }
+  .item-evento {
+    background: var(--branco);
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    border: 1px solid #E5EAEF;
+  }
+  .item-evento:hover { border-color: var(--navy); }
+  .item-evento .cor-tag {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    margin-right: 6px;
+  }
+  .item-evento .titulo-evento { font-weight: 700; font-size: 14px; }
+  .item-evento .meta-evento { font-size: 12px; color: var(--cinza-texto); margin-top: 2px; }
+
+  .vazio-lateral { color: var(--cinza-texto); font-size: 13px; text-align: center; padding: 24px 0; }
+
+  /* ---------- modal de detalhe ---------- */
+  .fundo-modal {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(12,25,46,0.4);
+    align-items: center; justify-content: center;
+    padding: 24px;
+    z-index: 50;
+  }
+  .fundo-modal.aberto { display: flex; }
+  .caixa-modal {
+    background: var(--branco);
+    border-radius: 14px;
+    padding: 28px;
+    max-width: 480px;
+    width: 100%;
+    max-height: 85vh;
+    overflow-y: auto;
+  }
+  .caixa-modal .fechar-modal {
+    float: right;
+    background: none; border: none;
+    font-size: 18px; cursor: pointer;
+    color: var(--cinza-texto);
+  }
+  .caixa-modal h2 { margin: 4px 0 4px; font-size: 19px; }
+  .caixa-modal .categoria-modal { font-size: 12px; color: var(--cinza-texto); margin-bottom: 12px; }
+  .caixa-modal .linha-info {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13px; margin-bottom: 8px; color: var(--navy);
+  }
+  .caixa-modal .descricao-modal { font-size: 13px; margin-top: 12px; line-height: 1.6; color: var(--cinza-texto); }
+  .caixa-modal img { width: 100%; border-radius: 10px; margin-top: 12px; }
+  .caixa-modal .acoes-modal { display: flex; gap: 10px; margin-top: 20px; }
+  .botao-secundario {
+    flex: 1;
+    padding: 10px;
+    background: var(--branco);
+    border: 1px solid #D7DEE6;
+    border-radius: 8px;
+    font-family: inherit;
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+    color: var(--navy);
+  }
+  .botao-perigo { color: var(--vermelho); border-color: #F0C6C0; }
+
+  .campo-form { text-align: left; margin-bottom: 14px; }
+  .campo-form label {
+    display: block; font-size: 12px; font-weight: 700;
+    margin-bottom: 5px; color: var(--navy);
+  }
+  .campo-form input, .campo-form select, .campo-form textarea {
+    width: 100%;
+    padding: 9px 10px;
+    border: 1px solid #D7DEE6;
+    border-radius: 7px;
+    font-family: inherit;
+    font-size: 13px;
+  }
+  .campo-form textarea { resize: vertical; min-height: 60px; }
+  .linha-form { display: flex; gap: 10px; }
+  .linha-form .campo-form { flex: 1; }
+  .campo-form.check { display: flex; align-items: center; gap: 8px; }
+  .campo-form.check label { margin: 0; }
+  .erro-form { color: var(--vermelho); font-size: 12px; margin-top: 4px; min-height: 14px; }
 </style>
 </head>
 <body>
@@ -231,10 +385,27 @@
   function renderizarConteudo(papel) {
     if (papel === 'admin') {
       conteudoEl.innerHTML = `
-        <div class="em-construcao">
-          <h2>Painel de Calendário</h2>
-          <p>Essa parte está sendo construída — chega na próxima atualização.</p>
+        <div class="cabecalho-mes">
+          <h2 id="titulo-mes"></h2>
+          <div style="display:flex; gap:12px; align-items:center;">
+            <div class="navegacao">
+              <button id="mes-anterior">‹</button>
+              <button id="mes-proximo">›</button>
+            </div>
+            <button class="botao-primario" style="width:auto;padding:8px 16px;" id="botao-novo-evento">+ Novo evento</button>
+          </div>
+        </div>
+        <div class="calendario-layout">
+          <div>
+            <div class="grade-calendario" id="dias-semana-labels"></div>
+            <div class="grade-calendario" id="grade-dias" style="margin-top:4px;"></div>
+          </div>
+          <div class="painel-lateral">
+            <h3 id="titulo-painel-lateral">Próximos eventos</h3>
+            <div id="lista-lateral"></div>
+          </div>
         </div>`;
+      iniciarCalendarioAdmin();
     } else {
       conteudoEl.innerHTML = `
         <div class="em-construcao">
@@ -275,8 +446,373 @@
   document.getElementById('botao-sair').addEventListener('click', sair);
   document.getElementById('botao-sair-negado').addEventListener('click', sair);
 
+  // =========================================================
+  // Calendario admin
+  // =========================================================
+  const CORES_ESCOPO = {
+    igreja: '#60A5FA', lideranca: '#FB923C', casais: '#EF4444',
+    homens: '#1D4ED8', mulheres: '#EC4899', embaixadores_mensageiras: '#8D6E63',
+    criancas: '#C4B5FD', coral: '#000000', danca: '#000000', diaconos: '#000000',
+    louvor: '#000000', midia: '#000000', multimidia: '#000000', teatro: '#000000',
+  };
+  const CORES_TIPO_AWAKE = { gc: '#4ADE80', comunhao: '#FACC15', laje: '#A78BFA' };
+  const LABEL_ESCOPO = {
+    igreja: 'Igreja (todos)', lideranca: 'Liderança geral', casais: 'Casais',
+    homens: 'Homens', mulheres: 'Mulheres', awake: 'Awake',
+    embaixadores_mensageiras: 'Embaixadores e Mensageiras', criancas: 'Crianças',
+    coral: 'Coral', danca: 'Dança', diaconos: 'Diáconos', louvor: 'Louvor',
+    midia: 'Mídia', multimidia: 'Multimídia', teatro: 'Teatro',
+  };
+  const ORDEM_ESCOPOS = Object.keys(LABEL_ESCOPO);
+  const TIPOS_POR_ESCOPO = {
+    igreja: { ebd: 'EBD', culto_celebracao: 'Culto de Celebração', culto_familia: 'Culto da Família', outro: 'Outro' },
+    awake: { gc: 'GC', comunhao: 'Comunhão', laje: 'Laje', outro: 'Outro' },
+  };
+
+  function corDoEvento(ev) {
+    if (ev.escopo === 'awake') return CORES_TIPO_AWAKE[ev.tipo] || '#A78BFA';
+    return CORES_ESCOPO[ev.escopo] || '#60A5FA';
+  }
+
+  function ocorrenciasNoIntervalo(evento, inicio, fim) {
+    const ocorrencias = [];
+    const dataBase = new Date(evento.data_inicio);
+    if (!evento.recorrente) {
+      if (dataBase >= inicio && dataBase <= fim) ocorrencias.push(dataBase);
+      return ocorrencias;
+    }
+    const fimRecorrencia = evento.recorrencia_fim ? new Date(evento.recorrencia_fim + 'T23:59:59') : null;
+    let cursor = new Date(dataBase);
+    while (cursor < inicio) cursor.setDate(cursor.getDate() + 7);
+    while (cursor <= fim) {
+      if (!fimRecorrencia || cursor <= fimRecorrencia) {
+        const semanasDoMes = evento.semanas_do_mes;
+        if (!semanasDoMes || semanasDoMes.length === 0) {
+          ocorrencias.push(new Date(cursor));
+        } else {
+          const semana = Math.floor((cursor.getDate() - 1) / 7) + 1;
+          if (semanasDoMes.includes(semana)) ocorrencias.push(new Date(cursor));
+        }
+      }
+      cursor.setDate(cursor.getDate() + 7);
+    }
+    return ocorrencias;
+  }
+
+  let mesAtual = new Date();
+  mesAtual.setDate(1);
+  let diaSelecionado = null;
+  let todosEventos = [];
+
+  async function iniciarCalendarioAdmin() {
+    const labelsEl = document.getElementById('dias-semana-labels');
+    labelsEl.innerHTML = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
+      .map(d => `<div class="dia-semana-label">${d}</div>`).join('');
+
+    document.getElementById('mes-anterior').addEventListener('click', () => {
+      mesAtual.setMonth(mesAtual.getMonth() - 1);
+      diaSelecionado = null;
+      renderizarMes();
+    });
+    document.getElementById('mes-proximo').addEventListener('click', () => {
+      mesAtual.setMonth(mesAtual.getMonth() + 1);
+      diaSelecionado = null;
+      renderizarMes();
+    });
+
+    const { data, error } = await supa.from('eventos').select('*');
+    todosEventos = data || [];
+    renderizarMes();
+  }
+
+  function renderizarMes() {
+    const tituloEl = document.getElementById('titulo-mes');
+    tituloEl.textContent = mesAtual.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+
+    const primeiroDiaMes = new Date(mesAtual.getFullYear(), mesAtual.getMonth(), 1);
+    const inicioGrade = new Date(primeiroDiaMes);
+    inicioGrade.setDate(inicioGrade.getDate() - inicioGrade.getDay());
+    const fimGrade = new Date(inicioGrade);
+    fimGrade.setDate(fimGrade.getDate() + 41); // 6 semanas
+
+    // Mapa dia -> lista de {evento, data}
+    const porDia = {};
+    todosEventos.forEach(ev => {
+      ocorrenciasNoIntervalo(ev, inicioGrade, fimGrade).forEach(data => {
+        const chave = data.toDateString();
+        (porDia[chave] = porDia[chave] || []).push({ evento: ev, data });
+      });
+    });
+
+    const hoje = new Date();
+    const gradeEl = document.getElementById('grade-dias');
+    let html = '';
+    for (let i = 0; i < 42; i++) {
+      const dia = new Date(inicioGrade);
+      dia.setDate(dia.getDate() + i);
+      const chave = dia.toDateString();
+      const foraDoMes = dia.getMonth() !== mesAtual.getMonth();
+      const ehHoje = dia.toDateString() === hoje.toDateString();
+      const ehSelecionado = diaSelecionado && dia.toDateString() === diaSelecionado.toDateString();
+      const itensDoDia = porDia[chave] || [];
+
+      const pontos = itensDoDia.slice(0, 4)
+        .map(item => `<span class="ponto" style="background:${corDoEvento(item.evento)}"></span>`)
+        .join('');
+
+      html += `
+        <div class="dia-celula ${foraDoMes ? 'fora-do-mes' : ''} ${ehHoje ? 'hoje' : ''} ${ehSelecionado ? 'selecionado' : ''}"
+             data-dia="${dia.toISOString()}">
+          ${dia.getDate()}
+          <div class="pontos">${pontos}</div>
+        </div>`;
+    }
+    gradeEl.innerHTML = html;
+
+    gradeEl.querySelectorAll('.dia-celula').forEach(el => {
+      el.addEventListener('click', () => {
+        diaSelecionado = new Date(el.dataset.dia);
+        renderizarMes();
+      });
+    });
+
+    renderizarListaLateral(porDia, inicioGrade);
+  }
+
+  function renderizarListaLateral(porDia, inicioGrade) {
+    const tituloEl = document.getElementById('titulo-painel-lateral');
+    const listaEl = document.getElementById('lista-lateral');
+
+    let itens;
+    if (diaSelecionado) {
+      tituloEl.textContent = diaSelecionado.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit' });
+      itens = porDia[diaSelecionado.toDateString()] || [];
+    } else {
+      tituloEl.textContent = 'Próximos eventos';
+      const hoje = new Date();
+      const daquiA30 = new Date(hoje.getTime() + 30 * 24 * 60 * 60 * 1000);
+      itens = [];
+      todosEventos.forEach(ev => {
+        ocorrenciasNoIntervalo(ev, hoje, daquiA30).forEach(data => itens.push({ evento: ev, data }));
+      });
+      itens.sort((a, b) => a.data - b.data);
+      itens = itens.slice(0, 15);
+    }
+
+    if (itens.length === 0) {
+      listaEl.innerHTML = '<div class="vazio-lateral">Nenhum evento aqui.</div>';
+      return;
+    }
+
+    listaEl.innerHTML = itens.map(item => `
+      <div class="item-evento" data-evento-id="${item.evento.id}" data-data="${item.data.toISOString()}">
+        <div class="titulo-evento"><span class="cor-tag" style="background:${corDoEvento(item.evento)}"></span>${escaparHtml(item.evento.titulo)}</div>
+        <div class="meta-evento">${item.data.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} às ${item.data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</div>
+      </div>
+    `).join('');
+
+    listaEl.querySelectorAll('.item-evento').forEach(el => {
+      el.addEventListener('click', () => abrirDetalheEvento(el.dataset.eventoId, new Date(el.dataset.data)));
+    });
+  }
+
+  function abrirDetalheEvento(eventoId, data) {
+    const evento = todosEventos.find(e => e.id === eventoId);
+    if (!evento) return;
+
+    const categoria = evento.escopo === 'awake' && evento.tipo && CORES_TIPO_AWAKE[evento.tipo]
+      ? `Awake • ${evento.tipo}`
+      : (LABEL_ESCOPO[evento.escopo] || evento.escopo);
+
+    document.getElementById('caixa-modal').innerHTML = `
+      <button class="fechar-modal" id="fechar-modal">✕</button>
+      <div class="categoria-modal">
+        <span class="cor-tag" style="background:${corDoEvento(evento)}"></span>${escaparHtml(categoria)}
+      </div>
+      <h2>${escaparHtml(evento.titulo)}</h2>
+      <div class="linha-info">🕒 ${data.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit' })} às ${data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</div>
+      ${evento.local ? `<div class="linha-info">📍 ${escaparHtml(evento.local)}</div>` : ''}
+      ${evento.recorrente ? `<div class="linha-info">🔁 Evento recorrente</div>` : ''}
+      ${evento.descricao ? `<div class="descricao-modal">${escaparHtml(evento.descricao)}</div>` : ''}
+      ${evento.foto_url ? `<img src="${evento.foto_url}">` : ''}
+      <div class="acoes-modal">
+        <button class="botao-secundario" id="btn-editar-evento">Editar</button>
+        <button class="botao-secundario botao-perigo" id="btn-excluir-evento">Excluir</button>
+      </div>
+    `;
+    document.getElementById('fundo-modal').classList.add('aberto');
+    document.getElementById('fechar-modal').addEventListener('click', fecharModal);
+    document.getElementById('btn-editar-evento').addEventListener('click', () => abrirFormularioEvento(evento));
+    document.getElementById('btn-excluir-evento').addEventListener('click', () => excluirEvento(evento));
+  }
+
+  function fecharModal() {
+    document.getElementById('fundo-modal').classList.remove('aberto');
+  }
+  document.getElementById('fundo-modal').addEventListener('click', (e) => {
+    if (e.target.id === 'fundo-modal') fecharModal();
+  });
+
+  document.getElementById('botao-novo-evento').addEventListener('click', () => abrirFormularioEvento(null));
+
+  function abrirFormularioEvento(eventoExistente) {
+    const ev = eventoExistente || {
+      titulo: '', escopo: 'igreja', tipo: 'outro', descricao: '', local: '',
+      data_inicio: new Date().toISOString(), recorrente: false,
+      recorrencia_fim: null, semanas_do_mes: [],
+    };
+    const dataObj = new Date(ev.data_inicio);
+    const dataInputValor = dataObj.toISOString().slice(0, 16);
+
+    document.getElementById('caixa-modal').innerHTML = `
+      <button class="fechar-modal" id="fechar-modal">✕</button>
+      <h2>${eventoExistente ? 'Editar evento' : 'Novo evento'}</h2>
+      <div class="campo-form">
+        <label>Título</label>
+        <input type="text" id="f-titulo" value="${escaparAtributo(ev.titulo)}">
+      </div>
+      <div class="linha-form">
+        <div class="campo-form">
+          <label>Categoria</label>
+          <select id="f-escopo">
+            ${ORDEM_ESCOPOS.map(e => `<option value="${e}" ${ev.escopo === e ? 'selected' : ''}>${LABEL_ESCOPO[e]}</option>`).join('')}
+          </select>
+        </div>
+        <div class="campo-form" id="campo-tipo-wrapper" style="display:none;">
+          <label>Tipo</label>
+          <select id="f-tipo"></select>
+        </div>
+      </div>
+      <div class="campo-form">
+        <label>Data e hora</label>
+        <input type="datetime-local" id="f-data" value="${dataInputValor}">
+      </div>
+      <div class="campo-form">
+        <label>Local</label>
+        <input type="text" id="f-local" value="${escaparAtributo(ev.local || '')}">
+      </div>
+      <div class="campo-form">
+        <label>Descrição</label>
+        <textarea id="f-descricao">${escaparHtml(ev.descricao || '')}</textarea>
+      </div>
+      <div class="campo-form check">
+        <input type="checkbox" id="f-recorrente" ${ev.recorrente ? 'checked' : ''}>
+        <label for="f-recorrente">Evento recorrente (toda semana)</label>
+      </div>
+      <div id="campos-recorrencia" style="display:${ev.recorrente ? 'block' : 'none'};">
+        <div class="campo-form">
+          <label>Repetir até (opcional)</label>
+          <input type="date" id="f-recorrencia-fim" value="${ev.recorrencia_fim || ''}">
+        </div>
+      </div>
+      <p class="erro-form" id="erro-form"></p>
+      <div class="acoes-modal">
+        <button class="botao-secundario" id="btn-cancelar-form">Cancelar</button>
+        <button class="botao-primario" style="flex:1;" id="btn-salvar-form">Salvar</button>
+      </div>
+    `;
+
+    document.getElementById('fundo-modal').classList.add('aberto');
+    document.getElementById('fechar-modal').addEventListener('click', fecharModal);
+    document.getElementById('btn-cancelar-form').addEventListener('click', fecharModal);
+
+    function atualizarTipos() {
+      const escopoSelecionado = document.getElementById('f-escopo').value;
+      const wrapper = document.getElementById('campo-tipo-wrapper');
+      const tipos = TIPOS_POR_ESCOPO[escopoSelecionado];
+      if (!tipos) { wrapper.style.display = 'none'; return; }
+      wrapper.style.display = 'block';
+      const tipoSel = document.getElementById('f-tipo');
+      tipoSel.innerHTML = Object.entries(tipos)
+        .map(([valor, label]) => `<option value="${valor}" ${ev.tipo === valor ? 'selected' : ''}>${label}</option>`)
+        .join('');
+    }
+    document.getElementById('f-escopo').addEventListener('change', atualizarTipos);
+    atualizarTipos();
+
+    document.getElementById('f-recorrente').addEventListener('change', (e) => {
+      document.getElementById('campos-recorrencia').style.display = e.target.checked ? 'block' : 'none';
+    });
+
+    document.getElementById('btn-salvar-form').addEventListener('click', () => salvarEvento(eventoExistente));
+  }
+
+  async function salvarEvento(eventoExistente) {
+    const titulo = document.getElementById('f-titulo').value.trim();
+    const erroEl = document.getElementById('erro-form');
+    if (!titulo) { erroEl.textContent = 'Informe um título.'; return; }
+
+    const escopo = document.getElementById('f-escopo').value;
+    const tipoSel = document.getElementById('f-tipo');
+    const tipo = (tipoSel && tipoSel.options.length) ? tipoSel.value : 'outro';
+    const dataInicio = document.getElementById('f-data').value;
+    if (!dataInicio) { erroEl.textContent = 'Selecione a data e hora.'; return; }
+    const recorrente = document.getElementById('f-recorrente').checked;
+    const recorrenciaFim = document.getElementById('f-recorrencia-fim').value || null;
+
+    const payload = {
+      titulo,
+      escopo,
+      tipo,
+      data_inicio: new Date(dataInicio).toISOString(),
+      local: document.getElementById('f-local').value.trim() || null,
+      descricao: document.getElementById('f-descricao').value.trim() || null,
+      recorrente,
+      recorrencia_fim: recorrente ? recorrenciaFim : null,
+    };
+
+    const botao = document.getElementById('btn-salvar-form');
+    botao.disabled = true;
+    botao.textContent = 'Salvando...';
+
+    let resultado;
+    if (eventoExistente) {
+      resultado = await supa.from('eventos').update(payload).eq('id', eventoExistente.id);
+    } else {
+      resultado = await supa.from('eventos').insert(payload);
+    }
+
+    if (resultado.error) {
+      erroEl.textContent = 'Erro ao salvar: ' + resultado.error.message;
+      botao.disabled = false;
+      botao.textContent = 'Salvar';
+      return;
+    }
+
+    fecharModal();
+    await recarregarEventos();
+  }
+
+  async function excluirEvento(evento) {
+    if (!confirm(`Excluir "${evento.titulo}" permanentemente? Essa ação não pode ser desfeita.`)) return;
+    const { error } = await supa.from('eventos').delete().eq('id', evento.id);
+    if (error) { alert('Erro ao excluir: ' + error.message); return; }
+    fecharModal();
+    await recarregarEventos();
+  }
+
+  async function recarregarEventos() {
+    const { data } = await supa.from('eventos').select('*');
+    todosEventos = data || [];
+    renderizarMes();
+  }
+
+  function escaparAtributo(texto) {
+    return escaparHtml(texto).replace(/"/g, '&quot;');
+  }
+
+  function escaparHtml(texto) {
+    const div = document.createElement('div');
+    div.textContent = texto ?? '';
+    return div.innerHTML;
+  }
+
   verificarSessao();
 </script>
+  <!-- ===== Modal de detalhes do evento ===== -->
+  <div class="fundo-modal" id="fundo-modal">
+    <div class="caixa-modal" id="caixa-modal"></div>
+  </div>
 
 </body>
 </html>
