@@ -3,177 +3,350 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Shallom</title>
+<title>Shallom | Comunidade Batista Shallom em Meriti</title>
+<meta name="description" content="Site oficial da Comunidade Batista Shallom em Meriti, RJ.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;1,700;1,800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;1,700;1,800&family=Source+Serif+4:ital@0;1&display=swap" rel="stylesheet">
 <style>
   :root {
     --navy: #0C192E;
     --navy-deep: #081120;
     --azul: #9BB0C7;
-    --azul-claro: #C3D2E0;
+    --azul-escuro: #45566E;
     --creme: #F7F2DD;
+    --creme-escuro: #EDE6C9;
     --branco: #FFFFFF;
+    --dourado: #CBA135;
   }
   * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
   body {
     margin: 0;
     font-family: 'Plus Jakarta Sans', sans-serif;
-    background: var(--navy);
-    color: var(--branco);
-    min-height: 100vh;
+    background: var(--creme);
+    color: var(--navy);
   }
-  header {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 18px 24px;
-    border-bottom: 1px solid rgba(155,176,199,0.25);
-  }
-  .logo-circulo {
-    width: 44px; height: 44px;
-    border-radius: 50%;
-    border: 2px solid var(--azul);
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0;
-  }
-  .logo-circulo img { width: 28px; height: auto; }
-  header h1 {
-    font-family: 'Plus Jakarta Sans', sans-serif;
-    font-style: italic; font-weight: 800;
-    font-size: 22px; margin: 0;
-  }
+  .serif { font-family: 'Source Serif 4', serif; }
+  section { padding: 72px 24px; }
+  .largura { max-width: 1040px; margin: 0 auto; }
+  .largura-estreita { max-width: 720px; margin: 0 auto; }
+  h1, h2, h3 { margin: 0; }
+  a { color: inherit; }
 
+  /* ---------- nav ---------- */
   nav {
-    display: flex;
-    overflow-x: auto;
-    border-bottom: 1px solid rgba(155,176,199,0.25);
-    position: sticky; top: 0; background: var(--navy); z-index: 10;
+    position: sticky; top: 0; z-index: 30;
+    background: rgba(247,242,221,0.92);
+    backdrop-filter: blur(6px);
+    border-bottom: 1px solid rgba(12,25,46,0.08);
   }
-  nav button {
-    background: none; border: none; color: var(--azul-claro);
-    font-family: inherit; font-size: 14px; font-weight: 600;
-    padding: 16px 20px; cursor: pointer; white-space: nowrap;
-    border-bottom: 3px solid transparent;
+  .nav-interna {
+    max-width: 1040px; margin: 0 auto;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 24px;
   }
-  nav button.ativo { color: var(--branco); border-bottom-color: var(--azul); }
+  .nav-logo { display: flex; align-items: center; gap: 10px; font-style: italic; font-weight: 800; font-size: 19px; }
+  .nav-logo img { width: 30px; height: 30px; }
+  .nav-links { display: flex; align-items: center; gap: 22px; font-size: 14px; font-weight: 600; }
+  .nav-links a:not(.botao-whatsapp) { margin-right: 22px; }
+  .nav-links a:last-child { margin-right: 0; }
+  .nav-links a { text-decoration: none; }
+  .nav-links a:hover { color: var(--dourado); }
+  .botao-whatsapp {
+    background: var(--navy); color: var(--branco) !important;
+    padding: 9px 16px; border-radius: 8px; font-size: 13px !important;
+    text-decoration: none;
+  }
+  .menu-mobile-btn { display: none; background: none; border: none; font-size: 22px; cursor: pointer; color: var(--navy); }
+  @media (max-width: 720px) {
+    .nav-links { display: none; }
+    .menu-mobile-btn { display: block; }
+  }
 
-  main { max-width: 720px; margin: 0 auto; padding: 28px 20px 60px; }
-  .painel { display: none; }
-  .painel.ativo { display: block; }
-
-  h2 { font-size: 22px; margin: 0 0 16px; }
-  p { line-height: 1.6; color: var(--azul-claro); font-size: 15px; }
-
-  .card-evento {
-    display: flex; gap: 14px;
-    background: rgba(155,176,199,0.08);
-    border-radius: 16px;
-    padding: 14px;
-    margin-bottom: 12px;
-    align-items: center;
+  /* ---------- hero ---------- */
+  .hero {
+    text-align: center;
+    padding: 90px 24px 70px;
   }
-  .card-evento img {
-    width: 84px; height: 84px; border-radius: 10px;
-    object-fit: cover; flex-shrink: 0; background: var(--navy-deep);
+  .eyebrow {
+    display: inline-block;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--dourado);
+    margin-bottom: 18px;
   }
-  .card-evento .sem-foto {
-    width: 84px; height: 84px; border-radius: 10px;
-    background: var(--navy-deep); flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 26px;
+  .hero h1 {
+    font-style: italic; font-weight: 800;
+    font-size: clamp(48px, 9vw, 88px);
+    line-height: 1;
+    margin-bottom: 14px;
   }
-  .card-evento .info { min-width: 0; }
-  .card-evento .titulo { font-weight: 700; font-size: 15px; margin: 0 0 4px; }
-  .card-evento .quando { font-size: 13px; color: var(--azul-claro); margin: 0 0 2px; }
-  .card-evento .onde { font-size: 12px; color: var(--azul-claro); opacity: 0.8; margin: 0; }
+  .hero .subhead {
+    font-size: 19px; color: var(--azul-escuro); margin-bottom: 28px;
+  }
+  .hero-botoes { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 40px; }
+  .botao-primario, .botao-secundario {
+    padding: 13px 26px; border-radius: 10px; font-weight: 700; font-size: 14px;
+    text-decoration: none; display: inline-block; cursor: pointer; border: none; font-family: inherit;
+  }
+  .botao-primario { background: var(--navy); color: var(--branco); }
+  .botao-secundario { background: transparent; color: var(--navy); border: 1.5px solid var(--navy); }
+  .versiculo {
+    font-family: 'Source Serif 4', serif; font-style: italic; font-size: 18px;
+    color: var(--azul-escuro); max-width: 460px; margin: 0 auto;
+  }
 
-  .video-destaque { border-radius: 14px; overflow: hidden; margin-bottom: 16px; cursor: pointer; position: relative; }
-  .video-destaque img { width: 100%; display: block; }
-  .video-destaque .titulo-video { margin-top: 8px; font-weight: 600; font-size: 15px; }
-
-  .card-video {
-    display: flex; gap: 12px; margin-bottom: 10px; cursor: pointer;
-    background: rgba(155,176,199,0.08); border-radius: 12px; padding: 8px;
+  /* ---------- secao padrao ---------- */
+  .rotulo-secao {
+    font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--dourado); margin-bottom: 8px; display: block;
   }
-  .card-video img { width: 100px; height: 60px; object-fit: cover; border-radius: 8px; flex-shrink: 0; }
-  .card-video .titulo { font-size: 13px; font-weight: 600; margin: 0; }
+  .titulo-secao { font-size: clamp(26px, 4vw, 36px); font-weight: 800; margin-bottom: 16px; }
+  .texto-secao { font-size: 16px; line-height: 1.7; color: var(--azul-escuro); }
 
-  .login-cartao {
-    background: var(--creme); color: var(--navy);
-    border-radius: 20px; padding: 32px 24px; text-align: center;
-  }
-  .login-cartao p { color: #45566E; }
-  .botao {
-    display: inline-flex; align-items: center; gap: 8px;
+  .secao-clara { background: var(--branco); }
+
+  /* ---------- tema do ano ---------- */
+  .cartao-tema {
     background: var(--navy); color: var(--branco);
-    text-decoration: none; font-weight: 700; font-size: 15px;
-    padding: 14px 24px; border-radius: 12px; margin-top: 16px;
+    border-radius: 18px; padding: 40px; text-align: center;
+    max-width: 640px; margin: 0 auto;
+  }
+  .cartao-tema .rotulo-secao { color: var(--azul); }
+  .cartao-tema h3 { font-size: 26px; font-style: italic; margin-bottom: 10px; }
+  .cartao-tema p { color: var(--azul); line-height: 1.6; margin: 0; }
+
+  /* ---------- agenda ---------- */
+  .tabela-horarios { width: 100%; border-collapse: collapse; margin-top: 24px; }
+  .tabela-horarios th {
+    text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--azul-escuro); padding: 10px 12px; border-bottom: 2px solid var(--navy);
+  }
+  .tabela-horarios td { padding: 14px 12px; border-bottom: 1px solid rgba(12,25,46,0.08); font-size: 14px; }
+  .tabela-horarios tr:last-child td { border-bottom: none; }
+  .dia-semana-cell { font-weight: 700; }
+  .horario-cell { text-align: right; font-weight: 700; color: var(--navy); white-space: nowrap; }
+
+  .cartao-especial {
+    background: var(--creme-escuro);
+    border-left: 4px solid var(--dourado);
+    border-radius: 12px; padding: 24px; margin-top: 20px;
+  }
+  .cartao-especial .rotulo-secao { margin-bottom: 6px; }
+  .cartao-especial h4 { font-size: 19px; margin-bottom: 8px; }
+  .cartao-especial p { font-size: 14px; color: var(--azul-escuro); margin: 0 0 16px; line-height: 1.6; }
+
+  /* ---------- redes sociais ---------- */
+  .grade-redes { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px,1fr)); gap: 14px; margin-top: 24px; }
+  .cartao-rede {
+    background: var(--branco); border-radius: 12px; padding: 18px;
+    text-decoration: none; display: flex; align-items: center; gap: 12px;
+    border: 1px solid rgba(12,25,46,0.08);
+  }
+  .cartao-rede:hover { border-color: var(--navy); }
+  .cartao-rede .icone-rede {
+    width: 38px; height: 38px; border-radius: 50%;
+    background: var(--navy); color: var(--branco);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 800; flex-shrink: 0;
+  }
+  .cartao-rede .nome-rede { font-weight: 700; font-size: 14px; }
+  .cartao-rede .handle-rede { font-size: 12px; color: var(--azul-escuro); }
+
+  /* ---------- contribua ---------- */
+  .secao-contribua { background: var(--navy); color: var(--branco); }
+  .secao-contribua .rotulo-secao { color: var(--azul); }
+  .secao-contribua .texto-secao { color: var(--azul); }
+  .botoes-contribua { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 28px; }
+  .botao-contribuir {
+    flex: 1; min-width: 220px;
+    background: var(--creme); color: var(--navy);
+    border: none; border-radius: 12px; padding: 18px;
+    font-family: inherit; font-weight: 700; font-size: 15px; cursor: pointer;
+    display: flex; align-items: center; gap: 10px; justify-content: center;
+  }
+  .botao-contribuir:hover { background: var(--branco); }
+
+  /* ---------- footer ---------- */
+  footer { background: var(--navy-deep); color: var(--azul); padding: 48px 24px 24px; }
+  .footer-topo { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 32px; max-width: 1040px; margin: 0 auto; }
+  .footer-marca { font-style: italic; font-weight: 800; font-size: 20px; color: var(--branco); margin-bottom: 8px; }
+  .footer-endereco { font-size: 13px; line-height: 1.6; max-width: 280px; }
+  .footer-coluna h5 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--branco); margin-bottom: 10px; }
+  .footer-coluna a { display: block; font-size: 13px; text-decoration: none; margin-bottom: 8px; color: var(--azul); }
+  .footer-coluna a:hover { color: var(--branco); }
+  .footer-baixo {
+    max-width: 1040px; margin: 32px auto 0; padding-top: 20px;
+    border-top: 1px solid rgba(155,176,199,0.2);
+    font-size: 12px; text-align: center; color: rgba(155,176,199,0.7);
   }
 
-  .vazio { color: var(--azul-claro); font-size: 14px; padding: 24px 0; text-align: center; }
+  /* ---------- modal generico (Pix) ---------- */
+  .fundo-modal {
+    display: none; position: fixed; inset: 0; background: rgba(12,25,46,0.5);
+    align-items: center; justify-content: center; padding: 20px; z-index: 100;
+  }
+  .fundo-modal.aberto { display: flex; }
+  .caixa-modal { background: var(--branco); border-radius: 16px; padding: 28px; max-width: 380px; width: 100%; text-align: center; }
+  .caixa-modal input[type="text"] {
+    width: 100%; padding: 12px; border: 1px solid #D7DEE6; border-radius: 8px;
+    font-family: inherit; font-size: 15px; text-align: center; margin: 12px 0;
+  }
+  .caixa-modal .opcao-modal {
+    width: 100%; text-align: left; padding: 14px; border-radius: 10px;
+    border: 1px solid #D7DEE6; background: none; font-family: inherit;
+    font-size: 15px; font-weight: 600; margin-bottom: 10px; cursor: pointer;
+  }
+  .caixa-modal .opcao-modal:hover { border-color: var(--navy); background: var(--creme); }
+  .caixa-modal .fechar-x { float: right; background: none; border: none; font-size: 18px; cursor: pointer; color: var(--azul-escuro); }
 </style>
 </head>
 <body>
 
-  <header>
-    <div class="logo-circulo"><img src="pomba_shallom.png" alt=""></div>
-    <h1>shallom</h1>
-  </header>
+<nav>
+  <div class="nav-interna">
+    <div class="nav-logo">
+      <img src="pomba_shallom.png" alt="">
+      shallom
+    </div>
+    <div class="nav-links">
+      <a href="#quem-somos">A Shallom</a>
+      <a href="#conteudos">Conteúdos</a>
+      <a href="#agenda">Agenda</a>
+      <a href="#contribua">Contribua</a>
+      <a class="botao-whatsapp" href="https://wa.me/5521979135103?text=Ola!%20Vim%20atraves%20do%20site%20da%20Shallom%20e%20gostaria%20de%20saber%20mais." target="_blank" rel="noopener">Fale conosco</a>
+    </div>
+  </div>
+</nav>
 
-  <nav>
-    <button class="ativo" data-aba="quemsomos">Quem somos nós</button>
-    <button data-aba="videos">Vídeos</button>
-    <button data-aba="calendario">Calendário</button>
-    <button data-aba="login">Login</button>
-  </nav>
+<!-- ===== HERO ===== -->
+<section class="hero">
+  <span class="eyebrow">Tema de 2026 · O Ano da Fé</span>
+  <h1>Shallom!</h1>
+  <p class="subhead">Seja bem-vindo à casa da paz.</p>
+  <div class="hero-botoes">
+    <a class="botao-primario" href="#quem-somos">Conheça a Shallom</a>
+    <a class="botao-secundario" href="#contribua">Contribua</a>
+  </div>
+  <p class="versiculo">"Paz vos deixo, minha paz vos dou." — João 14:27</p>
+</section>
 
-  <main>
+<!-- ===== QUEM SOMOS ===== -->
+<section class="secao-clara" id="quem-somos">
+  <div class="largura-estreita" style="text-align:center;">
+    <span class="rotulo-secao">Quem somos</span>
+    <h2 class="titulo-secao">Uma família de fé em Meriti</h2>
+    <p class="texto-secao">
+      A Comunidade Batista Shallom é uma igreja que existe para levar as pessoas a um
+      encontro genuíno com Deus, formando uma comunidade de fé, amor e propósito.
+      Dentro da Shallom, ministramos a diferentes públicos: o Awake reúne os jovens;
+      os ministérios de Homens e Mulheres cuidam da caminhada de cada um nessa fase
+      da vida; e cuidamos com carinho também das crianças e das famílias da nossa igreja.
+      Acreditamos que a igreja é, antes de tudo, gente cuidando de gente — por isso,
+      seja muito bem-vindo(a). Este é o seu lugar.
+    </p>
+  </div>
 
-    <section id="painel-quemsomos" class="painel ativo">
-      <h2>Quem somos nós</h2>
-      <p>
-        Somos a Comunidade Batista Shallom, uma igreja que existe para levar
-        as pessoas a um encontro genuíno com Deus, formando uma comunidade de
-        fé, amor e propósito.
-      </p>
-      <p>
-        Dentro da Shallom, ministramos a diferentes públicos: o Awake reúne
-        os jovens; os ministérios de Homens e Mulheres cuidam da caminhada de
-        cada um nessa fase da vida; e cuidamos com carinho também das
-        crianças e das famílias da nossa igreja.
-      </p>
-      <p>
-        Acreditamos que a igreja é, antes de tudo, gente cuidando de gente —
-        por isso, seja muito bem-vindo(a). Este é o seu lugar.
-      </p>
-    </section>
+  <div class="cartao-tema" style="margin-top:56px;">
+    <span class="rotulo-secao">Tema 2026</span>
+    <h3>O Ano da Fé</h3>
+    <p>Um ano para crer, esperar e caminhar em confiança na direção de Deus para a Shallom.</p>
+  </div>
+</section>
 
-    <section id="painel-videos" class="painel">
-      <h2>Nossos vídeos</h2>
-      <div id="videos-conteudo"><p>Carregando...</p></div>
-    </section>
+<!-- ===== CONTEUDOS (videos) ===== -->
+<section id="conteudos">
+  <div class="largura">
+    <span class="rotulo-secao">Conteúdos</span>
+    <h2 class="titulo-secao">Nossos vídeos</h2>
+    <div id="videos-conteudo" style="margin-top:20px;"><p class="texto-secao">Carregando...</p></div>
+  </div>
+</section>
 
-    <section id="painel-calendario" class="painel">
-      <h2>Próximos eventos</h2>
-      <div id="calendario-conteudo"><p>Carregando...</p></div>
-    </section>
+<!-- ===== AGENDA ===== -->
+<section class="secao-clara" id="agenda">
+  <div class="largura">
+    <span class="rotulo-secao">Agenda</span>
+    <h2 class="titulo-secao">Nossos horários</h2>
+    <p class="texto-secao">Separe um tempo na sua semana para estar com a nossa família da fé.</p>
+    <table class="tabela-horarios" id="tabela-horarios">
+      <thead><tr><th>Dia</th><th>Encontro</th><th style="text-align:right;">Horário</th></tr></thead>
+      <tbody id="corpo-tabela-horarios">
+        <tr><td colspan="3" style="text-align:center; color:var(--azul-escuro);">Carregando...</td></tr>
+      </tbody>
+    </table>
+    <div id="eventos-especiais"></div>
+  </div>
+</section>
 
-    <section id="painel-login" class="painel">
-      <div class="login-cartao">
-        <h2 style="color: var(--navy);">Área do membro</h2>
-        <p>
-          Se você já faz parte da nossa comunidade, entre com sua conta para
-          ver a agenda completa, suas escalas, contribuições e muito mais.
-          Líderes e administração também encontram aqui os painéis completos
-          de gestão (calendário, financeiro e mais).
-        </p>
-        <a class="botao" href="app/">Entrar / Criar conta</a>
+<!-- ===== REDES SOCIAIS ===== -->
+<section>
+  <div class="largura">
+    <span class="rotulo-secao">Fique por perto</span>
+    <h2 class="titulo-secao">Acompanhe a Shallom nas redes</h2>
+    <div class="grade-redes">
+      <a class="cartao-rede" href="https://www.instagram.com/comunidade.shallom" target="_blank" rel="noopener">
+        <div><div class="nome-rede">Instagram</div><div class="handle-rede">@comunidade.shallom</div></div>
+      </a>
+      <a class="cartao-rede" href="https://youtube.com/@shallomonline" target="_blank" rel="noopener">
+        <div><div class="nome-rede">YouTube</div><div class="handle-rede">Shallom Online</div></div>
+      </a>
+      <a class="cartao-rede" href="https://www.facebook.com/share/19MdKoMhtj/" target="_blank" rel="noopener">
+        <div><div class="nome-rede">Facebook</div><div class="handle-rede">Comunidade Shallom</div></div>
+      </a>
+    </div>
+  </div>
+</section>
+</section>
+
+<!-- ===== CONTRIBUA ===== -->
+<section class="secao-contribua" id="contribua">
+  <div class="largura-estreita" style="text-align:center;">
+    <span class="rotulo-secao">Contribua</span>
+    <h2 class="titulo-secao" style="color:var(--branco);">Sua contribuição sustenta essa obra</h2>
+    <p class="texto-secao">Dízimos, ofertas ou cartão — escolha o jeito mais fácil pra você.</p>
+    <div class="botoes-contribua">
+      <button class="botao-contribuir" id="btn-contribuir-pix">Contribuir via Pix</button>
+      <button class="botao-contribuir" id="btn-contribuir-cartao">Contribuir via cartão</button>
+    </div>
+  </div>
+</section>
+
+<!-- ===== FOOTER ===== -->
+<footer>
+  <div class="footer-topo">
+    <div>
+      <div class="footer-marca">shallom</div>
+      <div class="footer-endereco">
+        Av. Coronel Raimundo Sampaio, 155 — Jardim Botânico,<br>São João de Meriti, RJ.
+        <br><br><em>"Shallom: seja bem-vindo à casa da paz."</em>
       </div>
-    </section>
+    </div>
+    <div class="footer-coluna">
+      <h5>Navegação</h5>
+      <a href="#quem-somos">A Shallom</a>
+      <a href="#conteudos">Conteúdos</a>
+      <a href="#agenda">Agenda</a>
+      <a href="#contribua">Contribua</a>
+      <a href="app/">Área do membro</a>
+    </div>
+    <div class="footer-coluna">
+      <h5>Redes sociais</h5>
+      <a href="https://www.instagram.com/comunidade.shallom" target="_blank" rel="noopener">Instagram</a>
+      <a href="https://www.facebook.com/share/19MdKoMhtj/" target="_blank" rel="noopener">Facebook</a>
+      <a href="https://youtube.com/@shallomonline" target="_blank" rel="noopener">YouTube</a>
+      <a href="https://wa.me/5521979135103" target="_blank" rel="noopener">WhatsApp</a>
+    </div>
+  </div>
+  <div class="footer-baixo">
+    © 2026 Comunidade Batista Shallom em Meriti. Todos os direitos reservados. · O Ano da Fé · 2026
+  </div>
+</footer>
 
-  </main>
+<!-- ===== Modal Pix ===== -->
+<div class="fundo-modal" id="fundo-modal">
+  <div class="caixa-modal" id="caixa-modal"></div>
+</div>
 
 <script>
   const SUPABASE_URL = "https://eetethnvupitlquhdjkx.supabase.co";
@@ -181,15 +354,11 @@
   const YOUTUBE_API_KEY = "AIzaSyAIZsi0RzzDncWGMK4YLoDA_znkwgwSb5g";
   const YOUTUBE_PLAYLIST = "UUJjMlNpqp4JmorV6bCLprXg";
 
-  // --- navegacao entre abas ---
-  document.querySelectorAll('nav button').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('nav button').forEach(b => b.classList.remove('ativo'));
-      document.querySelectorAll('.painel').forEach(p => p.classList.remove('ativo'));
-      btn.classList.add('ativo');
-      document.getElementById('painel-' + btn.dataset.aba).classList.add('ativo');
-    });
-  });
+  function escaparHtml(texto) {
+    const div = document.createElement('div');
+    div.textContent = texto ?? '';
+    return div.innerHTML;
+  }
 
   // --- videos ---
   async function carregarVideos() {
@@ -200,34 +369,50 @@
       );
       const dados = await resp.json();
       const itens = dados.items || [];
-      if (itens.length === 0) { el.innerHTML = '<p>Nenhum vídeo encontrado.</p>'; return; }
+      if (itens.length === 0) { el.innerHTML = '<p class="texto-secao">Nenhum vídeo encontrado.</p>'; return; }
 
       const [destaque, ...outros] = itens;
       const idDestaque = destaque.snippet.resourceId.videoId;
 
-      let html = `
-        <a class="video-destaque" href="https://www.youtube.com/watch?v=${idDestaque}" target="_blank" rel="noopener">
-          <img src="https://i.ytimg.com/vi/${idDestaque}/hqdefault.jpg">
+      el.innerHTML = `
+        <a href="https://www.youtube.com/watch?v=${idDestaque}" target="_blank" rel="noopener"
+           style="text-decoration:none;color:inherit;display:block;margin-bottom:24px;">
+          <div style="position:relative;border-radius:14px;overflow:hidden;box-shadow:0 8px 24px rgba(12,25,46,0.12);">
+            <img src="https://i.ytimg.com/vi/${idDestaque}/hqdefault.jpg" style="width:100%;display:block;">
+          </div>
+          <p style="font-size:17px;font-weight:700;margin:14px 0 0;">${escaparHtml(destaque.snippet.title)}</p>
         </a>
-        <div class="titulo-video">${escaparHtml(destaque.snippet.title)}</div>
-        <div style="height:20px"></div>
-      `;
-      outros.forEach(v => {
-        const id = v.snippet.resourceId.videoId;
-        html += `
-          <a class="card-video" href="https://www.youtube.com/watch?v=${id}" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;">
-            <img src="https://i.ytimg.com/vi/${id}/hqdefault.jpg">
-            <p class="titulo">${escaparHtml(v.snippet.title)}</p>
-          </a>
-        `;
-      });
-      el.innerHTML = html;
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;">
+          ${outros.map(v => {
+            const id = v.snippet.resourceId.videoId;
+            return `
+              <a href="https://www.youtube.com/watch?v=${id}" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;">
+                <img src="https://i.ytimg.com/vi/${id}/hqdefault.jpg" style="width:100%;border-radius:10px;display:block;">
+                <p style="font-size:13px;font-weight:600;margin:8px 0 0;">${escaparHtml(v.snippet.title)}</p>
+              </a>`;
+          }).join('')}
+        </div>`;
     } catch (e) {
-      el.innerHTML = '<p>Não foi possível carregar os vídeos agora.</p>';
+      el.innerHTML = '<p class="texto-secao">Não foi possível carregar os vídeos agora.</p>';
     }
   }
 
-  // --- calendario publico ---
+  // --- agenda ---
+  const MAPA_ESCOPO_PUBLICO = {
+    igreja: 'Geral', homens: 'Homens', mulheres: 'Mulheres', awake: 'Jovens',
+  };
+
+  function proximaOcorrenciaSemanal(evento) {
+    // Le a data e o horario DIRETO do texto (sem passar por conversao
+    // de fuso horario nenhuma) -- o app tambem mostra os numeros
+    // exatamente como estao gravados, entao o site precisa fazer
+    // igual, senao os horarios batem diferente.
+    const match = evento.data_inicio.match(/(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+    const [, ano, mes, dia, hora, minuto] = match;
+    const dataSemHora = new Date(Date.UTC(Number(ano), Number(mes) - 1, Number(dia)));
+    return { diaSemana: dataSemHora.getUTCDay(), horario: `${hora}:${minuto}` };
+  }
+
   function ocorrenciasNoIntervalo(evento, inicio, fim) {
     const ocorrencias = [];
     const dataBase = new Date(evento.data_inicio);
@@ -239,22 +424,18 @@
     let cursor = new Date(dataBase);
     while (cursor < inicio) cursor.setDate(cursor.getDate() + 7);
     while (cursor <= fim) {
-      if (!fimRecorrencia || cursor <= fimRecorrencia) {
-        const semanasDoMes = evento.semanas_do_mes;
-        if (!semanasDoMes || semanasDoMes.length === 0) {
-          ocorrencias.push(new Date(cursor));
-        } else {
-          const semana = Math.floor((cursor.getDate() - 1) / 7) + 1;
-          if (semanasDoMes.includes(semana)) ocorrencias.push(new Date(cursor));
-        }
-      }
+      if (!fimRecorrencia || cursor <= fimRecorrencia) ocorrencias.push(new Date(cursor));
       cursor.setDate(cursor.getDate() + 7);
     }
     return ocorrencias;
   }
 
-  async function carregarCalendario() {
-    const el = document.getElementById('calendario-conteudo');
+  const NOMES_DIAS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+  const ORDEM_DIAS = [1, 2, 3, 4, 5, 6, 0]; // Segunda primeiro, Domingo por ultimo
+
+  async function carregarAgenda() {
+    const corpoTabela = document.getElementById('corpo-tabela-horarios');
+    const especiaisEl = document.getElementById('eventos-especiais');
     try {
       const resp = await fetch(
         `${SUPABASE_URL}/rest/v1/eventos_publicos?select=*`,
@@ -262,55 +443,181 @@
       );
       const eventos = await resp.json();
 
-      const agora = new Date();
-      const fim = new Date(agora); fim.setDate(fim.getDate() + 45);
+      const recorrentes = eventos.filter(e => e.recorrente);
+      // So mostra como "especial" (tipo Retiro) quem o admin marcou
+      // de verdade como Evento Ingressado -- um evento comum que so
+      // aconteceu de nao ser recorrente (ex: culto avulso) nao deveria
+      // aparecer aqui.
+      const especiais = eventos.filter(e => e.ingressado && new Date(e.data_inicio) > new Date());
 
-      let todasOcorrencias = [];
-      eventos.forEach(ev => {
-        ocorrenciasNoIntervalo(ev, agora, fim).forEach(data => {
-          todasOcorrencias.push({ evento: ev, data });
+      if (recorrentes.length === 0) {
+        corpoTabela.innerHTML = '<tr><td colspan="3" style="text-align:center;">Agenda em atualização.</td></tr>';
+      } else {
+        const linhas = recorrentes.map(ev => {
+          const { diaSemana, horario } = proximaOcorrenciaSemanal(ev);
+          return {
+            titulo: ev.titulo,
+            diaSemana,
+            horario,
+            categoria: MAPA_ESCOPO_PUBLICO[ev.escopo] || '',
+          };
         });
-      });
-      todasOcorrencias.sort((a, b) => a.data - b.data);
-      todasOcorrencias = todasOcorrencias.slice(0, 12);
 
-      if (todasOcorrencias.length === 0) {
-        el.innerHTML = '<div class="vazio">Nenhum evento nos próximos dias.</div>';
-        return;
+        // Agrupa por dia da semana -- se tem mais de um encontro no
+        // mesmo dia, mostra os dois juntos numa linha so, em vez de
+        // repetir o nome do dia varias vezes.
+        const porDia = {};
+        linhas.forEach(l => {
+          (porDia[l.diaSemana] = porDia[l.diaSemana] || []).push(l);
+        });
+        const diasOrdenados = ORDEM_DIAS.filter(d => porDia[d]);
+
+        corpoTabela.innerHTML = diasOrdenados.map(dia => {
+          const encontros = porDia[dia].sort((a, b) => a.horario.localeCompare(b.horario));
+          const listaEncontros = encontros
+            .map(e => `
+              ${escaparHtml(e.titulo)}
+              <span style="color:var(--dourado);font-weight:700;font-size:11px;text-transform:uppercase;">· ${escaparHtml(e.categoria)}</span>
+              <span style="color:var(--azul-escuro);font-weight:600;"> · ${e.horario}</span>
+            `)
+            .join('<br>');
+          return `
+            <tr>
+              <td class="dia-semana-cell">${NOMES_DIAS[dia]}</td>
+              <td colspan="2">${listaEncontros}</td>
+            </tr>
+          `;
+        }).join('');
       }
 
-      const formatador = new Intl.DateTimeFormat('pt-BR', {
-        weekday: 'long', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
-      });
-
-      el.innerHTML = todasOcorrencias.map(({ evento, data }) => `
-        <div class="card-evento">
-          ${evento.foto_url
-            ? `<img src="${evento.foto_url}">`
-            : `<div class="sem-foto">📅</div>`}
-          <div class="info">
-            <p class="titulo">${escaparHtml(evento.titulo)}</p>
-            <p class="quando">${capitalizar(formatador.format(data))}</p>
-            ${evento.local ? `<p class="onde">${escaparHtml(evento.local)}</p>` : ''}
-          </div>
-        </div>
-      `).join('');
+      if (especiais.length > 0) {
+        const agora = new Date();
+        const daquiA90 = new Date(agora.getTime() + 90 * 24 * 60 * 60 * 1000);
+        let proximaEspecial = null;
+        for (const ev of especiais) {
+          const ocs = ocorrenciasNoIntervalo(ev, agora, daquiA90);
+          if (ocs.length > 0 && (!proximaEspecial || ocs[0] < proximaEspecial.data)) {
+            proximaEspecial = { evento: ev, data: ocs[0] };
+          }
+        }
+        if (proximaEspecial) {
+          const dataFormatada = proximaEspecial.data.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' });
+          especiaisEl.innerHTML = `
+            <div class="cartao-especial">
+              <span class="rotulo-secao">Inscrições abertas</span>
+              <h4>${escaparHtml(proximaEspecial.evento.titulo)}</h4>
+              <p>Vem aí em ${dataFormatada}${proximaEspecial.evento.local ? ' — ' + escaparHtml(proximaEspecial.evento.local) : ''}. Vagas limitadas, garanta a sua!</p>
+              <a class="botao-primario" href="https://wa.me/5521979135103?text=Ola!%20Vim%20atraves%20do%20site%20da%20Shallom%20e%20gostaria%20de%20saber%20mais%20sobre%20${encodeURIComponent(proximaEspecial.evento.titulo)}." target="_blank" rel="noopener">Quero saber mais</a>
+            </div>`;
+        }
+      }
     } catch (e) {
-      el.innerHTML = '<div class="vazio">Não foi possível carregar os eventos agora.</div>';
+      corpoTabela.innerHTML = '<tr><td colspan="3" style="text-align:center;">Não foi possível carregar a agenda agora.</td></tr>';
     }
   }
 
-  function escaparHtml(texto) {
-    const div = document.createElement('div');
-    div.textContent = texto;
-    return div.innerHTML;
-  }
-  function capitalizar(texto) {
-    return texto.charAt(0).toUpperCase() + texto.slice(1);
+  // =========================================================
+  // Contribua -- mesmo estilo/logica do app (Pix com valor
+  // embutido, Dizimo/Oferta, Cartao via PagBank)
+  // =========================================================
+  function tlv(id, valor) {
+    const tamanho = valor.length.toString().padStart(2, '0');
+    return `${id}${tamanho}${valor}`;
   }
 
+  function crc16CcittFalse(payload) {
+    let crc = 0xFFFF;
+    for (let i = 0; i < payload.length; i++) {
+      crc ^= (payload.charCodeAt(i) << 8);
+      for (let j = 0; j < 8; j++) {
+        crc = (crc & 0x8000) ? ((crc << 1) ^ 0x1021) & 0xFFFF : (crc << 1) & 0xFFFF;
+      }
+    }
+    return crc & 0xFFFF;
+  }
+
+  function gerarCodigoPixComValor(valor) {
+    const valorFormatado = valor.toFixed(2);
+    const infoConta = tlv('00', 'br.gov.bcb.pix') + tlv('01', 'shallom.financeiro@gmail.com');
+    let semCrc = tlv('00', '01') + tlv('01', '12') + tlv('26', infoConta) +
+      tlv('52', '0000') + tlv('53', '986') + tlv('54', valorFormatado) +
+      tlv('58', 'BR') + tlv('59', 'COMUNIDADE SHALLOM') + tlv('60', 'SAO JOAO DE MER') +
+      tlv('62', tlv('05', '***')) + '6304';
+    const crc = crc16CcittFalse(semCrc).toString(16).toUpperCase().padStart(4, '0');
+    return semCrc + crc;
+  }
+
+  function fecharModal() { document.getElementById('fundo-modal').classList.remove('aberto'); }
+  document.getElementById('fundo-modal').addEventListener('click', (e) => {
+    if (e.target.id === 'fundo-modal') fecharModal();
+  });
+
+  document.getElementById('btn-contribuir-pix').addEventListener('click', () => {
+    document.getElementById('caixa-modal').innerHTML = `
+      <button class="fechar-x" id="fechar-x">✕</button>
+      <h3 style="margin-top:0;">Contribuir via Pix</h3>
+      <p style="font-size:13px;color:var(--azul-escuro);margin-bottom:16px;">É dízimo ou oferta?</p>
+      <button class="opcao-modal" id="opcao-dizimo">Dízimo</button>
+      <button class="opcao-modal" id="opcao-oferta">Oferta</button>
+    `;
+    document.getElementById('fundo-modal').classList.add('aberto');
+    document.getElementById('fechar-x').addEventListener('click', fecharModal);
+    document.getElementById('opcao-dizimo').addEventListener('click', () => abrirValorPix(true));
+    document.getElementById('opcao-oferta').addEventListener('click', () => abrirValorPix(false));
+  });
+
+  function abrirValorPix(ehDizimo) {
+    document.getElementById('caixa-modal').innerHTML = `
+      <button class="fechar-x" id="fechar-x">✕</button>
+      <h3 style="margin-top:0;">${ehDizimo ? 'Valor do dízimo' : 'Valor da oferta'}</h3>
+      <input type="text" id="input-valor-pix" placeholder="0,00" inputmode="decimal">
+      <button class="botao-primario" style="width:100%;" id="btn-gerar-qr">Gerar código Pix</button>
+    `;
+    document.getElementById('fechar-x').addEventListener('click', fecharModal);
+    document.getElementById('btn-gerar-qr').addEventListener('click', () => {
+      const texto = document.getElementById('input-valor-pix').value.replace(',', '.');
+      const valor = parseFloat(texto);
+      if (!valor || valor <= 0) { alert('Informe um valor válido.'); return; }
+      mostrarQrPix(valor);
+    });
+  }
+
+  function mostrarQrPix(valor) {
+    const codigo = gerarCodigoPixComValor(valor);
+    const valorTexto = valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    document.getElementById('caixa-modal').innerHTML = `
+      <button class="fechar-x" id="fechar-x">✕</button>
+      <h3 style="margin-top:0;">${valorTexto}</h3>
+      <div id="qr-pix" style="margin:16px auto;width:200px;height:200px;"></div>
+      <p style="font-size:12px;color:var(--azul-escuro);">Escaneie com a câmera do seu banco, ou copie o código.</p>
+      <button class="botao-primario" style="width:100%;margin-top:8px;" id="btn-copiar-pix">Copiar código Pix</button>
+    `;
+    document.getElementById('fechar-x').addEventListener('click', fecharModal);
+    document.getElementById('btn-copiar-pix').addEventListener('click', () => {
+      navigator.clipboard.writeText(codigo);
+      alert('Código Pix copiado!');
+    });
+    // QR gerado via API publica de QR Code (sem dependencia extra)
+    document.getElementById('qr-pix').innerHTML =
+      `<img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(codigo)}" width="200" height="200">`;
+  }
+
+  document.getElementById('btn-contribuir-cartao').addEventListener('click', () => {
+    document.getElementById('caixa-modal').innerHTML = `
+      <button class="fechar-x" id="fechar-x">✕</button>
+      <h3 style="margin-top:0;">Contribuir via cartão</h3>
+      <p style="font-size:13px;color:var(--azul-escuro);margin-bottom:16px;">Escolhe o valor — abre no PagBank.</p>
+      <a class="opcao-modal" style="display:block;text-align:center;" href="https://pag.ae/822FezHEv" target="_blank" rel="noopener">R$ 10</a>
+      <a class="opcao-modal" style="display:block;text-align:center;" href="https://pag.ae/822FdrAba" target="_blank" rel="noopener">R$ 20</a>
+      <a class="opcao-modal" style="display:block;text-align:center;" href="https://pag.ae/822FdPysH" target="_blank" rel="noopener">R$ 50</a>
+      <a class="opcao-modal" style="display:block;text-align:center;" href="https://pag.ae/822Feg44v" target="_blank" rel="noopener">R$ 100</a>
+    `;
+    document.getElementById('fundo-modal').classList.add('aberto');
+    document.getElementById('fechar-x').addEventListener('click', fecharModal);
+  });
+
   carregarVideos();
-  carregarCalendario();
+  carregarAgenda();
 </script>
 
 </body>
