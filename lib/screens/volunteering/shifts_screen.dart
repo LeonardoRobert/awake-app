@@ -34,6 +34,21 @@ class _ShiftsScreenState extends ConsumerState<ShiftsScreen> {
   String _chave(String escalaId, DateTime data) =>
       '${escalaId}_${DateFormat('yyyy-MM-dd').format(data)}';
 
+  /// Uma ocorrencia ainda "vale" enquanto nao passou do horario de
+  /// TERMINO dela -- diferente de eventos comuns (que somem no
+  /// inicio), aqui a pessoa continua "de servico" ate a escala acabar.
+  bool _aindaNaoAcabou(ShiftOccurrence occ) {
+    final partes = occ.shift.horarioFim.split(':');
+    final fim = DateTime(
+      occ.data.year,
+      occ.data.month,
+      occ.data.day,
+      int.parse(partes[0]),
+      partes.length > 1 ? int.parse(partes[1]) : 0,
+    );
+    return fim.isAfter(DateTime.now());
+  }
+
   @override
   Widget build(BuildContext context) {
     final occurrencesAsync = ref.watch(upcomingShiftOccurrencesProvider);
@@ -77,7 +92,12 @@ class _ShiftsScreenState extends ConsumerState<ShiftsScreen> {
         child: occurrencesAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (err, _) => Center(child: Text('Erro ao carregar escalas: $err')),
-          data: (occurrences) {
+          data: (todasOcorrencias) {
+            // So mostra o que ainda nao terminou -- uma escala some da
+            // lista quando passa do horario de TERMINO dela, nao do
+            // de inicio (a pessoa continua "de servico" ate acabar).
+            final occurrences = todasOcorrencias.where(_aindaNaoAcabou).toList();
+
             if (occurrences.isEmpty) {
               return const Center(child: Text('Nenhuma escala programada neste mês.'));
             }

@@ -1,9 +1,28 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../../services/visitante_service.dart';
 import '../../widgets/awake_app_bar.dart';
 
-/// Campos de exemplo (padrao de "ficha de visitante") -- ajusta
-/// livremente aqui se quiser mudar/adicionar algum.
+const _opcoesFe = [
+  'Sou cristão e estou ativo na igreja',
+  'Sou cristão, mas estou afastado',
+  'Estou conhecendo a fé cristã',
+  'Não sou cristão',
+  'Prefiro não responder',
+];
+
+const _opcoesComoConheceu = [
+  'Convite de um amigo ou familiar',
+  'Redes sociais',
+  'Google / Internet',
+  'Já conhecia a igreja',
+  'Evento ou ação da igreja',
+  'Vim acompanhado de alguém',
+  'Outro',
+];
+
+/// Formulario "Seja Bem-vindo!" -- preenchido pelo voluntario
+/// escalado na Recepcao/Primeira Vez, sobre a pessoa que visitou.
 class FormularioVisitanteScreen extends StatefulWidget {
   const FormularioVisitanteScreen({super.key});
 
@@ -13,15 +32,45 @@ class FormularioVisitanteScreen extends StatefulWidget {
 
 class _FormularioVisitanteScreenState extends State<FormularioVisitanteScreen> {
   final _nomeController = TextEditingController();
-  final _telefoneController = TextEditingController();
-  final _comoConheceuController = TextEditingController();
-  final _observacoesController = TextEditingController();
+  final _outroController = TextEditingController();
+  DateTime? _dataNascimento;
+  String? _sexo;
+  String? _situacaoFe;
+  String? _comoConheceu;
   bool _enviando = false;
+
+  Future<void> _escolherDataNascimento() async {
+    final data = await showDatePicker(
+      context: context,
+      initialDate: DateTime(2000, 1, 1),
+      firstDate: DateTime(1920, 1, 1),
+      lastDate: DateTime.now(),
+      helpText: 'Data de nascimento',
+    );
+    if (data != null) setState(() => _dataNascimento = data);
+  }
 
   Future<void> _enviar() async {
     if (_nomeController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Informe o nome do visitante.')));
+          .showSnackBar(const SnackBar(content: Text('Informe o nome completo.')));
+      return;
+    }
+    if (_sexo == null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Selecione o sexo.')));
+      return;
+    }
+    if (_situacaoFe == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Selecione como a pessoa se identifica em relação à fé.')),
+      );
+      return;
+    }
+    if (_comoConheceu == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Selecione como a pessoa conheceu a igreja.')),
+      );
       return;
     }
 
@@ -29,18 +78,26 @@ class _FormularioVisitanteScreenState extends State<FormularioVisitanteScreen> {
     try {
       await VisitanteService().registrar({
         'Nome completo': _nomeController.text.trim(),
-        'Telefone/WhatsApp': _telefoneController.text.trim(),
-        'Como conheceu a igreja / quem convidou': _comoConheceuController.text.trim(),
-        'Observações': _observacoesController.text.trim(),
+        'Data de nascimento':
+            _dataNascimento != null ? DateFormat('yyyy-MM-dd').format(_dataNascimento!) : '',
+        'Sexo': _sexo,
+        'Situação de fé': _situacaoFe,
+        'Como conheceu': _comoConheceu == 'Outro' && _outroController.text.trim().isNotEmpty
+            ? 'Outro: ${_outroController.text.trim()}'
+            : _comoConheceu,
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Visitante registrado! Obrigado por servir.')),
         );
-        _nomeController.clear();
-        _telefoneController.clear();
-        _comoConheceuController.clear();
-        _observacoesController.clear();
+        setState(() {
+          _nomeController.clear();
+          _outroController.clear();
+          _dataNascimento = null;
+          _sexo = null;
+          _situacaoFe = null;
+          _comoConheceu = null;
+        });
       }
     } catch (e) {
       if (mounted) {
@@ -52,6 +109,35 @@ class _FormularioVisitanteScreenState extends State<FormularioVisitanteScreen> {
     }
   }
 
+  Widget _pergunta(String titulo, Widget campo) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(titulo, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+          const SizedBox(height: 8),
+          campo,
+        ],
+      ),
+    );
+  }
+
+  Widget _opcoesRadio<T>(List<T> opcoes, T? valor, ValueChanged<T?> onChanged) {
+    return Column(
+      children: opcoes
+          .map((o) => RadioListTile<T>(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                title: Text(o.toString()),
+                value: o,
+                groupValue: valor,
+                onChanged: onChanged,
+              ))
+          .toList(),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -61,25 +147,66 @@ class _FormularioVisitanteScreenState extends State<FormularioVisitanteScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text('Que alegria receber essa pessoa! Preenche os dados dela aqui.'),
-            const SizedBox(height: 20),
-            const Text('Nome completo', style: TextStyle(fontWeight: FontWeight.w600)),
-            const SizedBox(height: 6),
-            TextField(controller: _nomeController),
-            const SizedBox(height: 20),
-            const Text('Telefone/WhatsApp', style: TextStyle(fontWeight: FontWeight.w600)),
-            const SizedBox(height: 6),
-            TextField(controller: _telefoneController, keyboardType: TextInputType.phone),
-            const SizedBox(height: 20),
-            const Text('Como conheceu a igreja / quem convidou?',
-                style: TextStyle(fontWeight: FontWeight.w600)),
-            const SizedBox(height: 6),
-            TextField(controller: _comoConheceuController),
-            const SizedBox(height: 20),
-            const Text('Observações (opcional)', style: TextStyle(fontWeight: FontWeight.w600)),
-            const SizedBox(height: 6),
-            TextField(controller: _observacoesController, maxLines: 3),
+            Text('Seja Bem-vindo! 👋', style: Theme.of(context).textTheme.headlineSmall),
+            const SizedBox(height: 4),
+            const Text('Preenche os dados da pessoa que visitou hoje.'),
             const SizedBox(height: 24),
+
+            _pergunta(
+              'Nome completo',
+              TextField(
+                controller: _nomeController,
+                decoration: const InputDecoration(hintText: 'Como podemos chamar você?'),
+              ),
+            ),
+
+            _pergunta(
+              'Data de nascimento',
+              InkWell(
+                onTap: _escolherDataNascimento,
+                child: InputDecorator(
+                  decoration: const InputDecoration(),
+                  child: Text(
+                    _dataNascimento == null
+                        ? 'Selecionar data'
+                        : DateFormat('dd/MM/yyyy').format(_dataNascimento!),
+                  ),
+                ),
+              ),
+            ),
+
+            _pergunta(
+              'Sexo',
+              _opcoesRadio(['Masculino', 'Feminino'], _sexo, (v) => setState(() => _sexo = v)),
+            ),
+
+            _pergunta(
+              'Como você se identifica atualmente em relação à fé?',
+              _opcoesRadio(_opcoesFe, _situacaoFe, (v) => setState(() => _situacaoFe = v)),
+            ),
+
+            _pergunta(
+              'Como você conheceu a Comunidade Batista Shallom?',
+              Column(
+                children: [
+                  _opcoesRadio(
+                    _opcoesComoConheceu,
+                    _comoConheceu,
+                    (v) => setState(() => _comoConheceu = v),
+                  ),
+                  if (_comoConheceu == 'Outro')
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: TextField(
+                        controller: _outroController,
+                        decoration: const InputDecoration(hintText: 'Qual?'),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 8),
             FilledButton(
               onPressed: _enviando ? null : _enviar,
               child: _enviando

@@ -1,8 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../models/shift_model.dart';
 import '../../providers/shift_provider.dart';
+
+class _AreaServico {
+  final String id;
+  final String nome;
+  _AreaServico({required this.id, required this.nome});
+}
+
+/// Valor especial usado no Dropdown pra representar "Outros" (nome
+/// livre, sem vincular a nenhuma area cadastrada).
+const _valorOutros = '__outros__';
 
 /// Tela do lider para criar ou editar uma escala.
 /// Se `shiftParaEditar` for informado, a tela entra em modo de edicao.
@@ -25,6 +36,9 @@ class _ShiftFormScreenState extends ConsumerState<ShiftFormScreen> {
   DateTime? _recorrenciaFim;
   bool _saving = false;
 
+  late Future<List<_AreaServico>> _futuroAreas;
+  String? _areaSelecionada; // guarda o ID, ou _valorOutros
+
   bool get _isEdicao => widget.shiftParaEditar != null;
 
   @override
@@ -41,6 +55,29 @@ class _ShiftFormScreenState extends ConsumerState<ShiftFormScreen> {
       _horarioInicio = _parseTimeOfDay(shift.horarioInicio);
       _horarioFim = _parseTimeOfDay(shift.horarioFim);
     }
+
+    _futuroAreas = _carregarAreas();
+  }
+
+  Future<List<_AreaServico>> _carregarAreas() async {
+    final resposta = await Supabase.instance.client
+        .from('areas_servico')
+        .select('id, nome')
+        .order('nome');
+    final areas = (resposta as List)
+        .map((e) => _AreaServico(id: e['id'] as String, nome: e['nome'] as String))
+        .toList();
+
+    // Se ja existe uma area vinculada (edicao), pre-seleciona ela.
+    final areaIdAtual = widget.shiftParaEditar?.areaId;
+    if (areaIdAtual != null && areas.any((a) => a.id == areaIdAtual)) {
+      _areaSelecionada = areaIdAtual;
+    } else if (widget.shiftParaEditar != null) {
+      // Editando uma escala antiga sem area vinculada -- cai em "Outros".
+      _areaSelecionada = _valorOutros;
+    }
+
+    return areas;
   }
 
   TimeOfDay _parseTimeOfDay(String hhmm) {
@@ -98,6 +135,14 @@ class _ShiftFormScreenState extends ConsumerState<ShiftFormScreen> {
       );
       return;
     }
+    if (_areaSelecionada == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Selecione a área de serviço.')),
+      );
+      return;
+    }
+
+    final areaIdParaSalvar = _areaSelecionada == _valorOutros ? null : _areaSelecionada;
 
     setState(() => _saving = true);
     try {
@@ -106,7 +151,7 @@ class _ShiftFormScreenState extends ConsumerState<ShiftFormScreen> {
         final atualizado = ShiftModel(
           id: widget.shiftParaEditar!.id,
           nome: _nomeController.text.trim(),
-          areaId: widget.shiftParaEditar!.areaId,
+          areaId: areaIdParaSalvar,
           data: _data!,
           horarioInicio: _formatTime(_horarioInicio!),
           horarioFim: _formatTime(_horarioFim!),
@@ -118,7 +163,7 @@ class _ShiftFormScreenState extends ConsumerState<ShiftFormScreen> {
       } else {
         await service.createShiftTemplate(
           nome: _nomeController.text.trim(),
-          areaId: null,
+          areaId: areaIdParaSalvar,
           data: _data!,
           horarioInicio: _formatTime(_horarioInicio!),
           horarioFim: _formatTime(_horarioFim!),
@@ -150,11 +195,44 @@ class _ShiftFormScreenState extends ConsumerState<ShiftFormScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              FutureBuilder<List<_AreaServico>>(
+                future: _futuroAreas,
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) {
+                    return const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      child: Center(child: CircularProgressIndicator()),
+                    );
+                  }
+                  final areas = snapshot.data!;
+                  return DropdownButtonFormField<String>(
+                    value: _areaSelecionada,
+                    decoration: const InputDecoration(labelText: 'Área de serviço'),
+                    items: [
+                      ...areas.map((a) => DropdownMenuItem(value: a.id, child: Text(a.nome))),
+                      const DropdownMenuItem(value: _valorOutros, child: Text('Outros')),
+                    ],
+                    onChanged: (v) => setState(() {
+                      _areaSelecionada = v;
+                      // Se escolheu uma area cadastrada, ja preenche o
+                      // nome da escala com o nome dela (a pessoa ainda
+                      // pode editar embaixo se quiser deixar mais especifico).
+                      if (v != null && v != _valorOutros) {
+                        final area = areas.firstWhere((a) => a.id == v);
+                        _nomeController.text = area.nome;
+                      }
+                    }),
+                  );
+                },
+              ),
+              const SizedBox(height: 16),
               TextFormField(
                 controller: _nomeController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Nome da escala',
-                  hintText: 'Ex: Recepção, Primeira vez, GC...',
+                  hintText: _areaSelecionada == _valorOutros
+                      ? 'Escreve o nome (ex: Ação Social)'
+                      : 'Pode deixar mais específico, se quiser',
                 ),
                 validator: (v) => (v == null || v.trim().isEmpty) ? 'Informe um nome' : null,
               ),

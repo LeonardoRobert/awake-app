@@ -83,6 +83,22 @@ class ContribuicaoService {
     });
   }
 
+  /// Meus proprios pagamentos vinculados a um evento ingressado
+  /// especifico -- usado na tela de detalhes do evento.
+  Future<List<ContribuicaoModel>> listarMeusPagamentosDoEvento(String eventoId) async {
+    final userId = _client.auth.currentUser!.id;
+    final data = await _client
+        .from('contribuicoes')
+        .select()
+        .eq('profile_id', userId)
+        .eq('evento_id', eventoId)
+        .order('data', ascending: false);
+
+    return (data as List)
+        .map((e) => ContribuicaoModel.fromMap(e as Map<String, dynamic>))
+        .toList();
+  }
+
   /// Quanto a pessoa logada ja pagou de um evento ingressado especifico
   /// -- usado na tarja de progresso da tela de Inicio.
   Future<double> totalPagoEvento(String eventoId) async {

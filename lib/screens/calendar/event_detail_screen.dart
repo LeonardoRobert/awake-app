@@ -4,10 +4,12 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../models/contribuicao_model.dart';
 import '../../models/event_model.dart';
 import '../../models/profile_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/event_provider.dart';
+import '../../services/contribuicao_service.dart';
 import '../../services/escala_servico_service.dart';
 import '../../widgets/awake_app_bar.dart';
 import '../../widgets/quem_esta_escalado.dart';
@@ -180,6 +182,10 @@ class EventDetailScreen extends ConsumerWidget {
                     ],
                   ),
                 ],
+                if (event.ingressado) ...[
+                  const SizedBox(height: 24),
+                  _SecaoPagamentosEvento(evento: event),
+                ],
                 if (event.escopo == EventoEscopo.igreja) ...[
                   QuemEstaEscalado(eventoId: event.id, dataOcorrencia: dataExibida),
                 ],
@@ -325,6 +331,118 @@ class EventDetailScreen extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Seção mostrada nos detalhes de um evento ingressado: valor total,
+/// parcelas sugeridas, métodos de pagamento aceitos, barra de
+/// progresso e histórico dos MEUS pagamentos pra esse evento.
+class _SecaoPagamentosEvento extends StatefulWidget {
+  final EventModel evento;
+  const _SecaoPagamentosEvento({required this.evento});
+
+  @override
+  State<_SecaoPagamentosEvento> createState() => _SecaoPagamentosEventoState();
+}
+
+class _SecaoPagamentosEventoState extends State<_SecaoPagamentosEvento> {
+  late Future<List<ContribuicaoModel>> _futuroPagamentos;
+
+  @override
+  void initState() {
+    super.initState();
+    _futuroPagamentos = ContribuicaoService().listarMeusPagamentosDoEvento(widget.evento.id);
+  }
+
+  static const _labelMetodo = {
+    'pix': 'Pix',
+    'cartao': 'Cartão',
+    'dinheiro': 'Dinheiro',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final valorTotal = widget.evento.valorTotal ?? 0;
+    final formatoMoeda = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
+
+    return FutureBuilder<List<ContribuicaoModel>>(
+      future: _futuroPagamentos,
+      builder: (context, snapshot) {
+        final pagamentos = snapshot.data ?? [];
+        final totalPago = pagamentos.fold<double>(0, (soma, p) => soma + p.valor);
+        final progresso = valorTotal > 0 ? (totalPago / valorTotal).clamp(0.0, 1.0) : 0.0;
+        final porcentagem = (progresso * 100).round();
+
+        return Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.confirmation_num_outlined, size: 20),
+                    const SizedBox(width: 8),
+                    Text('Inscrição', style: Theme.of(context).textTheme.titleMedium),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: LinearProgressIndicator(value: progresso, minHeight: 8),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '$porcentagem% pago — ${formatoMoeda.format(totalPago)} de '
+                  '${formatoMoeda.format(valorTotal)}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                if (widget.evento.parcelasSugeridas != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    'Parcelas sugeridas: ${widget.evento.parcelasSugeridas}x de '
+                    '${formatoMoeda.format(valorTotal / widget.evento.parcelasSugeridas!)}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+                if (widget.evento.metodosPagamento != null &&
+                    widget.evento.metodosPagamento!.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'Formas de pagamento: ${widget.evento.metodosPagamento!.map((m) => _labelMetodo[m] ?? m).join(', ')}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+                const SizedBox(height: 16),
+                const Divider(),
+                const SizedBox(height: 8),
+                Text('Meus pagamentos', style: Theme.of(context).textTheme.titleSmall),
+                const SizedBox(height: 8),
+                if (snapshot.connectionState == ConnectionState.waiting)
+                  const Center(child: Padding(
+                    padding: EdgeInsets.all(12),
+                    child: CircularProgressIndicator(),
+                  ))
+                else if (pagamentos.isEmpty)
+                  const Text('Nenhum pagamento registrado ainda. Fale com a administração.')
+                else
+                  ...pagamentos.map((p) => Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(DateFormat('dd/MM/yyyy').format(p.data)),
+                            Text(formatoMoeda.format(p.valor),
+                                style: const TextStyle(fontWeight: FontWeight.w600)),
+                          ],
+                        ),
+                      )),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

@@ -25,6 +25,39 @@ class _AdminVisitantesScreenState extends State<AdminVisitantesScreen> {
     await _futuro;
   }
 
+  // ---- calculos das estatisticas ----
+
+  int? _idade(VisitanteModel v) {
+    final texto = v.dados['Data de nascimento']?.toString();
+    if (texto == null || texto.isEmpty) return null;
+    final nascimento = DateTime.tryParse(texto);
+    if (nascimento == null) return null;
+    final hoje = DateTime.now();
+    var idade = hoje.year - nascimento.year;
+    if (hoje.month < nascimento.month ||
+        (hoje.month == nascimento.month && hoje.day < nascimento.day)) {
+      idade--;
+    }
+    return idade;
+  }
+
+  /// Conta quantas vezes cada valor aparece num campo, ordenado do
+  /// mais comum pro menos comum -- usado pra "Situacao de fe" e
+  /// "Como conheceu".
+  List<MapEntry<String, int>> _contagemPorCampo(List<VisitanteModel> lista, String campo) {
+    final contagem = <String, int>{};
+    for (final v in lista) {
+      final valor = v.dados[campo]?.toString();
+      if (valor == null || valor.isEmpty) continue;
+      // Agrupa qualquer "Outro: xyz" sob um unico rotulo "Outro",
+      // pra nao espalhar o grafico em dezenas de respostas unicas.
+      final chave = valor.startsWith('Outro:') ? 'Outro' : valor;
+      contagem[chave] = (contagem[chave] ?? 0) + 1;
+    }
+    final entradas = contagem.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    return entradas;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -54,6 +87,18 @@ class _AdminVisitantesScreenState extends State<AdminVisitantesScreen> {
                 .length;
             final naoLidos = lista.where((v) => !v.lido).length;
 
+            // ---- estatisticas novas ----
+            final idades = lista.map(_idade).whereType<int>().toList();
+            final mediaIdade =
+                idades.isEmpty ? null : (idades.reduce((a, b) => a + b) / idades.length);
+
+            final porSexo = _contagemPorCampo(lista, 'Sexo');
+            final porFe = _contagemPorCampo(lista, 'Situação de fé');
+            final porComoConheceu = _contagemPorCampo(lista, 'Como conheceu');
+
+            final situacaoMaisComum = porFe.isEmpty ? null : porFe.first;
+            final comoConheceuMaisComum = porComoConheceu.isEmpty ? null : porComoConheceu.first;
+
             return ListView(
               padding: const EdgeInsets.all(16),
               children: [
@@ -72,56 +117,144 @@ class _AdminVisitantesScreenState extends State<AdminVisitantesScreen> {
                   ],
                 ),
                 const SizedBox(height: 20),
+                Text('Perfil dos visitantes', style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 8),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _linhaEstatistica(
+                          'Idade média',
+                          mediaIdade == null ? '—' : '${mediaIdade.toStringAsFixed(0)} anos',
+                        ),
+                        _linhaEstatistica(
+                          'Situação de fé mais comum',
+                          situacaoMaisComum == null
+                              ? '—'
+                              : '${situacaoMaisComum.key} (${situacaoMaisComum.value})',
+                        ),
+                        _linhaEstatistica(
+                          'Como mais conheceram a igreja',
+                          comoConheceuMaisComum == null
+                              ? '—'
+                              : '${comoConheceuMaisComum.key} (${comoConheceuMaisComum.value})',
+                        ),
+                        if (porSexo.isNotEmpty) ...[
+                          const Divider(height: 24),
+                          Text('Sexo', style: Theme.of(context).textTheme.labelLarge),
+                          const SizedBox(height: 8),
+                          ...porSexo.map((e) => _barraProporcao(e.key, e.value, lista.length)),
+                        ],
+                        if (porFe.isNotEmpty) ...[
+                          const Divider(height: 24),
+                          Text('Situação de fé — tudo', style: Theme.of(context).textTheme.labelLarge),
+                          const SizedBox(height: 8),
+                          ...porFe.map((e) => _barraProporcao(e.key, e.value, lista.length)),
+                        ],
+                        if (porComoConheceu.isNotEmpty) ...[
+                          const Divider(height: 24),
+                          Text('Como conheceu — tudo', style: Theme.of(context).textTheme.labelLarge),
+                          const SizedBox(height: 8),
+                          ...porComoConheceu.map((e) => _barraProporcao(e.key, e.value, lista.length)),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
                 Text('Todos os visitantes', style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 8),
-                ...lista.map((v) => Card(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      child: ExpansionTile(
-                        title: Text(v.dados['Nome completo']?.toString() ?? '(sem nome)'),
-                        subtitle: Text(
-                          '${DateFormat('dd/MM/yyyy HH:mm').format(v.criadoEm)}'
-                          '${v.nomeRegistrador != null ? ' • registrado por ${v.nomeRegistrador}' : ''}',
-                        ),
-                        trailing:
-                            v.lido ? null : const Icon(Icons.circle, color: Colors.red, size: 10),
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                ...v.dados.entries.map((e) => Padding(
-                                      padding: const EdgeInsets.only(bottom: 10),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(e.key,
-                                              style: const TextStyle(fontWeight: FontWeight.w600)),
-                                          Text('${e.value}'.isEmpty ? '—' : '${e.value}'),
-                                        ],
-                                      ),
-                                    )),
-                                if (!v.lido)
-                                  Align(
-                                    alignment: Alignment.centerRight,
-                                    child: TextButton(
-                                      onPressed: () async {
-                                        await VisitanteService().marcarComoLido(v.id);
-                                        _recarregar();
-                                      },
-                                      child: const Text('Marcar como lido'),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ],
+                ...lista.map((v) {
+                  final idade = _idade(v);
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    child: ExpansionTile(
+                      title: Text(v.dados['Nome completo']?.toString() ?? '(sem nome)'),
+                      subtitle: Text(
+                        '${DateFormat('dd/MM/yyyy HH:mm').format(v.criadoEm)}'
+                        '${idade != null ? ' • $idade anos' : ''}'
+                        '${v.nomeRegistrador != null ? ' • registrado por ${v.nomeRegistrador}' : ''}',
                       ),
-                    )),
+                      trailing:
+                          v.lido ? null : const Icon(Icons.circle, color: Colors.red, size: 10),
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              ...v.dados.entries.map((e) => Padding(
+                                    padding: const EdgeInsets.only(bottom: 10),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(e.key,
+                                            style: const TextStyle(fontWeight: FontWeight.w600)),
+                                        Text('${e.value}'.isEmpty ? '—' : '${e.value}'),
+                                      ],
+                                    ),
+                                  )),
+                              if (!v.lido)
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: TextButton(
+                                    onPressed: () async {
+                                      await VisitanteService().marcarComoLido(v.id);
+                                      _recarregar();
+                                    },
+                                    child: const Text('Marcar como lido'),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
               ],
             );
           },
         ),
+      ),
+    );
+  }
+
+  Widget _linhaEstatistica(String rotulo, String valor) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(rotulo),
+          Text(valor, style: const TextStyle(fontWeight: FontWeight.w700)),
+        ],
+      ),
+    );
+  }
+
+  Widget _barraProporcao(String rotulo, int quantidade, int total) {
+    final proporcao = total > 0 ? quantidade / total : 0.0;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(child: Text(rotulo, style: const TextStyle(fontSize: 13))),
+              Text('$quantidade', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(value: proporcao, minHeight: 6),
+          ),
+        ],
       ),
     );
   }
