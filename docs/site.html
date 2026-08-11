@@ -474,17 +474,20 @@
 
         corpoTabela.innerHTML = diasOrdenados.map(dia => {
           const encontros = porDia[dia].sort((a, b) => a.horario.localeCompare(b.horario));
-          const listaEncontros = encontros
+          const colunaEncontro = encontros
             .map(e => `
               ${escaparHtml(e.titulo)}
               <span style="color:var(--dourado);font-weight:700;font-size:11px;text-transform:uppercase;">· ${escaparHtml(e.categoria)}</span>
-              <span style="color:var(--azul-escuro);font-weight:600;"> · ${e.horario}</span>
             `)
+            .join('<br>');
+          const colunaHorario = encontros
+            .map(e => `<span style="color:var(--azul-escuro);font-weight:600;">${e.horario}</span>`)
             .join('<br>');
           return `
             <tr>
               <td class="dia-semana-cell">${NOMES_DIAS[dia]}</td>
-              <td colspan="2">${listaEncontros}</td>
+              <td>${colunaEncontro}</td>
+              <td style="text-align:right;">${colunaHorario}</td>
             </tr>
           `;
         }).join('');
