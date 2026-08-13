@@ -36,7 +36,8 @@ class AuthService {
     // A categoria (Genesis/Next/One) e calculada sozinha no banco a
     // partir da data de nascimento e do estado civil.
     if (response.user != null) {
-      await _client.from('profiles').update({
+      final userId = response.user!.id;
+      final campos = {
         'nome': nome,
         'telefone': telefone,
         'endereco': endereco,
@@ -45,17 +46,36 @@ class AuthService {
         'estado_civil': estadoCivil.name,
         'sexo': sexo.name,
         'grupo_casais': grupoCasais?.valorBanco,
-      }).eq('id', response.user!.id);
+      };
+
+      // Logo apos o signUp, a sessao nova as vezes ainda nao "assentou"
+      // a tempo do RLS reconhecer auth.uid() == id direito -- o UPDATE
+      // roda sem erro nenhum, so nao acha a linha e bate 0 linhas em
+      // silencio (Postgres nao avisa erro nesse caso). Confirma com
+      // .select() e tenta de novo com um respiro curto se vier vazio.
+      var atualizados = await _client.from('profiles').update(campos).eq('id', userId).select();
+      for (var tentativa = 0; atualizados.isEmpty && tentativa < 4; tentativa++) {
+        await Future.delayed(const Duration(milliseconds: 400));
+        atualizados = await _client.from('profiles').update(campos).eq('id', userId).select();
+      }
 
       for (final ministerio in ministerios) {
-        await _client.from('profile_ministerios').upsert(
-          {
-            'profile_id': response.user!.id,
-            'ministerio': ministerio,
-            'papel': 'membro',
-          },
-          onConflict: 'profile_id,ministerio',
-        );
+        for (var tentativa = 0; tentativa < 4; tentativa++) {
+          try {
+            await _client.from('profile_ministerios').upsert(
+              {
+                'profile_id': userId,
+                'ministerio': ministerio,
+                'papel': 'membro',
+              },
+              onConflict: 'profile_id,ministerio',
+            );
+            break;
+          } catch (_) {
+            if (tentativa == 3) rethrow;
+            await Future.delayed(const Duration(milliseconds: 400));
+          }
+        }
       }
     }
 
