@@ -1920,6 +1920,23 @@
     return '(sem nome)';
   }
 
+  // Segunda-feira da semana de uma data 'YYYY-MM-DD' -- mesma
+  // convencao de semana (segunda a domingo) usada na agenda do site
+  // publico. Construido em UTC de proposito, igual o resto do projeto
+  // faz com essas strings de data pura (sem hora) -- evita o bug ja
+  // conhecido de virar o dia errado por causa de fuso.
+  function segundaFeiraDaSemana(isoData) {
+    const [ano, mes, dia] = isoData.split('-').map(Number);
+    const d = new Date(Date.UTC(ano, mes - 1, dia));
+    const diaSemana = d.getUTCDay(); // 0 = domingo, 1 = segunda...
+    d.setUTCDate(d.getUTCDate() + (diaSemana === 0 ? -6 : 1 - diaSemana));
+    return d;
+  }
+
+  function formatarDataCurtaUtc(d) {
+    return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'UTC' });
+  }
+
   let todasEntradas = [];
   let mesEntradasSelecionado = null;
 
@@ -1996,6 +2013,18 @@
       porEvento[titulo] = (porEvento[titulo] || 0) + Number(e.valor);
     });
 
+    // Semana = segunda a domingo. Uma semana pode comecar ou terminar
+    // fora do mes selecionado (ex: primeira semana de agosto pode
+    // comecar numa segunda de julho) -- mostra o intervalo real da
+    // semana mesmo assim, so soma o que caiu dentro do mes.
+    const porSemana = {};
+    linhasValidas.forEach(e => {
+      const inicio = segundaFeiraDaSemana(e.data);
+      const chave = inicio.toISOString().slice(0, 10);
+      if (!porSemana[chave]) porSemana[chave] = { inicio, total: 0 };
+      porSemana[chave].total += Number(e.valor);
+    });
+
     el.innerHTML = `
       <h3 style="margin-top:24px;">Por categoria</h3>
       <div class="lista-simples">
@@ -2010,6 +2039,14 @@
             <div class="linha-simples"><span>${escaparHtml(titulo)}</span><span class="valor-simples">R$ ${valor.toFixed(2)}</span></div>
           `).join('')}
         </div>` : ''}
+      <h3 style="margin-top:24px;">Por semana</h3>
+      <div class="lista-simples">
+        ${Object.entries(porSemana).sort((a, b) => a[0].localeCompare(b[0])).map(([chave, s]) => {
+          const fim = new Date(s.inicio);
+          fim.setUTCDate(fim.getUTCDate() + 6);
+          return `<div class="linha-simples"><span>${formatarDataCurtaUtc(s.inicio)} a ${formatarDataCurtaUtc(fim)}</span><span class="valor-simples">R$ ${s.total.toFixed(2)}</span></div>`;
+        }).join('') || '<div class="vazio-lateral">Nenhuma entrada nesse mês.</div>'}
+      </div>
       <h3 style="margin-top:24px;">Todas as transações do mês</h3>
       <div class="tabela-revisao-wrap">
         <table class="tabela-revisao">
