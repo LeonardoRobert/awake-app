@@ -1165,8 +1165,13 @@
   async function iniciarPainelFinanceiro() {
     const { data: pessoas } = await supa.from('profiles').select('id, nome').order('nome');
     todasPessoas = pessoas || [];
-    renderizarListaPessoas();
 
+    if (!eventosIngressadosCache) {
+      const { data } = await supa.from('eventos').select('id, titulo').eq('ingressado', true).order('titulo');
+      eventosIngressadosCache = data || [];
+    }
+
+    renderizarListaPessoas();
     document.getElementById('busca-pessoa').addEventListener('input', renderizarListaPessoas);
     await carregarPendentes();
   }
@@ -1218,6 +1223,13 @@
             <option value="transferencia">Transferência</option>
             <option value="boleto">Boleto</option>
             <option value="outro">Outro</option>
+          </select>
+        </div>
+        <div class="campo-form">
+          <label>Evento ingressado (opcional)</label>
+          <select id="lc-evento">
+            <option value="">Nenhum — dízimo/oferta comum</option>
+            ${eventosIngressadosCache.map(ev => `<option value="${ev.id}">${escaparHtml(ev.titulo)}</option>`).join('')}
           </select>
         </div>
         <div class="campo-form">
@@ -1280,12 +1292,14 @@
       valor,
       meio_pagamento: document.getElementById('lc-meio').value,
       observacao: document.getElementById('lc-observacao').value.trim() || null,
+      evento_id: document.getElementById('lc-evento').value || null,
     });
 
     if (error) { erroEl.textContent = 'Erro: ' + error.message; return; }
 
     document.getElementById('lc-valor').value = '';
     document.getElementById('lc-observacao').value = '';
+    document.getElementById('lc-evento').value = '';
     await carregarHistorico();
   }
 
