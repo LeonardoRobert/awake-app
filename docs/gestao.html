@@ -1657,7 +1657,6 @@
               <th>Valor</th>
               <th>Data e horário</th>
               <th>Descrição</th>
-              <th>Evento ingressado</th>
               <th>Ignorar</th>
             </tr>
           </thead>
@@ -1684,20 +1683,17 @@
                   </td>
                   <td>
                     <select class="select-tipo-extrato" data-indice="${i}">
-                      ${Object.entries(LABEL_TIPO_EXTRATO).map(([v, l]) => `<option value="${v}" ${v === (linha.tipo || '') ? 'selected' : ''}>${l}</option>`).join('')}
+                      ${Object.entries(LABEL_TIPO_EXTRATO).map(([v, l]) => `<option value="${v}" ${!linha.eventoId && v === (linha.tipo || '') ? 'selected' : ''}>${l}</option>`).join('')}
+                      ${eventosIngressadosCache.length ? `
+                        <optgroup label="Evento ingressado">
+                          ${eventosIngressadosCache.map(ev => `<option value="evento:${ev.id}" ${linha.eventoId === ev.id ? 'selected' : ''}>${escaparHtml(ev.titulo)}</option>`).join('')}
+                        </optgroup>` : ''}
                     </select>
                   </td>
                   <td style="white-space:nowrap;">R$ ${linha.valor.toFixed(2)}</td>
                   <td style="white-space:nowrap;">${formatarDataBrExtrato(linha.data)}${linha.horario ? ' ' + linha.horario.slice(0, 5) : ''}</td>
                   <td>
                     <input type="text" class="input-observacao-extrato" data-indice="${i}" value="${escaparAtributo(linha.observacao)}">
-                  </td>
-                  <td>
-                    ${eventosIngressadosCache.length ? `
-                      <select class="select-evento-extrato" data-indice="${i}">
-                        <option value="">Dízimo/oferta</option>
-                        ${eventosIngressadosCache.map(ev => `<option value="${ev.id}" ${ev.id === linha.eventoId ? 'selected' : ''}>${escaparHtml(ev.titulo)}</option>`).join('')}
-                      </select>` : '—'}
                   </td>
                   <td style="text-align:center;">
                     <input type="checkbox" class="chk-ignorar-extrato" data-indice="${i}" ${linha.ignorar ? 'checked' : ''}>
@@ -1732,17 +1728,20 @@
     });
     el.querySelectorAll('.select-tipo-extrato').forEach(sel => {
       sel.addEventListener('change', (e) => {
-        linhasExtratoRevisao[e.target.dataset.indice].tipo = e.target.value || null;
+        const linha = linhasExtratoRevisao[e.target.dataset.indice];
+        const valor = e.target.value;
+        if (valor.startsWith('evento:')) {
+          linha.eventoId = valor.slice('evento:'.length);
+          linha.tipo = null;
+        } else {
+          linha.eventoId = null;
+          linha.tipo = valor || null;
+        }
       });
     });
     el.querySelectorAll('.input-observacao-extrato').forEach(inp => {
       inp.addEventListener('input', (e) => {
         linhasExtratoRevisao[e.target.dataset.indice].observacao = e.target.value;
-      });
-    });
-    el.querySelectorAll('.select-evento-extrato').forEach(sel => {
-      sel.addEventListener('change', (e) => {
-        linhasExtratoRevisao[e.target.dataset.indice].eventoId = e.target.value || null;
       });
     });
     el.querySelectorAll('.chk-ignorar-extrato').forEach(chk => {
@@ -1796,19 +1795,17 @@
       chave_importacao: l.chaveImportacao,
     }));
 
-    const { error } = await supa.from('contribuicoes').insert(payload);
+    // upsert + ignoreDuplicates: se uma linha igual (mesma chave_importacao)
+    // ja tiver sido lancada por outra pessoa nesse meio tempo, o Postgres
+    // so pula ela em silencio -- nao trava o lote inteiro com erro.
+    const { error } = await supa
+      .from('contribuicoes')
+      .upsert(payload, { onConflict: 'chave_importacao', ignoreDuplicates: true });
 
     botao.disabled = false;
     botao.textContent = 'Confirmar tudo';
 
-    if (error) {
-      // 23505 = unique_violation -- alguem mais confirmou uma linha
-      // igual entre o momento em que a tela carregou e agora.
-      erroEl.textContent = error.code === '23505'
-        ? 'Uma ou mais linhas já foram importadas por outra pessoa nesse meio tempo. Feche e reabra o arquivo pra atualizar a revisão.'
-        : 'Erro ao lançar: ' + error.message;
-      return;
-    }
+    if (error) { erroEl.textContent = 'Erro ao lançar: ' + error.message; return; }
 
     const casadas = linhasExtratoRevisao.filter(l => !l.ignorar && l.profileId).length;
     const semUsuario = linhasExtratoRevisao.filter(l => !l.ignorar && !l.profileId).length;
@@ -1850,7 +1847,7 @@
     document.getElementById('entradas-lista-meses').innerHTML = '<div class="vazio-lateral">Carregando...</div>';
     const { data, error } = await supa
       .from('contribuicoes')
-      .select('id, data, horario, valor, tipo, motivo_sem_usuario, evento_id, meio_pagamento, banco_origem, profiles(nome), eventos(titulo)')
+      .select('id, data, horario, valor, tipo, motivo_sem_usuario, evento_id, meio_pagamento, banco_origem, profiles!contribuicoes_profile_id_fkey(nome), eventos(titulo)')
       .order('data', { ascending: false });
 
     if (error) {
