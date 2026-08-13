@@ -87,8 +87,34 @@ String gerarCodigoPixComValor(double valor) {
   return '$semCrc$crc';
 }
 
-class FinanceiroScreen extends ConsumerWidget {
+class FinanceiroScreen extends ConsumerStatefulWidget {
   const FinanceiroScreen({super.key});
+
+  @override
+  ConsumerState<FinanceiroScreen> createState() => _FinanceiroScreenState();
+}
+
+class _FinanceiroScreenState extends ConsumerState<FinanceiroScreen> {
+  // Sempre dia 1 -- so o mes/ano importam pra filtrar o historico.
+  late DateTime _mesSelecionado;
+
+  @override
+  void initState() {
+    super.initState();
+    final agora = DateTime.now();
+    _mesSelecionado = DateTime(agora.year, agora.month, 1);
+  }
+
+  bool get _ehMesAtual {
+    final agora = DateTime.now();
+    return _mesSelecionado.year == agora.year && _mesSelecionado.month == agora.month;
+  }
+
+  void _mudarMes(int delta) {
+    setState(() {
+      _mesSelecionado = DateTime(_mesSelecionado.year, _mesSelecionado.month + delta, 1);
+    });
+  }
 
   void _copiarDadosBancarios(BuildContext context) {
     Clipboard.setData(const ClipboardData(text: _dadosBancarios));
@@ -355,7 +381,7 @@ class FinanceiroScreen extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final contribuicoesAsync = ref.watch(minhasContribuicoesProvider);
     final formatoMoeda = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
 
@@ -434,10 +460,27 @@ class FinanceiroScreen extends ConsumerWidget {
             Text('Minhas contribuições', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 4),
             Text(
-              'Só você vê esse histórico.',
+              'Só você vê esse histórico. Reseta a cada mês.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                IconButton(
+                  onPressed: () => _mudarMes(-1),
+                  icon: const Icon(Icons.chevron_left),
+                ),
+                Text(
+                  _capitalizar(DateFormat("MMMM 'de' yyyy", 'pt_BR').format(_mesSelecionado)),
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                IconButton(
+                  onPressed: _ehMesAtual ? null : () => _mudarMes(1),
+                  icon: const Icon(Icons.chevron_right),
+                ),
+              ],
+            ),
             contribuicoesAsync.when(
               loading: () => const Padding(
                 padding: EdgeInsets.symmetric(vertical: 24),
@@ -447,11 +490,16 @@ class FinanceiroScreen extends ConsumerWidget {
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 child: Text('Erro ao carregar: $err'),
               ),
-              data: (contribuicoes) {
+              data: (todasContribuicoes) {
+                final contribuicoes = todasContribuicoes
+                    .where((c) =>
+                        c.data.year == _mesSelecionado.year && c.data.month == _mesSelecionado.month)
+                    .toList();
+
                 if (contribuicoes.isEmpty) {
                   return const Padding(
                     padding: EdgeInsets.symmetric(vertical: 24),
-                    child: Text('Nenhuma contribuição registrada ainda.'),
+                    child: Text('Nenhuma contribuição nesse mês.'),
                   );
                 }
 
@@ -467,7 +515,7 @@ class FinanceiroScreen extends ConsumerWidget {
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text('Total contribuído',
+                            const Text('Total do mês',
                                 style: TextStyle(fontWeight: FontWeight.w600)),
                             Text(
                               formatoMoeda.format(total),
@@ -481,7 +529,10 @@ class FinanceiroScreen extends ConsumerWidget {
                     ...contribuicoes.map((c) => Card(
                           margin: const EdgeInsets.only(bottom: 8),
                           child: ListTile(
-                            title: Text(formatoMoeda.format(c.valor)),
+                            title: Text(
+                              '${formatoMoeda.format(c.valor)}'
+                              '${c.tipo != null ? ' • ${c.tipo!.label}' : ''}',
+                            ),
                             subtitle: Text(
                               '${DateFormat("dd/MM/yyyy", 'pt_BR').format(c.data)}'
                               '${c.horario != null ? ' às ${c.horario}' : ''}'
@@ -500,4 +551,7 @@ class FinanceiroScreen extends ConsumerWidget {
       ),
     );
   }
+
+  String _capitalizar(String texto) =>
+      texto.isEmpty ? texto : texto[0].toUpperCase() + texto.substring(1);
 }

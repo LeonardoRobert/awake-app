@@ -70,6 +70,7 @@ class ContribuicaoService {
     required MeioPagamento meioPagamento,
     String? observacao,
     String? eventoId,
+    TipoContribuicao? tipo,
   }) async {
     await _client.from('contribuicoes').insert({
       'profile_id': profileId,
@@ -80,6 +81,7 @@ class ContribuicaoService {
       'observacao': observacao,
       'lancado_por': _client.auth.currentUser!.id,
       'evento_id': eventoId,
+      'tipo': tipo?.valorBanco,
     });
   }
 

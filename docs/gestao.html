@@ -1131,10 +1131,6 @@
             <div id="painel-financeiro-direita">
               <div class="vazio-lateral" style="padding:40px 0;">Selecione uma pessoa à esquerda.</div>
             </div>
-            <div style="margin-top:24px;">
-              <h3>Transações do PagBank sem vínculo</h3>
-              <div id="lista-pendentes"></div>
-            </div>
           </div>
         </div>`;
       iniciarPainelFinanceiro();
@@ -1163,7 +1159,7 @@
   let pessoaSelecionada = null;
 
   async function iniciarPainelFinanceiro() {
-    const { data: pessoas } = await supa.from('profiles').select('id, nome').order('nome');
+    const { data: pessoas } = await supa.from('profiles').select('id, nome, valor_dizimo_padrao').order('nome');
     todasPessoas = pessoas || [];
 
     if (!eventosIngressadosCache) {
@@ -1173,7 +1169,6 @@
 
     renderizarListaPessoas();
     document.getElementById('busca-pessoa').addEventListener('input', renderizarListaPessoas);
-    await carregarPendentes();
   }
 
   function renderizarListaPessoas() {
@@ -1214,16 +1209,27 @@
             <input type="date" id="lc-data" value="${new Date().toISOString().split('T')[0]}">
           </div>
         </div>
-        <div class="campo-form">
-          <label>Meio de pagamento</label>
-          <select id="lc-meio">
-            <option value="pix">Pix</option>
-            <option value="dinheiro">Dinheiro</option>
-            <option value="cartao">Cartão</option>
-            <option value="transferencia">Transferência</option>
-            <option value="boleto">Boleto</option>
-            <option value="outro">Outro</option>
-          </select>
+        <div class="linha-form">
+          <div class="campo-form">
+            <label>Meio de pagamento</label>
+            <select id="lc-meio">
+              <option value="pix">Pix</option>
+              <option value="dinheiro">Dinheiro</option>
+              <option value="cartao">Cartão</option>
+              <option value="transferencia">Transferência</option>
+              <option value="boleto">Boleto</option>
+              <option value="outro">Outro</option>
+            </select>
+          </div>
+          <div class="campo-form">
+            <label>Tipo</label>
+            <select id="lc-tipo">
+              <option value="">Não especificado</option>
+              <option value="dizimo">Dízimo</option>
+              <option value="oferta">Oferta</option>
+              <option value="outro">Outro</option>
+            </select>
+          </div>
         </div>
         <div class="campo-form">
           <label>Evento ingressado (opcional)</label>
@@ -1243,6 +1249,25 @@
       <div id="lista-historico"><div class="vazio-lateral">Carregando...</div></div>
     `;
 
+    // Auto-detecta "Dizimo" quando o valor digitado bate com o valor
+    // fixo salvo da pessoa -- so enquanto o admin nao mexer no campo
+    // Tipo na mao (ai a escolha manual sempre vence).
+    let tipoEscolhidoManualmente = false;
+    document.getElementById('lc-tipo').addEventListener('change', () => {
+      tipoEscolhidoManualmente = true;
+    });
+    document.getElementById('lc-valor').addEventListener('input', (e) => {
+      if (tipoEscolhidoManualmente) return;
+      const valorDigitado = parseFloat(e.target.value.replace(',', '.'));
+      const valorFixo = pessoaSelecionada.valor_dizimo_padrao;
+      const tipoEl = document.getElementById('lc-tipo');
+      if (valorFixo != null && valorDigitado === Number(valorFixo)) {
+        tipoEl.value = 'dizimo';
+      } else if (tipoEl.value === 'dizimo') {
+        tipoEl.value = '';
+      }
+    });
+
     document.getElementById('btn-lancar').addEventListener('click', lancarContribuicao);
     await carregarHistorico();
   }
@@ -1261,10 +1286,11 @@
     }
 
     const LABEL_MEIO = { pix: 'Pix', dinheiro: 'Dinheiro', cartao: 'Cartão', transferencia: 'Transferência', boleto: 'Boleto', outro: 'Outro' };
+    const LABEL_TIPO = { dizimo: 'Dízimo', oferta: 'Oferta', outro: 'Outro' };
     historicoEl.innerHTML = data.map(c => `
       <div class="item-historico">
         <div>
-          <div class="valor-historico">R$ ${Number(c.valor).toFixed(2)}</div>
+          <div class="valor-historico">R$ ${Number(c.valor).toFixed(2)}${c.tipo ? ' • ' + LABEL_TIPO[c.tipo] : ''}</div>
           <div class="meta-historico">${new Date(c.data).toLocaleDateString('pt-BR')} • ${LABEL_MEIO[c.meio_pagamento] || c.meio_pagamento}${c.observacao ? ' • ' + escaparHtml(c.observacao) : ''}</div>
         </div>
         <button class="excluir-lancamento" data-id="${c.id}">Excluir</button>
@@ -1293,6 +1319,7 @@
       meio_pagamento: document.getElementById('lc-meio').value,
       observacao: document.getElementById('lc-observacao').value.trim() || null,
       evento_id: document.getElementById('lc-evento').value || null,
+      tipo: document.getElementById('lc-tipo').value || null,
     });
 
     if (error) { erroEl.textContent = 'Erro: ' + error.message; return; }
@@ -1300,67 +1327,8 @@
     document.getElementById('lc-valor').value = '';
     document.getElementById('lc-observacao').value = '';
     document.getElementById('lc-evento').value = '';
+    document.getElementById('lc-tipo').value = '';
     await carregarHistorico();
-  }
-
-  async function carregarPendentes() {
-    const { data } = await supa
-      .from('transacoes_bancarias')
-      .select('*')
-      .is('profile_id', null)
-      .order('data_transacao', { ascending: false });
-
-    const listaEl = document.getElementById('lista-pendentes');
-    if (!data || data.length === 0) {
-      listaEl.innerHTML = '<div class="vazio-lateral">Nenhuma transação pendente. 🎉</div>';
-      return;
-    }
-
-    listaEl.innerHTML = data.map(t => `
-      <div class="item-pendente" data-id="${t.id}" data-valor="${t.valor}">
-        <div class="topo-pendente">
-          <span>${escaparHtml(t.nome_pagador || '(sem nome)')}</span>
-          <span class="valor-pendente">R$ ${Number(t.valor).toFixed(2)}</span>
-        </div>
-        <div class="meta-historico">${new Date(t.data_transacao).toLocaleDateString('pt-BR')} • ${escaparHtml(t.meio || '')}</div>
-        <select class="select-vincular">
-          <option value="">Vincular a quem?</option>
-          ${todasPessoas.map(p => `<option value="${p.id}">${escaparHtml(p.nome)}</option>`).join('')}
-        </select>
-        <button class="botao-secundario btn-confirmar-vinculo">Vincular e lançar</button>
-      </div>
-    `).join('');
-
-    listaEl.querySelectorAll('.item-pendente').forEach(item => {
-      item.querySelector('.btn-confirmar-vinculo').addEventListener('click', async () => {
-        const profileId = item.querySelector('.select-vincular').value;
-        if (!profileId) { alert('Escolha uma pessoa primeiro.'); return; }
-        await vincularTransacaoPendente(item.dataset.id, profileId, Number(item.dataset.valor));
-      });
-    });
-  }
-
-  async function vincularTransacaoPendente(transacaoId, profileId, valor) {
-    const { data: contribuicaoInserida, error } = await supa
-      .from('contribuicoes')
-      .insert({
-        profile_id: profileId,
-        data: new Date().toISOString().split('T')[0],
-        valor,
-        meio_pagamento: 'pix',
-        observacao: 'Vinculado manualmente a partir do PagBank',
-      })
-      .select('id')
-      .single();
-
-    if (error) { alert('Erro ao lançar: ' + error.message); return; }
-
-    await supa.from('transacoes_bancarias')
-      .update({ profile_id: profileId, contribuicao_id: contribuicaoInserida.id })
-      .eq('id', transacaoId);
-
-    await carregarPendentes();
-    if (pessoaSelecionada && pessoaSelecionada.id === profileId) await carregarHistorico();
   }
 
   // =========================================================
@@ -1368,8 +1336,9 @@
   // =========================================================
   // Parsers testados isoladamente contra arquivos de exemplo reais antes
   // de integrar aqui -- ver decisoes tomadas com o Leo:
-  // - PagBank: so TIPO exatamente "Pix recebido" (nao inclui "QR Code
-  //   Pix recebido").
+  // - PagBank: TIPO "Pix recebido" OU "QR Code Pix recebido" (decisao
+  //   revista -- QR Code tambem precisa entrar, e um Pix recebido
+  //   normal, so mudou o jeito de gerar o codigo).
   // - Cora: Valor usa PONTO como decimal (nao virgula, diferente dos
   //   outros dois bancos) -- confirmado testando contra o arquivo real.
   // - Stone: Movimentacao=Credito E (Tipo=Pix OU (Tipo=Transacao E
@@ -1447,7 +1416,7 @@
     pagbank: {
       extrair(texto) {
         return linhasCsvParaObjetos(parseCsvExtrato(texto, ';'))
-          .filter(o => o.TIPO === 'Pix recebido')
+          .filter(o => o.TIPO === 'Pix recebido' || o.TIPO === 'QR Code Pix recebido')
           .map(o => ({
             data: dataBrParaIso(o.DATA),
             horario: null,
@@ -1535,7 +1504,7 @@
       }
 
       if (!todasPessoas.length) {
-        const { data } = await supa.from('profiles').select('id, nome').order('nome');
+        const { data } = await supa.from('profiles').select('id, nome, valor_dizimo_padrao').order('nome');
         todasPessoas = data || [];
       }
       if (!eventosIngressadosCache) {
@@ -1548,6 +1517,12 @@
       // -- sem acento/case -- com uma UNICA pessoa).
       linhasExtratoRevisao = await Promise.all(linhasBrutas.map(async (linha) => {
         const { data: profileId } = await supa.rpc('tentar_casar_transacao', { p_nome_pagador: linha.nome });
+        // Auto-detecta "Dizimo" quando o valor da linha bate com o
+        // valor fixo salvo da pessoa que casou -- editavel na revisao,
+        // igual o lancamento manual.
+        const pessoaCasada = profileId ? todasPessoas.find(p => p.id === profileId) : null;
+        const valorFixo = pessoaCasada?.valor_dizimo_padrao;
+        const tipoDetectado = valorFixo != null && linha.valor === Number(valorFixo) ? 'dizimo' : null;
         return {
           ...linha,
           profileId: profileId || null,
@@ -1558,6 +1533,7 @@
           eventoId: null,
           ignorar: false,
           meioPagamento: 'pix',
+          tipo: tipoDetectado,
           observacao: OBSERVACAO_PADRAO_BANCO_EXTRATO[bancoExtratoEscolhido],
         };
       }));
@@ -1590,6 +1566,7 @@
     pix: 'Pix', dinheiro: 'Dinheiro', cartao: 'Cartão',
     transferencia: 'Transferência', boleto: 'Boleto', outro: 'Outro',
   };
+  const LABEL_TIPO_EXTRATO = { '': 'Não especificado', dizimo: 'Dízimo', oferta: 'Oferta', outro: 'Outro' };
 
   function renderizarRevisaoExtrato() {
     const el = document.getElementById('revisao-extrato');
@@ -1603,6 +1580,7 @@
               <th>Nome completo</th>
               <th>Conta</th>
               <th>Meio de pagamento</th>
+              <th>Tipo</th>
               <th>Valor</th>
               <th>Data e horário</th>
               <th>Descrição</th>
@@ -1629,6 +1607,11 @@
                   <td>
                     <select class="select-meio-extrato" data-indice="${i}">
                       ${Object.entries(LABEL_MEIO_EXTRATO).map(([v, l]) => `<option value="${v}" ${v === linha.meioPagamento ? 'selected' : ''}>${l}</option>`).join('')}
+                    </select>
+                  </td>
+                  <td>
+                    <select class="select-tipo-extrato" data-indice="${i}">
+                      ${Object.entries(LABEL_TIPO_EXTRATO).map(([v, l]) => `<option value="${v}" ${v === (linha.tipo || '') ? 'selected' : ''}>${l}</option>`).join('')}
                     </select>
                   </td>
                   <td style="white-space:nowrap;">R$ ${linha.valor.toFixed(2)}</td>
@@ -1672,6 +1655,11 @@
     el.querySelectorAll('.select-meio-extrato').forEach(sel => {
       sel.addEventListener('change', (e) => {
         linhasExtratoRevisao[e.target.dataset.indice].meioPagamento = e.target.value;
+      });
+    });
+    el.querySelectorAll('.select-tipo-extrato').forEach(sel => {
+      sel.addEventListener('change', (e) => {
+        linhasExtratoRevisao[e.target.dataset.indice].tipo = e.target.value || null;
       });
     });
     el.querySelectorAll('.input-observacao-extrato').forEach(inp => {
@@ -1720,6 +1708,7 @@
       meio_pagamento: l.meioPagamento,
       observacao: l.observacao || null,
       evento_id: l.eventoId || null,
+      tipo: l.tipo || null,
     }));
 
     const { error } = await supa.from('contribuicoes').insert(payload);

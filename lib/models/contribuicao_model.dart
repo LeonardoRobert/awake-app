@@ -17,6 +17,45 @@ MeioPagamento meioPagamentoFromString(String? value) {
   }
 }
 
+enum TipoContribuicao { dizimo, oferta, outro }
+
+TipoContribuicao? tipoContribuicaoFromString(String? value) {
+  switch (value) {
+    case 'dizimo':
+      return TipoContribuicao.dizimo;
+    case 'oferta':
+      return TipoContribuicao.oferta;
+    case 'outro':
+      return TipoContribuicao.outro;
+    default:
+      return null;
+  }
+}
+
+extension TipoContribuicaoLabel on TipoContribuicao {
+  String get valorBanco {
+    switch (this) {
+      case TipoContribuicao.dizimo:
+        return 'dizimo';
+      case TipoContribuicao.oferta:
+        return 'oferta';
+      case TipoContribuicao.outro:
+        return 'outro';
+    }
+  }
+
+  String get label {
+    switch (this) {
+      case TipoContribuicao.dizimo:
+        return 'Dízimo';
+      case TipoContribuicao.oferta:
+        return 'Oferta';
+      case TipoContribuicao.outro:
+        return 'Outro';
+    }
+  }
+}
+
 extension MeioPagamentoLabel on MeioPagamento {
   String get valorBanco {
     switch (this) {
@@ -66,6 +105,9 @@ class ContribuicaoModel {
   /// um evento ingressado especifico (ex: parcela do retiro) -- em
   /// vez de um dizimo/oferta comum.
   final String? eventoId;
+  /// Nulo = nao especificado (lancamentos antigos, ou quando quem
+  /// lancou nao escolheu).
+  final TipoContribuicao? tipo;
 
   ContribuicaoModel({
     required this.id,
@@ -77,6 +119,7 @@ class ContribuicaoModel {
     this.observacao,
     this.nomePessoa,
     this.eventoId,
+    this.tipo,
   });
 
   factory ContribuicaoModel.fromMap(Map<String, dynamic> map) {
@@ -91,6 +134,7 @@ class ContribuicaoModel {
       observacao: map['observacao'] as String?,
       nomePessoa: perfil?['nome'] as String?,
       eventoId: map['evento_id'] as String?,
+      tipo: tipoContribuicaoFromString(map['tipo'] as String?),
     );
   }
 }
