@@ -1470,6 +1470,9 @@
               horario: horaParte || null,
               nome: o.Origem,
               valor: decimalComVirgula(o.Valor),
+              // A coluna Tipo ja diz Pix ou Transacao (transferencia) --
+              // antes isso era jogado fora e tudo virava "pix" fixo.
+              meioPagamento: o.Tipo === 'Pix' ? 'pix' : 'transferencia',
             };
           });
       },
@@ -1605,7 +1608,10 @@
           motivoSemUsuario: profileId ? null : '__nao_cadastrado__',
           eventoId: null,
           ignorar: false,
-          meioPagamento: 'pix',
+          // Stone ja diz o meio certo por linha (pix/transferencia) --
+          // so cai pra "pix" quando o parser nao especificou nada
+          // (PagBank/Cora, que so lidam com Pix mesmo).
+          meioPagamento: linha.meioPagamento || 'pix',
           tipo: tipoDetectado,
           observacao: OBSERVACAO_PADRAO_BANCO_EXTRATO[bancoExtratoEscolhido],
         };
