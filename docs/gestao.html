@@ -1537,7 +1537,10 @@
         return {
           ...linha,
           profileId: profileId || null,
-          motivoSemUsuario: null, // '__nao_cadastrado__' | '__sem_identificacao__' quando profileId for null
+          // Pre-preenche com "Usuario nao cadastrado" quando nao casou --
+          // evita a linha ficar em branco esperando escolha manual; o
+          // admin so muda se for o caso de "Credito sem identificacao".
+          motivoSemUsuario: profileId ? null : '__nao_cadastrado__',
           eventoId: null,
           ignorar: false,
           meioPagamento: 'pix',
