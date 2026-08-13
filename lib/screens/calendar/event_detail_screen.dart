@@ -197,9 +197,7 @@ class EventDetailScreen extends ConsumerWidget {
                           onPressed: () => Navigator.of(context).push(MaterialPageRoute(
                             builder: (_) => EscalaServicoScreen(
                               ministerio: ministerio,
-                              eventoId: event.id,
-                              eventoTitulo: event.titulo,
-                              dataOcorrencia: dataExibida,
+                              ocorrencias: [(dataExibida, event)],
                             ),
                           )),
                           icon: const Icon(Icons.assignment_ind_outlined),

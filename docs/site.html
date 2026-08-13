@@ -10,14 +10,17 @@
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;1,700;1,800&family=Source+Serif+4:ital@0;1&display=swap" rel="stylesheet">
 <style>
   :root {
-    --navy: #0C192E;
-    --navy-deep: #081120;
+    /* Identidade alinhada com o site institucional novo: terracota
+       como cor de acao/destaque, tinta como "chrome" escuro (antes
+       era navy), azul/creme como cores secundarias -- mesmos tokens. */
+    --tinta: #2B271E;
+    --terracota: #BD440D;
+    --terracota-escuro: #9C380A;
     --azul: #9BB0C7;
-    --azul-escuro: #45566E;
+    --azul-escuro: #3D4D5E;
     --creme: #F7F2DD;
-    --creme-escuro: #EDE6C9;
-    --branco: #FFFFFF;
-    --dourado: #CBA135;
+    --creme-escuro: #EFE6C9;
+    --branco: #FFFDF8;
   }
   * { box-sizing: border-box; }
   html { scroll-behavior: smooth; }
@@ -25,7 +28,7 @@
     margin: 0;
     font-family: 'Plus Jakarta Sans', sans-serif;
     background: var(--creme);
-    color: var(--navy);
+    color: var(--tinta);
   }
   .serif { font-family: 'Source Serif 4', serif; }
   section { padding: 72px 24px; }
@@ -39,7 +42,7 @@
     position: sticky; top: 0; z-index: 30;
     background: rgba(247,242,221,0.92);
     backdrop-filter: blur(6px);
-    border-bottom: 1px solid rgba(12,25,46,0.08);
+    border-bottom: 1px solid rgba(43,39,30,0.08);
   }
   .nav-interna {
     max-width: 1040px; margin: 0 auto;
@@ -52,13 +55,13 @@
   .nav-links a:not(.botao-whatsapp) { margin-right: 22px; }
   .nav-links a:last-child { margin-right: 0; }
   .nav-links a { text-decoration: none; }
-  .nav-links a:hover { color: var(--dourado); }
+  .nav-links a:hover { color: var(--terracota); }
   .botao-whatsapp {
-    background: var(--navy); color: var(--branco) !important;
+    background: var(--terracota); color: var(--branco) !important;
     padding: 9px 16px; border-radius: 8px; font-size: 13px !important;
     text-decoration: none;
   }
-  .menu-mobile-btn { display: none; background: none; border: none; font-size: 22px; cursor: pointer; color: var(--navy); }
+  .menu-mobile-btn { display: none; background: none; border: none; font-size: 22px; cursor: pointer; color: var(--tinta); }
   @media (max-width: 720px) {
     .nav-links { display: none; }
     .menu-mobile-btn { display: block; }
@@ -72,7 +75,7 @@
   .eyebrow {
     display: inline-block;
     font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
-    color: var(--dourado);
+    color: var(--terracota);
     margin-bottom: 18px;
   }
   .hero h1 {
@@ -89,8 +92,9 @@
     padding: 13px 26px; border-radius: 10px; font-weight: 700; font-size: 14px;
     text-decoration: none; display: inline-block; cursor: pointer; border: none; font-family: inherit;
   }
-  .botao-primario { background: var(--navy); color: var(--branco); }
-  .botao-secundario { background: transparent; color: var(--navy); border: 1.5px solid var(--navy); }
+  .botao-primario { background: var(--terracota); color: var(--branco); }
+  .botao-primario:hover { background: var(--terracota-escuro); }
+  .botao-secundario { background: transparent; color: var(--tinta); border: 1.5px solid var(--tinta); }
   .versiculo {
     font-family: 'Source Serif 4', serif; font-style: italic; font-size: 18px;
     color: var(--azul-escuro); max-width: 460px; margin: 0 auto;
@@ -99,7 +103,7 @@
   /* ---------- secao padrao ---------- */
   .rotulo-secao {
     font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
-    color: var(--dourado); margin-bottom: 8px; display: block;
+    color: var(--terracota); margin-bottom: 8px; display: block;
   }
   .titulo-secao { font-size: clamp(26px, 4vw, 36px); font-weight: 800; margin-bottom: 16px; }
   .texto-secao { font-size: 16px; line-height: 1.7; color: var(--azul-escuro); }
@@ -108,7 +112,7 @@
 
   /* ---------- tema do ano ---------- */
   .cartao-tema {
-    background: var(--navy); color: var(--branco);
+    background: var(--tinta); color: var(--branco);
     border-radius: 18px; padding: 40px; text-align: center;
     max-width: 640px; margin: 0 auto;
   }
@@ -117,19 +121,19 @@
   .cartao-tema p { color: var(--azul); line-height: 1.6; margin: 0; }
 
   /* ---------- agenda ---------- */
-  .tabela-horarios { width: 100%; border-collapse: collapse; margin-top: 24px; }
+  .tabela-horarios { width: 100%; border-collapse: collapse; margin-top: 24px; border-radius: 14px; overflow: hidden; }
   .tabela-horarios th {
     text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
-    color: var(--azul-escuro); padding: 10px 12px; border-bottom: 2px solid var(--navy);
+    color: var(--branco); background: var(--azul); padding: 10px 12px;
   }
-  .tabela-horarios td { padding: 14px 12px; border-bottom: 1px solid rgba(12,25,46,0.08); font-size: 14px; }
+  .tabela-horarios td { padding: 14px 12px; border-bottom: 1px solid rgba(43,39,30,0.08); font-size: 14px; }
   .tabela-horarios tr:last-child td { border-bottom: none; }
-  .dia-semana-cell { font-weight: 700; }
-  .horario-cell { text-align: right; font-weight: 700; color: var(--navy); white-space: nowrap; }
+  .dia-semana-cell { font-weight: 700; color: var(--terracota); }
+  .horario-cell { text-align: right; font-weight: 700; color: var(--tinta); white-space: nowrap; }
 
   .cartao-especial {
     background: var(--creme-escuro);
-    border-left: 4px solid var(--dourado);
+    border-left: 4px solid var(--terracota);
     border-radius: 12px; padding: 24px; margin-top: 20px;
   }
   .cartao-especial .rotulo-secao { margin-bottom: 6px; }
@@ -141,12 +145,12 @@
   .cartao-rede {
     background: var(--branco); border-radius: 12px; padding: 18px;
     text-decoration: none; display: flex; align-items: center; gap: 12px;
-    border: 1px solid rgba(12,25,46,0.08);
+    border: 1px solid rgba(43,39,30,0.08);
   }
-  .cartao-rede:hover { border-color: var(--navy); }
+  .cartao-rede:hover { border-color: var(--terracota); }
   .cartao-rede .icone-rede {
-    width: 38px; height: 38px; border-radius: 50%;
-    background: var(--navy); color: var(--branco);
+    width: 38px; height: 38px; border-radius: 14px;
+    background: var(--azul); color: var(--branco);
     display: flex; align-items: center; justify-content: center;
     font-size: 12px; font-weight: 800; flex-shrink: 0;
   }
@@ -154,13 +158,16 @@
   .cartao-rede .handle-rede { font-size: 12px; color: var(--azul-escuro); }
 
   /* ---------- contribua ---------- */
-  .secao-contribua { background: var(--navy); color: var(--branco); }
-  .secao-contribua .rotulo-secao { color: var(--azul); }
-  .secao-contribua .texto-secao { color: var(--azul); }
+  .secao-contribua {
+    background: linear-gradient(135deg, var(--terracota) 0%, var(--terracota-escuro) 100%);
+    color: var(--branco);
+  }
+  .secao-contribua .rotulo-secao { color: rgba(255,255,255,0.85); }
+  .secao-contribua .texto-secao { color: rgba(255,255,255,0.88); }
   .botoes-contribua { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 28px; }
   .botao-contribuir {
     flex: 1; min-width: 220px;
-    background: var(--creme); color: var(--navy);
+    background: var(--creme); color: var(--tinta);
     border: none; border-radius: 12px; padding: 18px;
     font-family: inherit; font-weight: 700; font-size: 15px; cursor: pointer;
     display: flex; align-items: center; gap: 10px; justify-content: center;
@@ -168,7 +175,7 @@
   .botao-contribuir:hover { background: var(--branco); }
 
   /* ---------- footer ---------- */
-  footer { background: var(--navy-deep); color: var(--azul); padding: 48px 24px 24px; }
+  footer { background: var(--tinta); color: var(--azul); padding: 48px 24px 24px; }
   .footer-topo { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 32px; max-width: 1040px; margin: 0 auto; }
   .footer-marca { font-style: italic; font-weight: 800; font-size: 20px; color: var(--branco); margin-bottom: 8px; }
   .footer-endereco { font-size: 13px; line-height: 1.6; max-width: 280px; }
@@ -183,7 +190,7 @@
 
   /* ---------- modal generico (Pix) ---------- */
   .fundo-modal {
-    display: none; position: fixed; inset: 0; background: rgba(12,25,46,0.5);
+    display: none; position: fixed; inset: 0; background: rgba(43,39,30,0.5);
     align-items: center; justify-content: center; padding: 20px; z-index: 100;
   }
   .fundo-modal.aberto { display: flex; }
@@ -197,7 +204,7 @@
     border: 1px solid #D7DEE6; background: none; font-family: inherit;
     font-size: 15px; font-weight: 600; margin-bottom: 10px; cursor: pointer;
   }
-  .caixa-modal .opcao-modal:hover { border-color: var(--navy); background: var(--creme); }
+  .caixa-modal .opcao-modal:hover { border-color: var(--terracota); background: var(--creme); }
   .caixa-modal .fechar-x { float: right; background: none; border: none; font-size: 18px; cursor: pointer; color: var(--azul-escuro); }
 </style>
 </head>
@@ -377,7 +384,7 @@
       el.innerHTML = `
         <a href="https://www.youtube.com/watch?v=${idDestaque}" target="_blank" rel="noopener"
            style="text-decoration:none;color:inherit;display:block;margin-bottom:24px;">
-          <div style="position:relative;border-radius:14px;overflow:hidden;box-shadow:0 8px 24px rgba(12,25,46,0.12);">
+          <div style="position:relative;border-radius:14px;overflow:hidden;box-shadow:0 8px 24px rgba(43,39,30,0.12);">
             <img src="https://i.ytimg.com/vi/${idDestaque}/hqdefault.jpg" style="width:100%;display:block;">
           </div>
           <p style="font-size:17px;font-weight:700;margin:14px 0 0;">${escaparHtml(destaque.snippet.title)}</p>
@@ -477,7 +484,7 @@
           const colunaEncontro = encontros
             .map(e => `
               ${escaparHtml(e.titulo)}
-              <span style="color:var(--dourado);font-weight:700;font-size:11px;text-transform:uppercase;">· ${escaparHtml(e.categoria)}</span>
+              <span style="color:var(--terracota);font-weight:700;font-size:11px;text-transform:uppercase;">· ${escaparHtml(e.categoria)}</span>
             `)
             .join('<br>');
           const colunaHorario = encontros

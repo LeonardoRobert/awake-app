@@ -12,7 +12,7 @@ import '../../screens/pages/nossas_paginas_screen.dart';
 import '../../models/profile_model.dart';
 import '../../screens/pages/nossos_conteudos_screen.dart';
 import '../../screens/pages/quem_somos_screen.dart';
-import '../../screens/calendar/escala_mensal_screen.dart';
+import '../../screens/calendar/escala_grade_screen.dart';
 import '../../screens/volunteering/admin_visitantes_screen.dart';
 import '../../screens/volunteering/dashboard_ministerio_screen.dart';
 import '../../services/escala_servico_service.dart';
@@ -263,7 +263,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           title: Text('Escala mensal — ${m.ministerio.labelMinisterio}'),
                           trailing: const Icon(Icons.chevron_right),
                           onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                            builder: (_) => EscalaMensalScreen(ministerio: m.ministerio),
+                            builder: (_) => EscalaGradeScreen(ministerio: m.ministerio),
                           )),
                         )),
               ],

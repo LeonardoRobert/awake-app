@@ -1,25 +1,36 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../models/escala_servico_model.dart';
+import '../../models/event_model.dart';
 import '../../models/profile_model.dart';
 import '../../services/escala_servico_service.dart';
 import '../../widgets/awake_app_bar.dart';
 
+/// Estado de uma ocorrencia (culto especifico) dentro da tela: comeca so
+/// com data/evento, e ganha escalaId/posicoes depois do primeiro carregar.
+class _OcorrenciaEscala {
+  final DateTime data;
+  final EventModel evento;
+  String? escalaId;
+  List<PosicaoEscala> posicoes = [];
+
+  _OcorrenciaEscala({required this.data, required this.evento});
+}
+
 /// Tela de criar/editar a escala de um ministerio de servico (Diaconos,
-/// Louvor, Danca, Midia, Multimidia) pra uma ocorrencia especifica de
-/// um evento geral da igreja.
+/// Louvor, Danca, Midia, Multimidia) pra uma ou mais ocorrencias de
+/// eventos gerais da igreja -- usada tanto pra uma unica ocorrencia
+/// (botao "Criar/editar escala" dentro do detalhe de um evento) quanto
+/// pra semana inteira de uma vez (fluxo Semanal), pra nao precisar abrir
+/// a tela de novo culto a culto.
 class EscalaServicoScreen extends StatefulWidget {
   final String ministerio;
-  final String eventoId;
-  final String eventoTitulo;
-  final DateTime dataOcorrencia;
+  final List<(DateTime data, EventModel evento)> ocorrencias;
 
   const EscalaServicoScreen({
     super.key,
     required this.ministerio,
-    required this.eventoId,
-    required this.eventoTitulo,
-    required this.dataOcorrencia,
+    required this.ocorrencias,
   });
 
   @override
@@ -28,8 +39,9 @@ class EscalaServicoScreen extends StatefulWidget {
 
 class _EscalaServicoScreenState extends State<EscalaServicoScreen> {
   final _service = EscalaServicoService();
-  String? _escalaId;
-  List<PosicaoEscala> _posicoes = [];
+  late final List<_OcorrenciaEscala> _ocorrencias = widget.ocorrencias
+      .map((oc) => _OcorrenciaEscala(data: oc.$1, evento: oc.$2))
+      .toList();
   bool _carregando = true;
 
   @override
@@ -40,24 +52,32 @@ class _EscalaServicoScreenState extends State<EscalaServicoScreen> {
 
   Future<void> _carregar() async {
     setState(() => _carregando = true);
-    final escalaId = await _service.buscarOuCriarEscala(
-      ministerio: widget.ministerio,
-      eventoId: widget.eventoId,
-      dataOcorrencia: widget.dataOcorrencia,
-    );
-    final posicoes = await _service.listarPosicoes(escalaId);
-    if (mounted) {
-      setState(() {
-        _escalaId = escalaId;
-        _posicoes = posicoes;
-        _carregando = false;
-      });
-    }
+    await Future.wait(_ocorrencias.map((oc) async {
+      final escalaId = await _service.buscarOuCriarEscala(
+        ministerio: widget.ministerio,
+        eventoId: oc.evento.id,
+        dataOcorrencia: oc.data,
+      );
+      final posicoes = await _service.listarPosicoes(escalaId);
+      oc.escalaId = escalaId;
+      oc.posicoes = posicoes;
+    }));
+    if (mounted) setState(() => _carregando = false);
+  }
+
+  Future<void> _recarregarOcorrencia(_OcorrenciaEscala ocorrencia) async {
+    final posicoes = await _service.listarPosicoes(ocorrencia.escalaId!);
+    if (!mounted) return;
+    setState(() => ocorrencia.posicoes = posicoes);
   }
 
   bool get _ehDiaconos => widget.ministerio == 'diaconos';
 
-  Future<void> _escolherPessoa(PosicaoEscala posicao, {int slot = 1}) async {
+  Future<void> _escolherPessoa(
+    _OcorrenciaEscala ocorrencia,
+    PosicaoEscala posicao, {
+    int slot = 1,
+  }) async {
     final buscaController = TextEditingController();
     List<PessoaBusca> resultados = [];
     final jaTemPessoa = slot == 1 ? posicao.profileId != null : posicao.profileId2 != null;
@@ -126,7 +146,6 @@ class _EscalaServicoScreenState extends State<EscalaServicoScreen> {
             ],
           );
         },
-
       ),
     );
 
@@ -138,10 +157,57 @@ class _EscalaServicoScreenState extends State<EscalaServicoScreen> {
     } else {
       await _service.definirSegundaPessoa(posicao.id, novoProfileId);
     }
-    _carregar();
+
+    // Mesma memoria de casal ja usada na grade mensal: so pros
+    // Diaconos, e so quando a pessoa foi definida (nao ao limpar).
+    if (_ehDiaconos && novoProfileId != null) {
+      await _aplicarEfeitoCasal(ocorrencia, posicao.funcao, slot, selecionado);
+    }
+
+    await _recarregarOcorrencia(ocorrencia);
   }
 
-  Future<void> _adicionarFuncaoLivre() async {
+  /// Autopreenche o slot irmao com o par salvo (se houver) e, assim que
+  /// os dois slots dessa posicao ficarem preenchidos, lembra/atualiza o
+  /// par -- mesma logica da grade mensal (ver escala_grade_screen.dart).
+  Future<void> _aplicarEfeitoCasal(
+    _OcorrenciaEscala ocorrencia,
+    String funcao,
+    int slotEditado,
+    PessoaBusca pessoa,
+  ) async {
+    final posicoes = await _service.listarPosicoes(ocorrencia.escalaId!);
+    final posicaoAtual = posicoes.firstWhere((p) => p.funcao == funcao);
+
+    final slotIrmaoVazio =
+        slotEditado == 1 ? posicaoAtual.profileId2 == null : posicaoAtual.profileId == null;
+
+    if (slotIrmaoVazio) {
+      final par = await _service.buscarParDoCasal(
+        ministerio: widget.ministerio,
+        profileId: pessoa.id,
+      );
+      if (par != null) {
+        if (slotEditado == 1) {
+          await _service.definirSegundaPessoa(posicaoAtual.id, par.id);
+        } else {
+          await _service.definirPessoa(posicaoAtual.id, par.id);
+        }
+      }
+    }
+
+    final posicoesFinal = await _service.listarPosicoes(ocorrencia.escalaId!);
+    final posicaoFinal = posicoesFinal.firstWhere((p) => p.funcao == funcao);
+    if (posicaoFinal.profileId != null && posicaoFinal.profileId2 != null) {
+      await _service.salvarPar(
+        ministerio: widget.ministerio,
+        profileIdA: posicaoFinal.profileId!,
+        profileIdB: posicaoFinal.profileId2!,
+      );
+    }
+  }
+
+  Future<void> _adicionarFuncaoLivre(_OcorrenciaEscala ocorrencia) async {
     final controller = TextEditingController();
     final nome = await showDialog<String>(
       context: context,
@@ -165,77 +231,85 @@ class _EscalaServicoScreenState extends State<EscalaServicoScreen> {
       ),
     );
 
-    if (nome == null || nome.isEmpty || _escalaId == null) return;
+    if (nome == null || nome.isEmpty || ocorrencia.escalaId == null) return;
     await _service.adicionarPosicao(
-      escalaId: _escalaId!,
+      escalaId: ocorrencia.escalaId!,
       funcao: nome,
-      ordem: _posicoes.length + 1,
+      ordem: ocorrencia.posicoes.length + 1,
     );
-    _carregar();
+    await _recarregarOcorrencia(ocorrencia);
   }
 
-  Future<void> _removerPosicao(PosicaoEscala posicao) async {
+  Future<void> _removerPosicao(_OcorrenciaEscala ocorrencia, PosicaoEscala posicao) async {
     await _service.removerPosicao(posicao.id);
-    _carregar();
+    await _recarregarOcorrencia(ocorrencia);
   }
 
   @override
   Widget build(BuildContext context) {
+    final titulo = _ocorrencias.length > 1
+        ? 'Escala semanal — ${widget.ministerio.labelMinisterio}'
+        : 'Escala de ${widget.ministerio.labelMinisterio}';
+
     return Scaffold(
-      appBar: AwakeAppBar(
-        title: 'Escala de ${widget.ministerio.labelMinisterio}',
-        showQrButton: false,
-      ),
+      appBar: AwakeAppBar(title: titulo, showQrButton: false),
       body: _carregando
           ? const Center(child: CircularProgressIndicator())
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                Text(widget.eventoTitulo, style: Theme.of(context).textTheme.titleLarge),
-                Text(
-                  DateFormat("EEEE, dd 'de' MMMM", 'pt_BR').format(widget.dataOcorrencia),
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 20),
-                ..._posicoes.map((posicao) => Card(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      child: _ehDiaconos
-                          ? _buildPosicaoCasal(posicao)
-                          : ListTile(
-                              title: Text(posicao.funcao),
-                              subtitle:
-                                  Text(posicao.nomePessoa ?? 'Ninguém escalado ainda'),
-                              trailing: IconButton(
-                                icon: const Icon(Icons.close, size: 18),
-                                tooltip: 'Remover essa posição da escala',
-                                onPressed: () => _removerPosicao(posicao),
-                              ),
-                              leading: CircleAvatar(
-                                backgroundColor: posicao.profileId != null
-                                    ? Colors.green.withOpacity(0.2)
-                                    : Colors.grey.withOpacity(0.2),
-                                child: Icon(
-                                  posicao.profileId != null
-                                      ? Icons.check
-                                      : Icons.person_outline,
-                                  size: 18,
+                for (final ocorrencia in _ocorrencias) ...[
+                  Text(ocorrencia.evento.titulo, style: Theme.of(context).textTheme.titleLarge),
+                  Text(
+                    DateFormat("EEEE, dd 'de' MMMM", 'pt_BR').format(ocorrencia.data),
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 12),
+                  ...ocorrencia.posicoes.map((posicao) => Card(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        child: _ehDiaconos
+                            ? _buildPosicaoCasal(ocorrencia, posicao)
+                            : ListTile(
+                                title: Text(posicao.funcao),
+                                subtitle:
+                                    Text(posicao.nomePessoa ?? 'Ninguém escalado ainda'),
+                                trailing: IconButton(
+                                  icon: const Icon(Icons.close, size: 18),
+                                  tooltip: 'Remover essa posição da escala',
+                                  onPressed: () => _removerPosicao(ocorrencia, posicao),
                                 ),
+                                leading: CircleAvatar(
+                                  backgroundColor: posicao.profileId != null
+                                      ? Colors.green.withOpacity(0.2)
+                                      : Colors.grey.withOpacity(0.2),
+                                  child: Icon(
+                                    posicao.profileId != null
+                                        ? Icons.check
+                                        : Icons.person_outline,
+                                    size: 18,
+                                  ),
+                                ),
+                                onTap: () => _escolherPessoa(ocorrencia, posicao),
                               ),
-                              onTap: () => _escolherPessoa(posicao),
-                            ),
-                    )),
-                const SizedBox(height: 8),
-                OutlinedButton.icon(
-                  onPressed: _adicionarFuncaoLivre,
-                  icon: const Icon(Icons.add),
-                  label: const Text('Adicionar posição'),
-                ),
+                      )),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: () => _adicionarFuncaoLivre(ocorrencia),
+                    icon: const Icon(Icons.add),
+                    label: const Text('Adicionar posição'),
+                  ),
+                  if (ocorrencia != _ocorrencias.last) ...[
+                    const SizedBox(height: 24),
+                    const Divider(height: 1),
+                    const SizedBox(height: 20),
+                  ],
+                ],
               ],
             ),
     );
   }
 
-  Widget _buildPosicaoCasal(PosicaoEscala posicao) {
+  Widget _buildPosicaoCasal(_OcorrenciaEscala ocorrencia, PosicaoEscala posicao) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Column(
@@ -252,7 +326,7 @@ class _EscalaServicoScreenState extends State<EscalaServicoScreen> {
                 IconButton(
                   icon: const Icon(Icons.close, size: 18),
                   tooltip: 'Remover essa posição da escala',
-                  onPressed: () => _removerPosicao(posicao),
+                  onPressed: () => _removerPosicao(ocorrencia, posicao),
                 ),
               ],
             ),
@@ -270,7 +344,7 @@ class _EscalaServicoScreenState extends State<EscalaServicoScreen> {
               ),
             ),
             title: Text(posicao.nomePessoa ?? 'Escolher 1ª pessoa do casal'),
-            onTap: () => _escolherPessoa(posicao, slot: 1),
+            onTap: () => _escolherPessoa(ocorrencia, posicao, slot: 1),
           ),
           ListTile(
             dense: true,
@@ -285,7 +359,7 @@ class _EscalaServicoScreenState extends State<EscalaServicoScreen> {
               ),
             ),
             title: Text(posicao.nomePessoa2 ?? 'Escolher 2ª pessoa do casal'),
-            onTap: () => _escolherPessoa(posicao, slot: 2),
+            onTap: () => _escolherPessoa(ocorrencia, posicao, slot: 2),
           ),
           const SizedBox(height: 4),
         ],

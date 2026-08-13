@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import '../models/event_model.dart';
 import '../models/profile_model.dart';
-import '../screens/calendar/escala_mensal_screen.dart';
+import '../screens/calendar/escala_grade_screen.dart';
 import '../screens/calendar/escala_servico_screen.dart';
 import '../services/escala_servico_service.dart';
 
@@ -116,34 +115,13 @@ Future<void> _abrirEscalaSemanal(
     return;
   }
 
-  final escolhida = await showModalBottomSheet<(DateTime, EventModel)>(
-    context: context,
-    builder: (dialogContext) => SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Padding(
-            padding: EdgeInsets.all(16),
-            child: Text('Qual culto?', style: TextStyle(fontWeight: FontWeight.w600)),
-          ),
-          ...ocorrencias.map((oc) => ListTile(
-                title: Text(oc.$2.titulo),
-                subtitle: Text(DateFormat("dd/MM (EEEE) HH:mm", 'pt_BR').format(oc.$1)),
-                onTap: () => Navigator.of(dialogContext).pop(oc),
-              )),
-        ],
-      ),
-    ),
-  );
-
-  if (escolhida == null || !context.mounted) return;
-
+  // Mostra todos os cultos da semana de uma vez na mesma tela (EBD,
+  // Culto de Celebracao, Culto da Familia etc.), sem precisar escolher
+  // um por um -- ver EscalaServicoScreen.
   await Navigator.of(context).push(MaterialPageRoute(
     builder: (_) => EscalaServicoScreen(
       ministerio: ministerio,
-      eventoId: escolhida.$2.id,
-      eventoTitulo: escolhida.$2.titulo,
-      dataOcorrencia: escolhida.$1,
+      ocorrencias: ocorrencias,
     ),
   ));
 }
@@ -153,50 +131,15 @@ Future<void> _abrirEscalaMensal(
   String ministerio,
   DateTime? diaSelecionado,
 ) async {
+  // A propria grade ja tem abas de mes (e seta de ano) -- entao abre
+  // direto nela, ja no mes do dia clicado (ou no mes atual), sem
+  // precisar de um seletor de mes separado antes.
   final base = diaSelecionado ?? DateTime.now();
-  var mesEscolhido = DateTime(base.year, base.month, 1);
-
-  final confirmado = await showDialog<DateTime>(
-    context: context,
-    builder: (dialogContext) => StatefulBuilder(
-      builder: (dialogContext, setDialogState) => AlertDialog(
-        title: const Text('Escala de qual mês?'),
-        content: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            IconButton(
-              icon: const Icon(Icons.chevron_left),
-              onPressed: () => setDialogState(() =>
-                  mesEscolhido = DateTime(mesEscolhido.year, mesEscolhido.month - 1, 1)),
-            ),
-            Text(
-              DateFormat("MMMM 'de' yyyy", 'pt_BR').format(mesEscolhido),
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-            IconButton(
-              icon: const Icon(Icons.chevron_right),
-              onPressed: () => setDialogState(() =>
-                  mesEscolhido = DateTime(mesEscolhido.year, mesEscolhido.month + 1, 1)),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(mesEscolhido),
-            child: const Text('Continuar'),
-          ),
-        ],
-      ),
-    ),
-  );
-
-  if (confirmado == null || !context.mounted) return;
-
   await Navigator.of(context).push(MaterialPageRoute(
-    builder: (_) => EscalaMensalScreen(ministerio: ministerio, mesInicial: confirmado),
+    builder: (_) => EscalaGradeScreen(
+      ministerio: ministerio,
+      anoInicial: base.year,
+      mesInicial: base.month,
+    ),
   ));
 }

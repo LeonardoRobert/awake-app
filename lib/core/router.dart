@@ -11,6 +11,7 @@ import '../screens/auth/signup_screen.dart';
 import '../screens/auth/termos_screen.dart';
 import '../screens/calendar/admin_calendario_screen.dart';
 import '../screens/financeiro/admin_financeiro_screen.dart';
+import '../screens/calendar/escala_grade_screen.dart';
 import '../screens/calendar/event_detail_screen.dart';
 import '../screens/calendar/event_form_screen.dart';
 import '../screens/financeiro/financeiro_screen.dart';
@@ -84,6 +85,18 @@ final routerProvider = Provider<GoRouter>((ref) {
           eventId: state.pathParameters['id']!,
           occurrenceDate: state.extra as DateTime?,
         ),
+      ),
+      GoRoute(
+        path: '/escala-grade/:ministerio',
+        builder: (context, state) {
+          final anoParam = state.uri.queryParameters['ano'];
+          final mesParam = state.uri.queryParameters['mes'];
+          return EscalaGradeScreen(
+            ministerio: state.pathParameters['ministerio']!,
+            anoInicial: anoParam != null ? int.tryParse(anoParam) : null,
+            mesInicial: mesParam != null ? int.tryParse(mesParam) : null,
+          );
+        },
       ),
       GoRoute(
         path: '/escalas/nova',

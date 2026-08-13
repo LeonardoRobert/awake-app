@@ -1,4 +1,15 @@
 -- =========================================================
+-- ⚠️ DESATUALIZADO — não reflete o banco de producao atual.
+-- Varias tabelas foram criadas depois via SQL Editor e nunca
+-- voltaram pra esse arquivo (contribuicoes, escala_servico_*,
+-- pedidos_oracao, testemunhos, visitantes_primeira_vez,
+-- profile_ministerios, transacoes_bancarias, entre outras).
+-- O enum user_role aqui tambem esta velho (ainda tem 'lider'
+-- como papel global e nao tem 'admin_financeiro').
+-- NAO USE PRA RECRIAR O BANCO — so rode de novo depois de
+-- substituir esse arquivo por um dump real (Supabase Database
+-- -> Backups, ou pg_dump com a connection string do projeto).
+-- =========================================================
 -- Awake — Schema Supabase — VERSAO DEFINITIVA
 -- Este script pode ser rodado quantas vezes precisar: ele sempre
 -- limpa qualquer coisa que tenha ficado de tentativas anteriores

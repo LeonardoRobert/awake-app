@@ -177,4 +177,61 @@ class EscalaServicoService {
       );
     }).toList();
   }
+
+  /// So usado pelos Diaconos -- busca o par de casal mais recentemente
+  /// salvo pra essa pessoa (se houver), pra autopreencher a celula
+  /// irma na grade. null se essa pessoa nunca foi pareada.
+  Future<PessoaBusca?> buscarParDoCasal({
+    required String ministerio,
+    required String profileId,
+  }) async {
+    final data = await _client
+        .from('escala_servico_casais')
+        .select(
+          'profile_id_a, profile_id_b, '
+          'a:profiles!escala_servico_casais_profile_id_a_fkey(nome), '
+          'b:profiles!escala_servico_casais_profile_id_b_fkey(nome)',
+        )
+        .eq('ministerio', ministerio)
+        .or('profile_id_a.eq.$profileId,profile_id_b.eq.$profileId')
+        .order('atualizado_em', ascending: false)
+        .limit(1)
+        .maybeSingle();
+
+    if (data == null) return null;
+
+    if (data['profile_id_a'] == profileId) {
+      final b = data['b'] as Map<String, dynamic>?;
+      return PessoaBusca(
+        id: data['profile_id_b'] as String,
+        nome: b?['nome'] as String? ?? '',
+      );
+    }
+    final a = data['a'] as Map<String, dynamic>?;
+    return PessoaBusca(
+      id: data['profile_id_a'] as String,
+      nome: a?['nome'] as String? ?? '',
+    );
+  }
+
+  /// So usado pelos Diaconos -- lembra (ou atualiza) o par de casal.
+  /// Upsert idempotente: seguro de chamar toda vez que as duas pessoas
+  /// de uma celula ficam preenchidas juntas, nunca duplica linha.
+  Future<void> salvarPar({
+    required String ministerio,
+    required String profileIdA,
+    required String profileIdB,
+  }) async {
+    if (profileIdA == profileIdB) return;
+    final ids = [profileIdA, profileIdB]..sort();
+    await _client.from('escala_servico_casais').upsert(
+      {
+        'ministerio': ministerio,
+        'profile_id_a': ids[0],
+        'profile_id_b': ids[1],
+        'atualizado_em': DateTime.now().toIso8601String(),
+      },
+      onConflict: 'ministerio,profile_id_a,profile_id_b',
+    );
+  }
 }

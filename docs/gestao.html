@@ -125,6 +125,18 @@
 
   main.conteudo { padding: 32px 24px; max-width: 1100px; margin: 0 auto; }
 
+  /* ---------- abas de secao (so aparece pra quem tem mais de 1) ---------- */
+  .abas-secao { display: flex; border-bottom: 1px solid #E5EAEF; margin-bottom: 24px; }
+  .aba-secao {
+    background: none; border: none; cursor: pointer;
+    font-family: inherit; font-size: 14px; font-weight: 600;
+    color: var(--cinza-texto);
+    padding: 10px 4px; margin-right: 24px;
+    border-bottom: 2px solid transparent;
+  }
+  .aba-secao:hover { color: var(--navy); }
+  .aba-secao.ativa { color: var(--navy); border-bottom-color: var(--navy); }
+
   .em-construcao {
     background: var(--azul-claro);
     border-radius: 12px;
@@ -352,6 +364,47 @@
   .item-pendente .valor-pendente { font-weight: 700; }
   .item-pendente select { margin-top: 8px; width: 100%; padding: 7px; border-radius: 6px; border: 1px solid #D7DEE6; font-family: inherit; font-size: 12px; }
   .item-pendente button { margin-top: 8px; width: 100%; }
+
+  /* ---------- usuarios ---------- */
+  .grade-agregados {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+  .cartao-agregado { background: var(--azul-claro); border-radius: 10px; padding: 14px; }
+  .cartao-agregado .nome-agregado { font-weight: 700; font-size: 13px; margin-bottom: 4px; }
+  .cartao-agregado .contagem-agregado { font-size: 22px; font-weight: 800; color: var(--navy); }
+  .cartao-agregado .lideres-agregado { font-size: 12px; color: var(--cinza-texto); margin-top: 6px; line-height: 1.5; }
+
+  .linha-usuario {
+    background: var(--branco);
+    border: 1px solid #E5EAEF;
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+  }
+  .linha-usuario .nome-usuario { font-weight: 700; font-size: 14px; }
+  .badge { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 20px; margin-left: 6px; }
+  .badge-admin { background: #FDE68A; color: #92400E; }
+  .badge-financeiro { background: #BFDBFE; color: #1E3A8A; }
+  .badge-inativo { background: #FEE2E2; color: #991B1B; }
+  .chips-ministerios { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .chip-ministerio {
+    font-size: 12px; font-weight: 600; padding: 5px 10px; border-radius: 20px;
+    cursor: pointer; border: 1px solid #D7DEE6; background: var(--branco); color: var(--navy);
+    font-family: inherit;
+  }
+  .chip-ministerio:hover { border-color: var(--navy); }
+  .chip-ministerio.eh-lider { background: var(--navy); color: var(--branco); border-color: var(--navy); }
+  .chip-casal { font-size: 12px; font-weight: 600; padding: 5px 10px; border-radius: 20px; background: var(--creme); color: var(--navy); }
+
+  /* ---------- abas de 2o nivel (dentro de uma secao, ex: Financeiro) ---------- */
+  .abas-secao-sub { margin-bottom: 16px; }
+
+  /* ---------- importar extrato ---------- */
+  .item-extrato-casado { border-color: #B7E4C7; }
+  .item-pendente select.select-evento-extrato { margin-top: 6px; }
 </style>
 </head>
 <body>
@@ -421,6 +474,22 @@
     await carregarPainel(session);
   }
 
+  // Cada papel enxerga um conjunto de secoes -- a primeira da lista e a
+  // que abre por padrao ao logar (mantem o comportamento de antes).
+  const SECOES_POR_PAPEL = {
+    admin: [
+      { id: 'calendario', label: 'Calendário' },
+      { id: 'usuarios', label: 'Usuários' },
+    ],
+    admin_financeiro: [
+      { id: 'financeiro', label: 'Financeiro' },
+      { id: 'usuarios', label: 'Usuários' },
+    ],
+  };
+  let secaoAtual = null;
+  // Sub-aba de 2o nivel, so dentro da secao Financeiro.
+  let subSecaoFinanceiro = 'lancamento';
+
   async function carregarPainel(session) {
     const { data: perfil, error } = await supa
       .from('profiles')
@@ -434,13 +503,30 @@
     }
 
     nomeUsuarioEl.textContent = `${perfil.nome} — ${perfil.papel === 'admin' ? 'Admin' : 'Admin Financeiro'}`;
+    secaoAtual = SECOES_POR_PAPEL[perfil.papel][0].id;
     renderizarConteudo(perfil.papel);
     mostrarSomente(appEl);
   }
 
   function renderizarConteudo(papel) {
-    if (papel === 'admin') {
-      conteudoEl.innerHTML = `
+    const secoes = SECOES_POR_PAPEL[papel] || [];
+    const abasHtml = `
+      <nav class="abas-secao">
+        ${secoes.map(s => `<button class="aba-secao ${s.id === secaoAtual ? 'ativa' : ''}" data-secao="${s.id}">${s.label}</button>`).join('')}
+      </nav>`;
+
+    conteudoEl.innerHTML = abasHtml + `<div id="secao-conteudo"></div>`;
+    conteudoEl.querySelectorAll('.aba-secao').forEach(btn => {
+      btn.addEventListener('click', () => {
+        secaoAtual = btn.dataset.secao;
+        renderizarConteudo(papel);
+      });
+    });
+
+    const secaoEl = document.getElementById('secao-conteudo');
+
+    if (secaoAtual === 'calendario') {
+      secaoEl.innerHTML = `
         <div class="cabecalho-mes">
           <h2 id="titulo-mes"></h2>
           <div style="display:flex; gap:12px; align-items:center;">
@@ -462,27 +548,30 @@
           </div>
         </div>`;
       iniciarCalendarioAdmin();
-    } else {
-      conteudoEl.innerHTML = `
-        <div class="calendario-layout" style="grid-template-columns: 320px 1fr;">
-          <div>
-            <div class="campo-form">
-              <label>Buscar pessoa</label>
-              <input type="text" id="busca-pessoa" placeholder="Nome...">
-            </div>
-            <div id="lista-pessoas" style="max-height:560px; overflow-y:auto;"></div>
-          </div>
-          <div>
-            <div id="painel-financeiro-direita">
-              <div class="vazio-lateral" style="padding:40px 0;">Selecione uma pessoa à esquerda.</div>
-            </div>
-            <div style="margin-top:24px;">
-              <h3>Transações do PagBank sem vínculo</h3>
-              <div id="lista-pendentes"></div>
-            </div>
-          </div>
-        </div>`;
-      iniciarPainelFinanceiro();
+    } else if (secaoAtual === 'financeiro') {
+      secaoEl.innerHTML = `
+        <nav class="abas-secao abas-secao-sub">
+          <button class="aba-secao ${subSecaoFinanceiro === 'lancamento' ? 'ativa' : ''}" data-sub="lancamento">Lançamento manual</button>
+          <button class="aba-secao ${subSecaoFinanceiro === 'importar' ? 'ativa' : ''}" data-sub="importar">Importar extrato</button>
+        </nav>
+        <div id="sub-financeiro"></div>`;
+      secaoEl.querySelectorAll('.abas-secao-sub .aba-secao').forEach(btn => {
+        btn.addEventListener('click', () => {
+          subSecaoFinanceiro = btn.dataset.sub;
+          renderizarConteudo(papel);
+        });
+      });
+      renderizarSubFinanceiro();
+    } else if (secaoAtual === 'usuarios') {
+      secaoEl.innerHTML = `
+        <h2 style="margin-top:0;">Usuários</h2>
+        <div id="agregados-usuarios" class="grade-agregados"></div>
+        <div class="campo-form" style="max-width:320px;">
+          <label>Buscar pessoa</label>
+          <input type="text" id="busca-usuario" placeholder="Nome...">
+        </div>
+        <div id="lista-usuarios"></div>`;
+      iniciarPainelUsuarios();
     }
   }
 
@@ -959,6 +1048,54 @@
   // =========================================================
   // Painel financeiro
   // =========================================================
+
+  // Alterna entre as 2 sub-abas da secao Financeiro -- o HTML de cada
+  // uma so e montado quando ela fica ativa (mesma ideia das abas de
+  // secao de 1o nivel).
+  function renderizarSubFinanceiro() {
+    const el = document.getElementById('sub-financeiro');
+    if (subSecaoFinanceiro === 'lancamento') {
+      el.innerHTML = `
+        <div class="calendario-layout" style="grid-template-columns: 320px 1fr;">
+          <div>
+            <div class="campo-form">
+              <label>Buscar pessoa</label>
+              <input type="text" id="busca-pessoa" placeholder="Nome...">
+            </div>
+            <div id="lista-pessoas" style="max-height:560px; overflow-y:auto;"></div>
+          </div>
+          <div>
+            <div id="painel-financeiro-direita">
+              <div class="vazio-lateral" style="padding:40px 0;">Selecione uma pessoa à esquerda.</div>
+            </div>
+            <div style="margin-top:24px;">
+              <h3>Transações do PagBank sem vínculo</h3>
+              <div id="lista-pendentes"></div>
+            </div>
+          </div>
+        </div>`;
+      iniciarPainelFinanceiro();
+    } else {
+      el.innerHTML = `
+        <div class="campo-form" style="max-width:420px;">
+          <label>Qual banco é esse extrato?</label>
+          <div class="radio-simples" id="escolha-banco-extrato">
+            <label><input type="radio" name="banco-extrato" value="pagbank"> PagBank</label>
+            <label><input type="radio" name="banco-extrato" value="cora"> Cora</label>
+            <label><input type="radio" name="banco-extrato" value="stone"> Stone</label>
+          </div>
+        </div>
+        <div class="campo-form" style="max-width:420px; display:none;" id="campo-upload-extrato">
+          <label>Arquivo CSV do extrato</label>
+          <input type="file" id="input-extrato" accept=".csv">
+        </div>
+        <p class="erro-form" id="erro-extrato"></p>
+        <div id="resumo-extrato"></div>
+        <div id="revisao-extrato"></div>`;
+      iniciarImportarExtrato();
+    }
+  }
+
   let todasPessoas = [];
   let pessoaSelecionada = null;
 
@@ -1147,6 +1284,452 @@
 
     await carregarPendentes();
     if (pessoaSelecionada && pessoaSelecionada.id === profileId) await carregarHistorico();
+  }
+
+  // =========================================================
+  // Importar extrato (PagBank / Cora / Stone)
+  // =========================================================
+  // Parsers testados isoladamente contra arquivos de exemplo reais antes
+  // de integrar aqui -- ver decisoes tomadas com o Leo:
+  // - PagBank: so TIPO exatamente "Pix recebido" (nao inclui "QR Code
+  //   Pix recebido").
+  // - Cora: Valor usa PONTO como decimal (nao virgula, diferente dos
+  //   outros dois bancos) -- confirmado testando contra o arquivo real.
+  // - Stone: Movimentacao=Credito E (Tipo=Pix OU (Tipo=Transacao E
+  //   Origem != "Desconhecido")) -- "Transacao" com Origem Desconhecido
+  //   e evento de sistema/tarifa, nao e pessoa. "Transferencia entre
+  //   contas Stone" fica de fora (e dinheiro entre contas da propria
+  //   igreja, nao e doacao).
+
+  /// Parser CSV generico que respeita campos entre aspas com o proprio
+  /// separador dentro (o Stone usa isso, ex: "R$ 24.262,92").
+  function parseCsvExtrato(texto, separador) {
+    const linhas = [];
+    let campo = '', linha = [], dentroAspas = false;
+    texto = texto.replace(/^﻿/, '').replace(/\r\n/g, '\n');
+
+    for (let i = 0; i < texto.length; i++) {
+      const c = texto[i];
+      if (dentroAspas) {
+        if (c === '"') {
+          if (texto[i + 1] === '"') { campo += '"'; i++; }
+          else dentroAspas = false;
+        } else campo += c;
+      } else if (c === '"') {
+        dentroAspas = true;
+      } else if (c === separador) {
+        linha.push(campo); campo = '';
+      } else if (c === '\n') {
+        linha.push(campo); campo = '';
+        linhas.push(linha); linha = [];
+      } else {
+        campo += c;
+      }
+    }
+    if (campo !== '' || linha.length) { linha.push(campo); linhas.push(linha); }
+    return linhas.filter(l => l.length > 1 || (l.length === 1 && l[0].trim() !== ''));
+  }
+
+  function linhasCsvParaObjetos(linhasCsv) {
+    const cabecalho = linhasCsv[0].map(h => h.trim());
+    return linhasCsv.slice(1).map(linha => {
+      const obj = {};
+      cabecalho.forEach((h, i) => obj[h] = (linha[i] ?? '').trim());
+      return obj;
+    });
+  }
+
+  function dataBrParaIso(str) {
+    const [d, m, a] = str.split('/').map(Number);
+    return `${a}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  }
+
+  function decimalComVirgula(str) {
+    return parseFloat(str.trim().replace(/\./g, '').replace(',', '.'));
+  }
+
+  /// Le o arquivo tentando UTF-8 primeiro; extratos bancarios as vezes
+  /// vem em Windows-1252/Latin-1, o que quebraria acentos silenciosamente
+  /// se so assumissemos UTF-8.
+  async function lerArquivoExtrato(arquivo) {
+    const buffer = await arquivo.arrayBuffer();
+    try {
+      return new TextDecoder('utf-8', { fatal: true }).decode(buffer);
+    } catch {
+      return new TextDecoder('windows-1252').decode(buffer);
+    }
+  }
+
+  const OBSERVACAO_PADRAO_BANCO_EXTRATO = {
+    pagbank: 'Importado do extrato PagBank',
+    cora: 'Importado do extrato Cora — Movimento da Paz',
+    stone: 'Importado do extrato Stone',
+  };
+
+  const PARSERS_EXTRATO = {
+    pagbank: {
+      extrair(texto) {
+        return linhasCsvParaObjetos(parseCsvExtrato(texto, ';'))
+          .filter(o => o.TIPO === 'Pix recebido')
+          .map(o => ({
+            data: dataBrParaIso(o.DATA),
+            horario: null,
+            nome: o.DESCRICAO,
+            valor: decimalComVirgula(o.VALOR),
+          }));
+      },
+    },
+    cora: {
+      extrair(texto) {
+        return linhasCsvParaObjetos(parseCsvExtrato(texto, ','))
+          .filter(o => o['Tipo Transação'] === 'CRÉDITO')
+          .map(o => ({
+            data: dataBrParaIso(o.Data),
+            horario: null,
+            nome: o['Identificação'],
+            valor: parseFloat(o.Valor), // Cora usa ponto decimal, nao virgula
+          }));
+      },
+    },
+    stone: {
+      extrair(texto) {
+        return linhasCsvParaObjetos(parseCsvExtrato(texto, ','))
+          .filter(o => o['Movimentação'] === 'Crédito' &&
+            (o.Tipo === 'Pix' || (o.Tipo === 'Transação' && o.Origem !== 'Desconhecido')))
+          .map(o => {
+            const [dataParte, horaParte] = o.Data.split(' ');
+            return {
+              data: dataBrParaIso(dataParte),
+              horario: horaParte || null,
+              nome: o.Origem,
+              valor: decimalComVirgula(o.Valor),
+            };
+          });
+      },
+    },
+  };
+
+  function formatarDataBrExtrato(isoData) {
+    const [a, m, d] = isoData.split('-');
+    return `${d}/${m}/${a}`;
+  }
+
+  let bancoExtratoEscolhido = null;
+  let linhasExtratoRevisao = []; // {data, horario, nome, valor, profileId, eventoId, ignorar}
+  let eventosIngressadosCache = null;
+
+  function iniciarImportarExtrato() {
+    document.querySelectorAll('input[name="banco-extrato"]').forEach(radio => {
+      radio.addEventListener('change', (e) => {
+        bancoExtratoEscolhido = e.target.value;
+        document.getElementById('campo-upload-extrato').style.display = 'block';
+        document.getElementById('input-extrato').value = '';
+        document.getElementById('erro-extrato').textContent = '';
+        document.getElementById('resumo-extrato').innerHTML = '';
+        document.getElementById('revisao-extrato').innerHTML = '';
+        linhasExtratoRevisao = [];
+      });
+    });
+    document.getElementById('input-extrato').addEventListener('change', processarArquivoExtrato);
+  }
+
+  async function processarArquivoExtrato(e) {
+    const arquivo = e.target.files[0];
+    if (!arquivo) return;
+    const erroEl = document.getElementById('erro-extrato');
+    erroEl.textContent = '';
+    document.getElementById('resumo-extrato').innerHTML = '<div class="vazio-lateral">Lendo arquivo...</div>';
+    document.getElementById('revisao-extrato').innerHTML = '';
+
+    try {
+      const texto = await lerArquivoExtrato(arquivo);
+      const linhasBrutas = PARSERS_EXTRATO[bancoExtratoEscolhido].extrair(texto);
+
+      if (linhasBrutas.length === 0) {
+        document.getElementById('resumo-extrato').innerHTML =
+          '<div class="vazio-lateral">Nenhuma linha de entrada de dinheiro encontrada nesse arquivo.</div>';
+        return;
+      }
+
+      if (!todasPessoas.length) {
+        const { data } = await supa.from('profiles').select('id, nome').order('nome');
+        todasPessoas = data || [];
+      }
+      if (!eventosIngressadosCache) {
+        const { data } = await supa.from('eventos').select('id, titulo').eq('ingressado', true).order('titulo');
+        eventosIngressadosCache = data || [];
+      }
+
+      // Tenta casar cada linha com uma pessoa cadastrada (mesma funcao
+      // ja usada antes pra esse fim, so casa quando o nome bate exato
+      // -- sem acento/case -- com uma UNICA pessoa).
+      linhasExtratoRevisao = await Promise.all(linhasBrutas.map(async (linha) => {
+        const { data: profileId } = await supa.rpc('tentar_casar_transacao', { p_nome_pagador: linha.nome });
+        return { ...linha, profileId: profileId || null, eventoId: null, ignorar: false };
+      }));
+
+      renderizarResumoExtrato();
+      renderizarRevisaoExtrato();
+    } catch (erro) {
+      erroEl.textContent = 'Erro ao ler o arquivo: ' + erro.message;
+      document.getElementById('resumo-extrato').innerHTML = '';
+    }
+  }
+
+  function renderizarResumoExtrato() {
+    const total = linhasExtratoRevisao.length;
+    const casadas = linhasExtratoRevisao.filter(l => l.profileId).length;
+    document.getElementById('resumo-extrato').innerHTML = `
+      <div class="cartao-lancamento" style="margin-top:16px;">
+        <strong>${total}</strong> linha(s) encontrada(s) — <strong>${casadas}</strong> casaram automático,
+        <strong>${total - casadas}</strong> precisam de escolha manual.
+        <div style="margin-top:12px;">
+          <button class="botao-primario" style="width:auto;padding:9px 20px;" id="btn-confirmar-extrato">Confirmar tudo</button>
+        </div>
+        <p class="erro-form" id="erro-confirmar-extrato"></p>
+      </div>`;
+    document.getElementById('btn-confirmar-extrato').addEventListener('click', confirmarImportacaoExtrato);
+  }
+
+  function renderizarRevisaoExtrato() {
+    const el = document.getElementById('revisao-extrato');
+    el.innerHTML = linhasExtratoRevisao.map((linha, i) => `
+      <div class="item-pendente ${linha.profileId ? 'item-extrato-casado' : ''}" data-indice="${i}">
+        <div class="topo-pendente">
+          <span>${escaparHtml(linha.nome)}</span>
+          <span class="valor-pendente">R$ ${linha.valor.toFixed(2)}</span>
+        </div>
+        <div class="meta-historico">${formatarDataBrExtrato(linha.data)}${linha.horario ? ' às ' + linha.horario.slice(0, 5) : ''}</div>
+        <select class="select-pessoa-extrato" data-indice="${i}">
+          <option value="">${linha.profileId ? 'Trocar pessoa...' : 'Selecionar pessoa...'}</option>
+          ${todasPessoas.map(p => `<option value="${p.id}" ${p.id === linha.profileId ? 'selected' : ''}>${escaparHtml(p.nome)}</option>`).join('')}
+        </select>
+        ${eventosIngressadosCache.length ? `
+          <select class="select-evento-extrato" data-indice="${i}">
+            <option value="">Dízimo/oferta (sem evento)</option>
+            ${eventosIngressadosCache.map(ev => `<option value="${ev.id}">${escaparHtml(ev.titulo)}</option>`).join('')}
+          </select>` : ''}
+        <label style="display:flex; align-items:center; gap:6px; font-size:12px; margin-top:8px; cursor:pointer;">
+          <input type="checkbox" class="chk-ignorar-extrato" data-indice="${i}"> Ignorar essa linha
+        </label>
+      </div>
+    `).join('');
+
+    el.querySelectorAll('.select-pessoa-extrato').forEach(sel => {
+      sel.addEventListener('change', (e) => {
+        linhasExtratoRevisao[e.target.dataset.indice].profileId = e.target.value || null;
+      });
+    });
+    el.querySelectorAll('.select-evento-extrato').forEach(sel => {
+      sel.addEventListener('change', (e) => {
+        linhasExtratoRevisao[e.target.dataset.indice].eventoId = e.target.value || null;
+      });
+    });
+    el.querySelectorAll('.chk-ignorar-extrato').forEach(chk => {
+      chk.addEventListener('change', (e) => {
+        linhasExtratoRevisao[e.target.dataset.indice].ignorar = e.target.checked;
+      });
+    });
+  }
+
+  async function confirmarImportacaoExtrato() {
+    const erroEl = document.getElementById('erro-confirmar-extrato');
+    erroEl.textContent = '';
+
+    const paraLancar = linhasExtratoRevisao.filter(l => !l.ignorar);
+    const semPessoa = paraLancar.filter(l => !l.profileId);
+    if (semPessoa.length > 0) {
+      erroEl.textContent = `${semPessoa.length} linha(s) sem pessoa selecionada. Escolha a pessoa ou marque "Ignorar essa linha".`;
+      return;
+    }
+    if (paraLancar.length === 0) {
+      erroEl.textContent = 'Nenhuma linha pra lançar (tudo foi ignorado).';
+      return;
+    }
+
+    const botao = document.getElementById('btn-confirmar-extrato');
+    botao.disabled = true;
+    botao.textContent = 'Lançando...';
+
+    const payload = paraLancar.map(l => ({
+      profile_id: l.profileId,
+      data: l.data,
+      horario: l.horario,
+      valor: l.valor,
+      meio_pagamento: 'pix',
+      observacao: OBSERVACAO_PADRAO_BANCO_EXTRATO[bancoExtratoEscolhido],
+      evento_id: l.eventoId || null,
+    }));
+
+    const { error } = await supa.from('contribuicoes').insert(payload);
+
+    botao.disabled = false;
+    botao.textContent = 'Confirmar tudo';
+
+    if (error) { erroEl.textContent = 'Erro ao lançar: ' + error.message; return; }
+
+    document.getElementById('resumo-extrato').innerHTML =
+      `<div class="cartao-lancamento" style="margin-top:16px;">✅ ${paraLancar.length} contribuição(ões) lançada(s) com sucesso.</div>`;
+    document.getElementById('revisao-extrato').innerHTML = '';
+    linhasExtratoRevisao = [];
+    document.getElementById('input-extrato').value = '';
+  }
+
+  // =========================================================
+  // Painel de Usuarios (Fase 5)
+  // =========================================================
+  // Faixa etaria + ministerios de servico -- mesmos valores aceitos pela
+  // CHECK constraint de profile_ministerios.ministerio.
+  const MINISTERIOS_AGREGADOS = [
+    'awake', 'homens', 'mulheres', 'criancas',
+    'diaconos', 'louvor', 'danca', 'midia', 'multimidia', 'teatro', 'coral',
+  ];
+  const LABEL_MINISTERIO_AGREGADO = {
+    awake: 'Awake', homens: 'Homens', mulheres: 'Mulheres', criancas: 'Crianças',
+    diaconos: 'Diáconos', louvor: 'Louvor', danca: 'Dança', midia: 'Mídia',
+    multimidia: 'Multimídia', teatro: 'Teatro', coral: 'Coral',
+  };
+  // Discipulado (Grupo de Casais) -- coluna direta em profiles, nao um
+  // vinculo em profile_ministerios, e sem conceito de "lider" (o grupo
+  // ja carrega o nome do casal que discipula no proprio label).
+  const LABEL_GRUPO_CASAIS = {
+    henrique_patricia: 'Grupo do Henrique e Patrícia',
+    ivaldo_sonja: 'Grupo do Ivaldo e Sonja',
+    marcelo_andreia: 'Grupo do Marcelo e Andréia',
+  };
+  const LABEL_CATEGORIA = { genesis: 'Genesis', next: 'Next', one: 'One' };
+
+  let todosUsuarios = [];
+  let todosVinculosMinisterio = [];
+
+  async function iniciarPainelUsuarios() {
+    const [{ data: perfis, error: erroPerfis }, { data: vinculos, error: erroVinculos }] = await Promise.all([
+      supa.from('profiles').select('id, nome, papel, ativo, categoria, grupo_casais').order('nome'),
+      supa.from('profile_ministerios').select('profile_id, ministerio, papel'),
+    ]);
+
+    if (erroPerfis || erroVinculos) {
+      document.getElementById('lista-usuarios').innerHTML =
+        `<div class="vazio-lateral">Erro ao carregar: ${escaparHtml((erroPerfis || erroVinculos).message)}</div>`;
+      return;
+    }
+
+    todosUsuarios = perfis || [];
+    todosVinculosMinisterio = vinculos || [];
+
+    renderizarAgregados();
+    renderizarListaUsuarios();
+    document.getElementById('busca-usuario').addEventListener('input', renderizarListaUsuarios);
+  }
+
+  function renderizarAgregados() {
+    const el = document.getElementById('agregados-usuarios');
+
+    const cartoesMinisterio = MINISTERIOS_AGREGADOS.map(ministerio => {
+      const vinculosDoMinisterio = todosVinculosMinisterio.filter(v => v.ministerio === ministerio);
+      const lideres = vinculosDoMinisterio
+        .filter(v => v.papel === 'lider')
+        .map(v => todosUsuarios.find(p => p.id === v.profile_id)?.nome)
+        .filter(Boolean);
+      return `
+        <div class="cartao-agregado">
+          <div class="nome-agregado">${LABEL_MINISTERIO_AGREGADO[ministerio]}</div>
+          <div class="contagem-agregado">${vinculosDoMinisterio.length}</div>
+          <div class="lideres-agregado">${lideres.length ? 'Líder: ' + escaparHtml(lideres.join(', ')) : 'Sem líder definido'}</div>
+        </div>`;
+    }).join('');
+
+    const cartoesCasais = Object.entries(LABEL_GRUPO_CASAIS).map(([valor, label]) => {
+      const qtd = todosUsuarios.filter(p => p.grupo_casais === valor).length;
+      return `
+        <div class="cartao-agregado">
+          <div class="nome-agregado">${label}</div>
+          <div class="contagem-agregado">${qtd}</div>
+        </div>`;
+    }).join('');
+
+    el.innerHTML = cartoesMinisterio + cartoesCasais;
+  }
+
+  function renderizarListaUsuarios() {
+    const busca = (document.getElementById('busca-usuario').value || '').trim().toLowerCase();
+    const filtrados = busca
+      ? todosUsuarios.filter(p => (p.nome || '').toLowerCase().includes(busca))
+      : todosUsuarios;
+
+    const listaEl = document.getElementById('lista-usuarios');
+
+    if (filtrados.length === 0) {
+      listaEl.innerHTML = '<div class="vazio-lateral">Nenhum usuário encontrado.</div>';
+      return;
+    }
+
+    listaEl.innerHTML = filtrados.map(pessoa => {
+      const vinculos = todosVinculosMinisterio.filter(v => v.profile_id === pessoa.id);
+
+      const badgePapel = pessoa.papel === 'admin'
+        ? '<span class="badge badge-admin">Admin</span>'
+        : pessoa.papel === 'admin_financeiro'
+          ? '<span class="badge badge-financeiro">Admin Financeiro</span>'
+          : '';
+      const badgeInativo = pessoa.ativo === false ? '<span class="badge badge-inativo">Inativo</span>' : '';
+
+      const chipsMinisterios = vinculos.map(v => {
+        const categoriaTexto = (v.ministerio === 'awake' && pessoa.categoria && LABEL_CATEGORIA[pessoa.categoria])
+          ? ` (${LABEL_CATEGORIA[pessoa.categoria]})`
+          : '';
+        const label = LABEL_MINISTERIO_AGREGADO[v.ministerio] || v.ministerio;
+        return `
+          <button type="button" class="chip-ministerio ${v.papel === 'lider' ? 'eh-lider' : ''}"
+                  data-profile-id="${pessoa.id}" data-ministerio="${v.ministerio}" data-papel-atual="${v.papel}">
+            ${escaparHtml(label)}${categoriaTexto}${v.papel === 'lider' ? ' ★' : ''}
+          </button>`;
+      }).join('');
+
+      const chipCasal = pessoa.grupo_casais
+        ? `<span class="chip-casal">${escaparHtml(LABEL_GRUPO_CASAIS[pessoa.grupo_casais] || pessoa.grupo_casais)}</span>`
+        : '';
+
+      return `
+        <div class="linha-usuario">
+          <span class="nome-usuario">${escaparHtml(pessoa.nome || '(sem nome)')}</span>${badgePapel}${badgeInativo}
+          <div class="chips-ministerios">${chipsMinisterios}${chipCasal}</div>
+        </div>`;
+    }).join('');
+
+    listaEl.querySelectorAll('.chip-ministerio').forEach(chip => {
+      chip.addEventListener('click', () => alternarLiderMinisterio(chip));
+    });
+  }
+
+  // Clicar num chip de ministerio alterna papel membro<->lider daquele
+  // vinculo especifico -- nunca cria/apaga vinculo, so alterna o papel
+  // de um que ja existe.
+  async function alternarLiderMinisterio(chip) {
+    const profileId = chip.dataset.profileId;
+    const ministerio = chip.dataset.ministerio;
+    const novoPapel = chip.dataset.papelAtual === 'lider' ? 'membro' : 'lider';
+    const nomePessoa = todosUsuarios.find(p => p.id === profileId)?.nome || 'essa pessoa';
+    const labelMinisterio = LABEL_MINISTERIO_AGREGADO[ministerio] || ministerio;
+
+    const mensagem = novoPapel === 'lider'
+      ? `Tornar ${nomePessoa} líder de ${labelMinisterio}?`
+      : `Remover ${nomePessoa} da liderança de ${labelMinisterio}?`;
+    if (!confirm(mensagem)) return;
+
+    const { error } = await supa
+      .from('profile_ministerios')
+      .update({ papel: novoPapel })
+      .eq('profile_id', profileId)
+      .eq('ministerio', ministerio);
+
+    if (error) { alert('Erro ao atualizar: ' + error.message); return; }
+
+    const vinculo = todosVinculosMinisterio.find(v => v.profile_id === profileId && v.ministerio === ministerio);
+    if (vinculo) vinculo.papel = novoPapel;
+
+    renderizarAgregados();
+    renderizarListaUsuarios();
   }
 
   function escaparHtml(texto) {
