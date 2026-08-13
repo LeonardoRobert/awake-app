@@ -431,6 +431,14 @@
   }
   .lista-simples .linha-simples:last-child { border-bottom: none; }
   .lista-simples .linha-simples .valor-simples { font-weight: 700; }
+  .item-mes-entrada {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 16px; font-size: 14px; border: 1px solid #E5EAEF;
+    border-radius: 10px; margin-bottom: 8px; cursor: pointer; background: var(--branco);
+  }
+  .item-mes-entrada:hover { border-color: var(--navy); }
+  .item-mes-entrada.ativo { border-color: var(--navy); background: var(--azul-claro); }
+  .item-mes-entrada .valor-simples { font-weight: 700; }
   .barra-progresso-simples {
     background: var(--azul-claro); border-radius: 20px; height: 10px; overflow: hidden; margin: 6px 0 4px;
   }
@@ -588,6 +596,7 @@
         <nav class="abas-secao abas-secao-sub">
           <button class="aba-secao ${subSecaoFinanceiro === 'lancamento' ? 'ativa' : ''}" data-sub="lancamento">Lançamento manual</button>
           <button class="aba-secao ${subSecaoFinanceiro === 'importar' ? 'ativa' : ''}" data-sub="importar">Importar extrato</button>
+          <button class="aba-secao ${subSecaoFinanceiro === 'entradas' ? 'ativa' : ''}" data-sub="entradas">Entradas</button>
         </nav>
         <div id="sub-financeiro"></div>`;
       secaoEl.querySelectorAll('.abas-secao-sub .aba-secao').forEach(btn => {
@@ -1134,7 +1143,7 @@
           </div>
         </div>`;
       iniciarPainelFinanceiro();
-    } else {
+    } else if (subSecaoFinanceiro === 'importar') {
       el.innerHTML = `
         <div class="campo-form" style="max-width:420px;">
           <label>Qual banco é esse extrato?</label>
@@ -1152,6 +1161,11 @@
         <div id="resumo-extrato"></div>
         <div id="revisao-extrato"></div>`;
       iniciarImportarExtrato();
+    } else {
+      el.innerHTML = `
+        <div id="entradas-lista-meses"></div>
+        <div id="entradas-detalhe-mes"></div>`;
+      iniciarEntradas();
     }
   }
 
@@ -1227,6 +1241,8 @@
               <option value="">Não especificado</option>
               <option value="dizimo">Dízimo</option>
               <option value="oferta">Oferta</option>
+              <option value="oferta_missionaria">Oferta missionária</option>
+              <option value="movimento_paz">Movimento da Paz</option>
               <option value="outro">Outro</option>
             </select>
           </div>
@@ -1286,7 +1302,7 @@
     }
 
     const LABEL_MEIO = { pix: 'Pix', dinheiro: 'Dinheiro', cartao: 'Cartão', transferencia: 'Transferência', boleto: 'Boleto', outro: 'Outro' };
-    const LABEL_TIPO = { dizimo: 'Dízimo', oferta: 'Oferta', outro: 'Outro' };
+    const LABEL_TIPO = { dizimo: 'Dízimo', oferta: 'Oferta', oferta_missionaria: 'Oferta missionária', movimento_paz: 'Movimento da Paz', outro: 'Outro' };
     historicoEl.innerHTML = data.map(c => `
       <div class="item-historico">
         <div>
@@ -1463,6 +1479,7 @@
   let bancoExtratoEscolhido = null;
   let linhasExtratoRevisao = []; // {data, horario, nome, valor, profileId, eventoId, ignorar}
   let eventosIngressadosCache = null;
+  let quantidadeDuplicadaExtrato = 0; // linhas descartadas por ja terem sido importadas antes
 
   function iniciarImportarExtrato() {
     document.querySelectorAll('input[name="banco-extrato"]').forEach(radio => {
@@ -1473,9 +1490,34 @@
         document.getElementById('resumo-extrato').innerHTML = '';
         document.getElementById('revisao-extrato').innerHTML = '';
         linhasExtratoRevisao = [];
+        quantidadeDuplicadaExtrato = 0;
       });
     });
     document.getElementById('input-extrato').addEventListener('change', processarArquivoExtrato);
+  }
+
+  // Mesma normalizacao usada em tentar_casar_transacao() (SQL) --
+  // ignora acento, maiuscula/minuscula, apostrofo/aspas e espacos
+  // duplicados -- pra montar uma chave estavel mesmo que o extrato
+  // venha formatado ligeiramente diferente de uma semana pra outra.
+  function normalizarNomeParaChave(nome) {
+    return (nome || '')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/['`´‘’]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  // Chave de deduplicacao: banco + data + valor + nome normalizado (+
+  // horario quando o banco fornece, ex: Stone). PagBank e Cora so tem
+  // data (sem hora) no extrato -- o valor entra na chave justamente
+  // pra nao confundir 2 entradas reais da mesma pessoa no mesmo dia
+  // (ex: dizimo e oferta no mesmo domingo, valores diferentes).
+  function montarChaveImportacao(linha) {
+    const partes = [bancoExtratoEscolhido, linha.data, linha.valor.toFixed(2), normalizarNomeParaChave(linha.nome)];
+    if (linha.horario) partes.push(linha.horario);
+    return partes.join('|');
   }
 
   async function processarArquivoExtrato(e) {
@@ -1503,6 +1545,26 @@
         return;
       }
 
+      // Deduplicacao: extrato importado toda semana costuma reincluir
+      // dias ja importados antes -- descarta aqui, ANTES de mostrar a
+      // revisao, pra nao pedir escolha 2x da mesma entrada nem lancar
+      // ela de novo.
+      const chavesDoArquivo = linhasBrutas.map(l => montarChaveImportacao(l));
+      const { data: jaImportadas } = await supa
+        .from('contribuicoes')
+        .select('chave_importacao')
+        .in('chave_importacao', chavesDoArquivo);
+      const chavesJaImportadas = new Set((jaImportadas || []).map(c => c.chave_importacao));
+
+      const linhasNovas = linhasBrutas.filter((l, i) => !chavesJaImportadas.has(chavesDoArquivo[i]));
+      quantidadeDuplicadaExtrato = linhasBrutas.length - linhasNovas.length;
+
+      if (linhasNovas.length === 0) {
+        document.getElementById('resumo-extrato').innerHTML =
+          `<div class="vazio-lateral">Todas as ${linhasBrutas.length} linha(s) desse arquivo já tinham sido importadas antes.</div>`;
+        return;
+      }
+
       if (!todasPessoas.length) {
         const { data } = await supa.from('profiles').select('id, nome, valor_dizimo_padrao').order('nome');
         todasPessoas = data || [];
@@ -1515,7 +1577,7 @@
       // Tenta casar cada linha com uma pessoa cadastrada (mesma funcao
       // ja usada antes pra esse fim, so casa quando o nome bate exato
       // -- sem acento/case -- com uma UNICA pessoa).
-      linhasExtratoRevisao = await Promise.all(linhasBrutas.map(async (linha) => {
+      linhasExtratoRevisao = await Promise.all(linhasNovas.map(async (linha) => {
         const { data: profileId } = await supa.rpc('tentar_casar_transacao', { p_nome_pagador: linha.nome });
         // Auto-detecta "Dizimo" quando o valor da linha bate com o
         // valor fixo salvo da pessoa que casou -- editavel na revisao,
@@ -1525,6 +1587,7 @@
         const tipoDetectado = valorFixo != null && linha.valor === Number(valorFixo) ? 'dizimo' : null;
         return {
           ...linha,
+          chaveImportacao: montarChaveImportacao(linha),
           profileId: profileId || null,
           // Pre-preenche com "Usuario nao cadastrado" quando nao casou --
           // evita a linha ficar em branco esperando escolha manual; o
@@ -1551,7 +1614,8 @@
     const casadas = linhasExtratoRevisao.filter(l => l.profileId).length;
     document.getElementById('resumo-extrato').innerHTML = `
       <div class="cartao-lancamento" style="margin-top:16px;">
-        <strong>${total}</strong> linha(s) encontrada(s) — <strong>${casadas}</strong> casaram automático,
+        ${quantidadeDuplicadaExtrato > 0 ? `<div style="margin-bottom:8px;">${quantidadeDuplicadaExtrato} linha(s) já importada(s) antes foram ignoradas automaticamente.</div>` : ''}
+        <strong>${total}</strong> linha(s) nova(s) — <strong>${casadas}</strong> casaram automático,
         <strong>${total - casadas}</strong> precisam de escolha manual.
         <div style="margin-top:12px;">
           <button class="botao-primario" style="width:auto;padding:9px 20px;" id="btn-confirmar-extrato">Confirmar tudo</button>
@@ -1566,7 +1630,10 @@
     pix: 'Pix', dinheiro: 'Dinheiro', cartao: 'Cartão',
     transferencia: 'Transferência', boleto: 'Boleto', outro: 'Outro',
   };
-  const LABEL_TIPO_EXTRATO = { '': 'Não especificado', dizimo: 'Dízimo', oferta: 'Oferta', outro: 'Outro' };
+  const LABEL_TIPO_EXTRATO = {
+    '': 'Não especificado', dizimo: 'Dízimo', oferta: 'Oferta',
+    oferta_missionaria: 'Oferta missionária', movimento_paz: 'Movimento da Paz', outro: 'Outro',
+  };
 
   function renderizarRevisaoExtrato() {
     const el = document.getElementById('revisao-extrato');
@@ -1679,10 +1746,20 @@
     });
   }
 
+  // Sentinela do <select> (evita colidir com um profileId de verdade
+  // no mesmo value-space) -> valor limpo aceito pela CHECK constraint
+  // de contribuicoes.motivo_sem_usuario.
+  const MOTIVO_SEM_USUARIO_BANCO = {
+    '__nao_cadastrado__': 'nao_cadastrado',
+    '__sem_identificacao__': 'sem_identificacao',
+  };
+
   async function confirmarImportacaoExtrato() {
     const erroEl = document.getElementById('erro-confirmar-extrato');
     erroEl.textContent = '';
 
+    // "Ignorar" dispensa a escolha de pessoa -- todo o resto precisa
+    // de pessoa, "Usuário não cadastrado" ou "Crédito sem identificação".
     const paraRevisar = linhasExtratoRevisao.filter(l => !l.ignorar);
     const semEscolha = paraRevisar.filter(l => !l.profileId && !l.motivoSemUsuario);
     if (semEscolha.length > 0) {
@@ -1690,25 +1767,27 @@
       return;
     }
 
-    const paraLancar = paraRevisar.filter(l => l.profileId);
-    if (paraLancar.length === 0) {
-      erroEl.textContent = 'Nenhuma linha com pessoa vinculada pra lançar (as demais não geram lançamento).';
-      return;
-    }
-
     const botao = document.getElementById('btn-confirmar-extrato');
     botao.disabled = true;
     botao.textContent = 'Lançando...';
 
-    const payload = paraLancar.map(l => ({
-      profile_id: l.profileId,
+    // TODA linha vira uma linha em contribuicoes agora -- casada,
+    // sem usuário ou ignorada -- pra aparecer em Entradas e pra ficar
+    // lembrada (chave_importacao) e não ser reimportada semana que vem.
+    // "Ignorada" entra com profile_id nulo + motivo_sem_usuario
+    // 'ignorado', e o dashboard de Entradas exclui esse motivo do total.
+    const payload = linhasExtratoRevisao.map(l => ({
+      profile_id: l.ignorar ? null : (l.profileId || null),
+      motivo_sem_usuario: l.ignorar ? 'ignorado' : (l.profileId ? null : MOTIVO_SEM_USUARIO_BANCO[l.motivoSemUsuario]),
       data: l.data,
       horario: l.horario,
       valor: l.valor,
       meio_pagamento: l.meioPagamento,
       observacao: l.observacao || null,
-      evento_id: l.eventoId || null,
-      tipo: l.tipo || null,
+      evento_id: l.ignorar ? null : (l.eventoId || null),
+      tipo: l.ignorar ? null : (l.tipo || null),
+      banco_origem: bancoExtratoEscolhido,
+      chave_importacao: l.chaveImportacao,
     }));
 
     const { error } = await supa.from('contribuicoes').insert(payload);
@@ -1716,19 +1795,157 @@
     botao.disabled = false;
     botao.textContent = 'Confirmar tudo';
 
-    if (error) { erroEl.textContent = 'Erro ao lançar: ' + error.message; return; }
+    if (error) {
+      // 23505 = unique_violation -- alguem mais confirmou uma linha
+      // igual entre o momento em que a tela carregou e agora.
+      erroEl.textContent = error.code === '23505'
+        ? 'Uma ou mais linhas já foram importadas por outra pessoa nesse meio tempo. Feche e reabra o arquivo pra atualizar a revisão.'
+        : 'Erro ao lançar: ' + error.message;
+      return;
+    }
 
-    const semUsuario = paraRevisar.length - paraLancar.length;
+    const casadas = linhasExtratoRevisao.filter(l => !l.ignorar && l.profileId).length;
+    const semUsuario = linhasExtratoRevisao.filter(l => !l.ignorar && !l.profileId).length;
     const ignoradas = linhasExtratoRevisao.length - paraRevisar.length;
     document.getElementById('resumo-extrato').innerHTML = `
       <div class="cartao-lancamento" style="margin-top:16px;">
-        ✅ ${paraLancar.length} contribuição(ões) lançada(s) com sucesso.
-        ${semUsuario ? `<br>${semUsuario} linha(s) revisada(s) sem usuário vinculado (não lançadas).` : ''}
-        ${ignoradas ? `<br>${ignoradas} linha(s) ignorada(s).` : ''}
+        ✅ ${linhasExtratoRevisao.length} linha(s) processada(s) com sucesso.
+        <br>${casadas} vinculada(s) a usuário.
+        ${semUsuario ? `<br>${semUsuario} sem usuário vinculado (aparecem em Entradas mesmo assim).` : ''}
+        ${ignoradas ? `<br>${ignoradas} ignorada(s).` : ''}
       </div>`;
     document.getElementById('revisao-extrato').innerHTML = '';
     linhasExtratoRevisao = [];
     document.getElementById('input-extrato').value = '';
+  }
+
+  // =========================================================
+  // Entradas -- dashboard mensal (dizimo/oferta/oferta missionaria/
+  // movimento da paz/evento ingressado), incluindo linhas sem usuario
+  // vinculado. So conta pro total quem NAO foi marcado como "ignorado"
+  // na revisao do extrato.
+  // =========================================================
+  const LABEL_TIPO_ENTRADA = {
+    dizimo: 'Dízimo', oferta: 'Oferta', oferta_missionaria: 'Oferta missionária',
+    movimento_paz: 'Movimento da Paz', outro: 'Outro', nao_especificado: 'Não especificado',
+  };
+
+  function labelMotivoEntrada(motivo) {
+    if (motivo === 'nao_cadastrado') return 'Usuário não cadastrado';
+    if (motivo === 'sem_identificacao') return 'Crédito sem identificação';
+    if (motivo === 'ignorado') return 'Ignorado';
+    return '(sem nome)';
+  }
+
+  let todasEntradas = [];
+  let mesEntradasSelecionado = null;
+
+  async function iniciarEntradas() {
+    document.getElementById('entradas-lista-meses').innerHTML = '<div class="vazio-lateral">Carregando...</div>';
+    const { data, error } = await supa
+      .from('contribuicoes')
+      .select('id, data, horario, valor, tipo, motivo_sem_usuario, evento_id, meio_pagamento, banco_origem, profiles(nome), eventos(titulo)')
+      .order('data', { ascending: false });
+
+    if (error) {
+      document.getElementById('entradas-lista-meses').innerHTML =
+        `<div class="vazio-lateral">Erro ao carregar: ${escaparHtml(error.message)}</div>`;
+      return;
+    }
+
+    todasEntradas = data || [];
+    mesEntradasSelecionado = null;
+    renderizarListaMesesEntradas();
+    document.getElementById('entradas-detalhe-mes').innerHTML = '';
+  }
+
+  function renderizarListaMesesEntradas() {
+    const porMes = {};
+    todasEntradas.forEach(e => {
+      const chave = e.data.slice(0, 7);
+      if (!porMes[chave]) porMes[chave] = 0;
+      if (e.motivo_sem_usuario !== 'ignorado') porMes[chave] += Number(e.valor);
+    });
+
+    const el = document.getElementById('entradas-lista-meses');
+    const meses = Object.keys(porMes).sort().reverse();
+    if (meses.length === 0) {
+      el.innerHTML = '<div class="vazio-lateral">Nenhuma entrada registrada ainda.</div>';
+      return;
+    }
+
+    el.innerHTML = meses.map(chave => {
+      const [ano, mes] = chave.split('-').map(Number);
+      const nomeMes = new Date(Date.UTC(ano, mes - 1, 1))
+        .toLocaleDateString('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+      return `
+        <div class="item-mes-entrada ${chave === mesEntradasSelecionado ? 'ativo' : ''}" data-chave="${chave}">
+          <span>${nomeMes[0].toUpperCase()}${nomeMes.slice(1)}</span>
+          <span class="valor-simples">R$ ${porMes[chave].toFixed(2)}</span>
+        </div>`;
+    }).join('');
+
+    el.querySelectorAll('.item-mes-entrada').forEach(item => {
+      item.addEventListener('click', () => {
+        mesEntradasSelecionado = mesEntradasSelecionado === item.dataset.chave ? null : item.dataset.chave;
+        renderizarListaMesesEntradas();
+        renderizarDetalheMesEntradas();
+      });
+    });
+  }
+
+  function renderizarDetalheMesEntradas() {
+    const el = document.getElementById('entradas-detalhe-mes');
+    if (!mesEntradasSelecionado) { el.innerHTML = ''; return; }
+
+    const linhasDoMes = todasEntradas.filter(e => e.data.slice(0, 7) === mesEntradasSelecionado);
+    const linhasValidas = linhasDoMes.filter(e => e.motivo_sem_usuario !== 'ignorado');
+
+    const porTipo = {};
+    linhasValidas.filter(e => !e.evento_id).forEach(e => {
+      const chave = e.tipo || 'nao_especificado';
+      porTipo[chave] = (porTipo[chave] || 0) + Number(e.valor);
+    });
+
+    const porEvento = {};
+    linhasValidas.filter(e => e.evento_id).forEach(e => {
+      const titulo = e.eventos?.titulo || '(evento removido)';
+      porEvento[titulo] = (porEvento[titulo] || 0) + Number(e.valor);
+    });
+
+    el.innerHTML = `
+      <h3 style="margin-top:24px;">Por categoria</h3>
+      <div class="lista-simples">
+        ${Object.entries(porTipo).sort((a, b) => b[1] - a[1]).map(([chave, valor]) => `
+          <div class="linha-simples"><span>${LABEL_TIPO_ENTRADA[chave] || chave}</span><span class="valor-simples">R$ ${valor.toFixed(2)}</span></div>
+        `).join('') || '<div class="vazio-lateral">Nenhuma entrada de dízimo/oferta nesse mês.</div>'}
+      </div>
+      ${Object.keys(porEvento).length ? `
+        <h3 style="margin-top:24px;">Por evento ingressado</h3>
+        <div class="lista-simples">
+          ${Object.entries(porEvento).sort((a, b) => b[1] - a[1]).map(([titulo, valor]) => `
+            <div class="linha-simples"><span>${escaparHtml(titulo)}</span><span class="valor-simples">R$ ${valor.toFixed(2)}</span></div>
+          `).join('')}
+        </div>` : ''}
+      <h3 style="margin-top:24px;">Todas as transações do mês</h3>
+      <div class="tabela-revisao-wrap">
+        <table class="tabela-revisao">
+          <thead>
+            <tr><th>Nome</th><th>Categoria</th><th>Valor</th><th>Data</th><th>Banco</th><th>Meio</th></tr>
+          </thead>
+          <tbody>
+            ${linhasDoMes.map(e => `
+              <tr class="${e.motivo_sem_usuario ? 'linha-sem-usuario' : ''}">
+                <td>${escaparHtml(e.profiles?.nome || labelMotivoEntrada(e.motivo_sem_usuario))}</td>
+                <td>${LABEL_TIPO_ENTRADA[e.tipo || 'nao_especificado']}${e.eventos?.titulo ? ' · ' + escaparHtml(e.eventos.titulo) : ''}</td>
+                <td style="white-space:nowrap;">R$ ${Number(e.valor).toFixed(2)}</td>
+                <td style="white-space:nowrap;">${new Date(e.data).toLocaleDateString('pt-BR')}</td>
+                <td>${LABEL_BANCO_EXTRATO[e.banco_origem] || 'Manual'}</td>
+                <td>${LABEL_MEIO_EXTRATO[e.meio_pagamento] || e.meio_pagamento}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
   }
 
   // =========================================================

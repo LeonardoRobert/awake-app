@@ -17,7 +17,7 @@ MeioPagamento meioPagamentoFromString(String? value) {
   }
 }
 
-enum TipoContribuicao { dizimo, oferta, outro }
+enum TipoContribuicao { dizimo, oferta, ofertaMissionaria, movimentoPaz, outro }
 
 TipoContribuicao? tipoContribuicaoFromString(String? value) {
   switch (value) {
@@ -25,6 +25,10 @@ TipoContribuicao? tipoContribuicaoFromString(String? value) {
       return TipoContribuicao.dizimo;
     case 'oferta':
       return TipoContribuicao.oferta;
+    case 'oferta_missionaria':
+      return TipoContribuicao.ofertaMissionaria;
+    case 'movimento_paz':
+      return TipoContribuicao.movimentoPaz;
     case 'outro':
       return TipoContribuicao.outro;
     default:
@@ -39,6 +43,10 @@ extension TipoContribuicaoLabel on TipoContribuicao {
         return 'dizimo';
       case TipoContribuicao.oferta:
         return 'oferta';
+      case TipoContribuicao.ofertaMissionaria:
+        return 'oferta_missionaria';
+      case TipoContribuicao.movimentoPaz:
+        return 'movimento_paz';
       case TipoContribuicao.outro:
         return 'outro';
     }
@@ -50,6 +58,10 @@ extension TipoContribuicaoLabel on TipoContribuicao {
         return 'Dízimo';
       case TipoContribuicao.oferta:
         return 'Oferta';
+      case TipoContribuicao.ofertaMissionaria:
+        return 'Oferta missionária';
+      case TipoContribuicao.movimentoPaz:
+        return 'Movimento da Paz';
       case TipoContribuicao.outro:
         return 'Outro';
     }
@@ -94,7 +106,11 @@ extension MeioPagamentoLabel on MeioPagamento {
 
 class ContribuicaoModel {
   final String id;
-  final String profileId;
+  /// Nulo quando a entrada veio de extrato importado e nao achou
+  /// ninguem cadastrado (ver motivoSemUsuario) -- nao usado hoje em
+  /// nenhuma tela do app (essas linhas so aparecem no gestao.html),
+  /// mas o model reflete o banco de verdade.
+  final String? profileId;
   final DateTime data;
   final String? horario;
   final double valor;
@@ -111,7 +127,7 @@ class ContribuicaoModel {
 
   ContribuicaoModel({
     required this.id,
-    required this.profileId,
+    this.profileId,
     required this.data,
     this.horario,
     required this.valor,
@@ -126,7 +142,7 @@ class ContribuicaoModel {
     final perfil = map['profiles'] as Map<String, dynamic>?;
     return ContribuicaoModel(
       id: map['id'] as String,
-      profileId: map['profile_id'] as String,
+      profileId: map['profile_id'] as String?,
       data: DateTime.parse(map['data'] as String),
       horario: map['horario'] as String?,
       valor: (map['valor'] as num).toDouble(),
