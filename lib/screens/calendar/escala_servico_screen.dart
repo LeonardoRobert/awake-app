@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../models/escala_servico_model.dart';
 import '../../models/event_model.dart';
 import '../../models/profile_model.dart';
@@ -72,7 +73,10 @@ class _EscalaServicoScreenState extends State<EscalaServicoScreen> {
       // Sem isso, qualquer falha aqui deixava a tela presa em
       // "carregando" pra sempre, sem nenhum aviso -- pior tipo de bug
       // de diagnosticar, porque nao aparece nada de errado na tela.
-      if (mounted) setState(() => _erroCarregar = e.toString());
+      // Inclui o id de quem esta logado no proprio erro -- serve pra
+      // diagnosticar problema de sessao sem precisar abrir o DevTools.
+      final meuId = Supabase.instance.client.auth.currentUser?.id ?? '(ninguém logado)';
+      if (mounted) setState(() => _erroCarregar = '(logado como $meuId) $e');
     } finally {
       if (mounted) setState(() => _carregando = false);
     }

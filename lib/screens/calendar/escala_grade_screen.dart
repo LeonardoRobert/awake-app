@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../models/escala_servico_model.dart';
 import '../../models/event_model.dart';
 import '../../models/profile_model.dart';
@@ -195,9 +196,12 @@ class _EscalaGradeScreenState extends ConsumerState<EscalaGradeScreen>
       // Sem isso, uma falha aqui (ex: RLS, rede) deixava a celula
       // silenciosamente sem salvar, sem nenhum aviso -- forcamos um
       // reload da linha pra refletir o estado real do banco, e avisamos.
+      // Inclui o id de quem esta logado no proprio erro -- serve pra
+      // diagnosticar problema de sessao sem precisar abrir o DevTools.
+      final meuId = Supabase.instance.client.auth.currentUser?.id ?? '(ninguém logado)';
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao salvar: $e')),
+          SnackBar(content: Text('Erro ao salvar (logado como $meuId): $e')),
         );
       }
       rethrow;
