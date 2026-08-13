@@ -54,6 +54,7 @@ class _EscalaGradeScreenState extends ConsumerState<EscalaGradeScreen>
   List<FuncaoCatalogo>? _colunas;
   final _linhasPorMes = <String, List<_LinhaGrade>>{};
   final _carregandoMes = <String, bool>{};
+  final _erroPorMes = <String, String>{};
 
   bool get _ehDiaconos => widget.ministerio == 'diaconos';
 
@@ -90,40 +91,48 @@ class _EscalaGradeScreenState extends ConsumerState<EscalaGradeScreen>
     if (_colunas == null) return;
     final chave = _chave(mes);
     if (_linhasPorMes.containsKey(chave) || _carregandoMes[chave] == true) return;
-    _carregandoMes[chave] = true;
-
-    final eventos = await ref.read(upcomingEventsProvider.future);
-    final eventosIgreja = eventos.where((e) => e.escopo == EventoEscopo.igreja).toList();
-
-    final inicio = DateTime(_ano, mes, 1);
-    final fim = DateTime(_ano, mes + 1, 0);
-    final ocorrencias = <(DateTime, EventModel)>[];
-    for (final evento in eventosIgreja) {
-      for (final occ in evento.occurrencesBetween(inicio, fim)) {
-        ocorrencias.add((occ, evento));
-      }
-    }
-    ocorrencias.sort((a, b) => a.$1.compareTo(b.$1));
-
-    final linhas = await Future.wait(ocorrencias.map((oc) async {
-      final (data, evento) = oc;
-      final posicoes = await _service.listarPosicoesSeExistir(
-        ministerio: widget.ministerio,
-        eventoId: evento.id,
-        dataOcorrencia: data,
-      );
-      final porFuncao = <String, PosicaoEscala?>{for (final c in _colunas!) c.funcao: null};
-      for (final p in posicoes) {
-        porFuncao[p.funcao] = p;
-      }
-      return _LinhaGrade(data: data, evento: evento, porFuncao: porFuncao);
-    }));
-
-    if (!mounted) return;
     setState(() {
-      _linhasPorMes[chave] = linhas;
-      _carregandoMes[chave] = false;
+      _carregandoMes[chave] = true;
+      _erroPorMes.remove(chave);
     });
+
+    try {
+      final eventos = await ref.read(upcomingEventsProvider.future);
+      final eventosIgreja = eventos.where((e) => e.escopo == EventoEscopo.igreja).toList();
+
+      final inicio = DateTime(_ano, mes, 1);
+      final fim = DateTime(_ano, mes + 1, 0);
+      final ocorrencias = <(DateTime, EventModel)>[];
+      for (final evento in eventosIgreja) {
+        for (final occ in evento.occurrencesBetween(inicio, fim)) {
+          ocorrencias.add((occ, evento));
+        }
+      }
+      ocorrencias.sort((a, b) => a.$1.compareTo(b.$1));
+
+      final linhas = await Future.wait(ocorrencias.map((oc) async {
+        final (data, evento) = oc;
+        final posicoes = await _service.listarPosicoesSeExistir(
+          ministerio: widget.ministerio,
+          eventoId: evento.id,
+          dataOcorrencia: data,
+        );
+        final porFuncao = <String, PosicaoEscala?>{for (final c in _colunas!) c.funcao: null};
+        for (final p in posicoes) {
+          porFuncao[p.funcao] = p;
+        }
+        return _LinhaGrade(data: data, evento: evento, porFuncao: porFuncao);
+      }));
+
+      if (!mounted) return;
+      setState(() => _linhasPorMes[chave] = linhas);
+    } catch (e) {
+      // Sem isso, qualquer falha aqui deixava a aba desse mes presa em
+      // "carregando" pra sempre, sem nenhum aviso.
+      if (mounted) setState(() => _erroPorMes[chave] = e.toString());
+    } finally {
+      if (mounted) setState(() => _carregandoMes[chave] = false);
+    }
   }
 
   void _trocarAno(int delta) {
@@ -147,39 +156,51 @@ class _EscalaGradeScreenState extends ConsumerState<EscalaGradeScreen>
     required PessoaBusca? pessoa,
     required int slot,
   }) async {
-    await _gravarCelula(linha: linha, funcao: funcao, pessoa: pessoa, slot: slot);
+    try {
+      await _gravarCelula(linha: linha, funcao: funcao, pessoa: pessoa, slot: slot);
 
-    if (!_ehDiaconos || pessoa == null) return;
+      if (!_ehDiaconos || pessoa == null) return;
 
-    final posicaoAtual = linha.porFuncao[funcao]!;
-    final slotIrmaoVazio =
-        slot == 1 ? posicaoAtual.profileId2 == null : posicaoAtual.profileId == null;
+      final posicaoAtual = linha.porFuncao[funcao]!;
+      final slotIrmaoVazio =
+          slot == 1 ? posicaoAtual.profileId2 == null : posicaoAtual.profileId == null;
 
-    if (slotIrmaoVazio) {
-      final par = await _service.buscarParDoCasal(
-        ministerio: widget.ministerio,
-        profileId: pessoa.id,
-      );
-      if (par != null) {
-        await _gravarCelula(
-          linha: linha,
-          funcao: funcao,
-          pessoa: par,
-          slot: slot == 1 ? 2 : 1,
+      if (slotIrmaoVazio) {
+        final par = await _service.buscarParDoCasal(
+          ministerio: widget.ministerio,
+          profileId: pessoa.id,
+        );
+        if (par != null) {
+          await _gravarCelula(
+            linha: linha,
+            funcao: funcao,
+            pessoa: par,
+            slot: slot == 1 ? 2 : 1,
+          );
+        }
+      }
+
+      // Se os dois slots dessa celula ficaram preenchidos (por autofill
+      // ou escolha manual), lembra/atualiza o par -- upsert idempotente,
+      // seguro de chamar toda vez que a celula "fecha" com os dois nomes.
+      final posicaoFinal = linha.porFuncao[funcao]!;
+      if (posicaoFinal.profileId != null && posicaoFinal.profileId2 != null) {
+        await _service.salvarPar(
+          ministerio: widget.ministerio,
+          profileIdA: posicaoFinal.profileId!,
+          profileIdB: posicaoFinal.profileId2!,
         );
       }
-    }
-
-    // Se os dois slots dessa celula ficaram preenchidos (por autofill
-    // ou escolha manual), lembra/atualiza o par -- upsert idempotente,
-    // seguro de chamar toda vez que a celula "fecha" com os dois nomes.
-    final posicaoFinal = linha.porFuncao[funcao]!;
-    if (posicaoFinal.profileId != null && posicaoFinal.profileId2 != null) {
-      await _service.salvarPar(
-        ministerio: widget.ministerio,
-        profileIdA: posicaoFinal.profileId!,
-        profileIdB: posicaoFinal.profileId2!,
-      );
+    } catch (e) {
+      // Sem isso, uma falha aqui (ex: RLS, rede) deixava a celula
+      // silenciosamente sem salvar, sem nenhum aviso -- forcamos um
+      // reload da linha pra refletir o estado real do banco, e avisamos.
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao salvar: $e')),
+        );
+      }
+      rethrow;
     }
   }
 
@@ -351,7 +372,27 @@ class _EscalaGradeScreenState extends ConsumerState<EscalaGradeScreen>
   }
 
   Widget _corpoDoMes(int mes) {
-    final linhas = _linhasPorMes[_chave(mes)];
+    final chave = _chave(mes);
+    final erro = _erroPorMes[chave];
+    if (erro != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Erro ao carregar esse mês: $erro', textAlign: TextAlign.center),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: () => _carregarMesSeNecessario(mes),
+                child: const Text('Tentar de novo'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    final linhas = _linhasPorMes[chave];
     if (linhas == null) {
       return const Center(child: CircularProgressIndicator());
     }

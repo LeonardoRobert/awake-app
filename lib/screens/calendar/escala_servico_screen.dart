@@ -44,6 +44,7 @@ class _EscalaServicoScreenState extends State<EscalaServicoScreen> {
       .map((oc) => _OcorrenciaEscala(data: oc.$1, evento: oc.$2))
       .toList();
   bool _carregando = true;
+  String? _erroCarregar;
 
   @override
   void initState() {
@@ -52,18 +53,29 @@ class _EscalaServicoScreenState extends State<EscalaServicoScreen> {
   }
 
   Future<void> _carregar() async {
-    setState(() => _carregando = true);
-    await Future.wait(_ocorrencias.map((oc) async {
-      final escalaId = await _service.buscarOuCriarEscala(
-        ministerio: widget.ministerio,
-        eventoId: oc.evento.id,
-        dataOcorrencia: oc.data,
-      );
-      final posicoes = await _service.listarPosicoes(escalaId);
-      oc.escalaId = escalaId;
-      oc.posicoes = posicoes;
-    }));
-    if (mounted) setState(() => _carregando = false);
+    setState(() {
+      _carregando = true;
+      _erroCarregar = null;
+    });
+    try {
+      await Future.wait(_ocorrencias.map((oc) async {
+        final escalaId = await _service.buscarOuCriarEscala(
+          ministerio: widget.ministerio,
+          eventoId: oc.evento.id,
+          dataOcorrencia: oc.data,
+        );
+        final posicoes = await _service.listarPosicoes(escalaId);
+        oc.escalaId = escalaId;
+        oc.posicoes = posicoes;
+      }));
+    } catch (e) {
+      // Sem isso, qualquer falha aqui deixava a tela presa em
+      // "carregando" pra sempre, sem nenhum aviso -- pior tipo de bug
+      // de diagnosticar, porque nao aparece nada de errado na tela.
+      if (mounted) setState(() => _erroCarregar = e.toString());
+    } finally {
+      if (mounted) setState(() => _carregando = false);
+    }
   }
 
   Future<void> _recarregarOcorrencia(_OcorrenciaEscala ocorrencia) async {
@@ -299,7 +311,21 @@ class _EscalaServicoScreenState extends State<EscalaServicoScreen> {
       ),
       body: _carregando
           ? const Center(child: CircularProgressIndicator())
-          : ListView(
+          : _erroCarregar != null
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('Erro ao carregar a escala: $_erroCarregar', textAlign: TextAlign.center),
+                        const SizedBox(height: 16),
+                        FilledButton(onPressed: _carregar, child: const Text('Tentar de novo')),
+                      ],
+                    ),
+                  ),
+                )
+              : ListView(
               padding: const EdgeInsets.all(16),
               children: [
                 for (final ocorrencia in _ocorrencias) ...[
