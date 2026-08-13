@@ -21,6 +21,14 @@ late final SupabaseClient _admin; // service role -- bypassa RLS, so pra escreve
 late final SupabaseClient _clienteMembro; // sessao normal da conta de teste, sujeita a RLS de verdade
 late final String _emailMembro;
 
+// O fluxo padrao (PKCE) exige um storage local pra guardar o "code
+// verifier" -- nao existe isso aqui (script Dart puro, sem navegador,
+// sem redirecionamento). Sem isso, signUp()/resetPasswordForEmail()
+// quebram com "Null check operator used on a null value". Fluxo
+// implicito nao precisa desse storage e e o correto pra um script
+// server-side como este.
+const _semPkce = AuthClientOptions(authFlowType: AuthFlowType.implicit);
+
 class _Resultado {
   final String nome;
   final bool sucesso;
@@ -65,13 +73,13 @@ Future<_Resultado> _rodar(String nome, Future<void> Function() teste) async {
 
 Future<void> _testarLogin() async {
   final senha = _env('TESTE_MEMBRO_SENHA');
-  _clienteMembro = SupabaseClient(_url, _anonKey);
+  _clienteMembro = SupabaseClient(_url, _anonKey, authOptions: _semPkce);
   final resposta = await _clienteMembro.auth.signInWithPassword(email: _emailMembro, password: senha);
   if (resposta.session == null) throw Exception('Login não retornou sessão.');
 }
 
 Future<void> _testarCadastro() async {
-  final clienteTemp = SupabaseClient(_url, _anonKey);
+  final clienteTemp = SupabaseClient(_url, _anonKey, authOptions: _semPkce);
   final marca = DateTime.now().millisecondsSinceEpoch;
   final emailDescartavel = 'teste.descartavel.$marca@shallom.app';
   final senhaDescartavel = 'Descartavel$marca!';
@@ -94,7 +102,7 @@ Future<void> _testarRecuperarSenha() async {
   // So confere que o fluxo INICIA sem erro -- nao completa a troca de
   // senha de verdade (manda um e-mail real pra caixa de teste, o que
   // e esperado e inofensivo).
-  final clienteAnon = SupabaseClient(_url, _anonKey);
+  final clienteAnon = SupabaseClient(_url, _anonKey, authOptions: _semPkce);
   await clienteAnon.auth.resetPasswordForEmail(_emailMembro);
 }
 
@@ -216,7 +224,7 @@ Future<void> main() async {
   final serviceKey = _env('SUPABASE_SERVICE_ROLE_KEY');
   _emailMembro = _env('TESTE_MEMBRO_EMAIL');
 
-  _admin = SupabaseClient(_url, serviceKey);
+  _admin = SupabaseClient(_url, serviceKey, authOptions: _semPkce);
 
   final rodadaId = _gerarUuidV4();
   stdout.writeln('=== Rodada $rodadaId ===');
