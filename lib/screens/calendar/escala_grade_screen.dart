@@ -162,7 +162,11 @@ class _EscalaGradeScreenState extends ConsumerState<EscalaGradeScreen>
 
       if (!_ehDiaconos || pessoa == null) return;
 
-      final posicaoAtual = linha.porFuncao[funcao]!;
+      // Pode ficar null se a funcao nao existir mais no catalogo (ver
+      // _gravarCelula) -- nesse caso so nao tem o que fazer aqui, sem
+      // travar com erro de null.
+      final posicaoAtual = linha.porFuncao[funcao];
+      if (posicaoAtual == null) return;
       final slotIrmaoVazio =
           slot == 1 ? posicaoAtual.profileId2 == null : posicaoAtual.profileId == null;
 
@@ -184,8 +188,8 @@ class _EscalaGradeScreenState extends ConsumerState<EscalaGradeScreen>
       // Se os dois slots dessa celula ficaram preenchidos (por autofill
       // ou escolha manual), lembra/atualiza o par -- upsert idempotente,
       // seguro de chamar toda vez que a celula "fecha" com os dois nomes.
-      final posicaoFinal = linha.porFuncao[funcao]!;
-      if (posicaoFinal.profileId != null && posicaoFinal.profileId2 != null) {
+      final posicaoFinal = linha.porFuncao[funcao];
+      if (posicaoFinal != null && posicaoFinal.profileId != null && posicaoFinal.profileId2 != null) {
         await _service.salvarPar(
           ministerio: widget.ministerio,
           profileIdA: posicaoFinal.profileId!,
