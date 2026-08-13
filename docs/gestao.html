@@ -1480,6 +1480,7 @@
   let linhasExtratoRevisao = []; // {data, horario, nome, valor, profileId, eventoId, ignorar}
   let eventosIngressadosCache = null;
   let quantidadeDuplicadaExtrato = 0; // linhas descartadas por ja terem sido importadas antes
+  let erroCasamentoNomeExtrato = null; // erro da RPC tentar_casar_transacao, se der -- nao pode ficar silencioso
 
   function iniciarImportarExtrato() {
     document.querySelectorAll('input[name="banco-extrato"]').forEach(radio => {
@@ -1577,8 +1578,12 @@
       // Tenta casar cada linha com uma pessoa cadastrada (mesma funcao
       // ja usada antes pra esse fim, so casa quando o nome bate exato
       // -- sem acento/case -- com uma UNICA pessoa).
+      erroCasamentoNomeExtrato = null;
       linhasExtratoRevisao = await Promise.all(linhasNovas.map(async (linha) => {
-        const { data: profileId } = await supa.rpc('tentar_casar_transacao', { p_nome_pagador: linha.nome });
+        const { data: profileId, error: erroRpc } = await supa.rpc('tentar_casar_transacao', { p_nome_pagador: linha.nome });
+        // Guarda so o primeiro erro -- se a funcao estiver quebrada,
+        // vai falhar em toda linha igual, nao precisa acumular todos.
+        if (erroRpc && !erroCasamentoNomeExtrato) erroCasamentoNomeExtrato = erroRpc.message;
         // Auto-detecta "Dizimo" quando o valor da linha bate com o
         // valor fixo salvo da pessoa que casou -- editavel na revisao,
         // igual o lancamento manual.
@@ -1614,6 +1619,7 @@
     const casadas = linhasExtratoRevisao.filter(l => l.profileId).length;
     document.getElementById('resumo-extrato').innerHTML = `
       <div class="cartao-lancamento" style="margin-top:16px;">
+        ${erroCasamentoNomeExtrato ? `<p class="erro-form">Casamento automático de nome falhou: ${escaparHtml(erroCasamentoNomeExtrato)} (todas as linhas caíram pra escolha manual por causa disso).</p>` : ''}
         ${quantidadeDuplicadaExtrato > 0 ? `<div style="margin-bottom:8px;">${quantidadeDuplicadaExtrato} linha(s) já importada(s) antes foram ignoradas automaticamente.</div>` : ''}
         <strong>${total}</strong> linha(s) nova(s) — <strong>${casadas}</strong> casaram automático,
         <strong>${total - casadas}</strong> precisam de escolha manual.

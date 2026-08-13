@@ -11,6 +11,17 @@
 -- ignorando acento e maiuscula/minuscula como antes. Continua exigindo
 -- bater EXATO no resto do nome -- so fica mais tolerante ao que sao
 -- diferencas puramente de formatacao, nao de identidade.
+--
+-- ACHADO SEPARADO (bem mais grave, ja existia antes de qualquer coisa
+-- desse arquivo): a funcao original usava "max(id)" pra pegar o id
+-- quando so 1 pessoa bate -- so que esse Postgres nao tem agregado
+-- max() pra uuid ("function max(uuid) does not exist"). Isso fazia a
+-- funcao INTEIRA falhar com erro toda vez que era chamada -- e como o
+-- app so olha o "data" do retorno da RPC e ignora "error", esse erro
+-- sempre foi engolido em silencio. Ou seja: o casamento automatico
+-- NUNCA funcionou, pra nome nenhum, desde sempre -- nao era so esse
+-- caso do apostrofo. Trocado por array_agg(id) + [1], que funciona com
+-- qualquer tipo (inclusive uuid).
 
 create or replace function public.tentar_casar_transacao(p_nome_pagador text)
 returns uuid
@@ -29,7 +40,7 @@ begin
     '\s+', ' ', 'g'
   );
 
-  select count(*), max(id) into v_quantidade, v_profile_id
+  select count(*), (array_agg(id))[1] into v_quantidade, v_profile_id
   from profiles
   where regexp_replace(
     regexp_replace(unaccent(lower(nome)), '[''`´‘’]', '', 'g'),
