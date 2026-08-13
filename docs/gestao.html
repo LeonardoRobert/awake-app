@@ -1164,7 +1164,8 @@
         </div>
         <p class="erro-form" id="erro-extrato"></p>
         <div id="resumo-extrato"></div>
-        <div id="revisao-extrato"></div>`;
+        <div id="revisao-extrato"></div>
+        <div id="importacoes-recentes" style="margin-top:32px;"></div>`;
       iniciarImportarExtrato();
     } else {
       el.innerHTML = `
@@ -1503,6 +1504,68 @@
       });
     });
     document.getElementById('input-extrato').addEventListener('change', processarArquivoExtrato);
+    carregarImportacoesRecentes();
+  }
+
+  // Lista os ultimos lotes de importacao (agrupados no proprio JS por
+  // lote_importacao_id, que cada linha ganha no momento do "Confirmar
+  // tudo"), com botao pra apagar um lote inteiro de uma vez -- pra
+  // desfazer uma importacao que saiu errada.
+  async function carregarImportacoesRecentes() {
+    const el = document.getElementById('importacoes-recentes');
+    if (!el) return;
+    el.innerHTML = '<div class="vazio-lateral">Carregando importações recentes...</div>';
+
+    const { data, error } = await supa
+      .from('contribuicoes')
+      .select('lote_importacao_id, banco_origem, data')
+      .not('lote_importacao_id', 'is', null)
+      .order('data', { ascending: false })
+      .limit(1000);
+
+    if (error || !data || data.length === 0) {
+      el.innerHTML = '';
+      return;
+    }
+
+    const lotes = new Map();
+    for (const linha of data) {
+      const chave = linha.lote_importacao_id;
+      if (!lotes.has(chave)) {
+        lotes.set(chave, { banco: linha.banco_origem, min: linha.data, max: linha.data, qtd: 0 });
+      }
+      const l = lotes.get(chave);
+      l.qtd++;
+      if (linha.data < l.min) l.min = linha.data;
+      if (linha.data > l.max) l.max = linha.data;
+    }
+
+    // Mais recente primeiro (pela maior data de cada lote), so os
+    // ultimos 10 -- nao precisa listar importacao de meses atras aqui.
+    const listaLotes = [...lotes.entries()]
+      .sort((a, b) => b[1].max.localeCompare(a[1].max))
+      .slice(0, 10);
+
+    el.innerHTML = `
+      <h3>Importações recentes</h3>
+      ${listaLotes.map(([loteId, l]) => `
+        <div class="item-historico">
+          <div>
+            <div class="valor-historico">${LABEL_BANCO_EXTRATO[l.banco] || l.banco} — ${l.qtd} lançamento(s)</div>
+            <div class="meta-historico">${formatarDataBrExtrato(l.min)}${l.min !== l.max ? ' a ' + formatarDataBrExtrato(l.max) : ''}</div>
+          </div>
+          <button class="excluir-lancamento" data-lote="${loteId}">Apagar essa importação</button>
+        </div>
+      `).join('')}`;
+
+    el.querySelectorAll('[data-lote]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Apagar TODOS os lançamentos dessa importação? Essa ação não pode ser desfeita.')) return;
+        btn.disabled = true;
+        await supa.from('contribuicoes').delete().eq('lote_importacao_id', btn.dataset.lote);
+        await carregarImportacoesRecentes();
+      });
+    });
   }
 
   // Mesma normalizacao usada em tentar_casar_transacao() (SQL) --
@@ -1792,6 +1855,10 @@
     // lembrada (chave_importacao) e não ser reimportada semana que vem.
     // "Ignorada" entra com profile_id nulo + motivo_sem_usuario
     // 'ignorado', e o dashboard de Entradas exclui esse motivo do total.
+    // lote_importacao_id e o mesmo pra todas as linhas desse clique --
+    // serve so pra dar pra apagar essa importacao inteira de uma vez
+    // depois, se foi importada errada (ver carregarImportacoesRecentes).
+    const loteId = crypto.randomUUID();
     const payload = linhasExtratoRevisao.map(l => ({
       profile_id: l.ignorar ? null : (l.profileId || null),
       motivo_sem_usuario: l.ignorar ? 'ignorado' : (l.profileId ? null : MOTIVO_SEM_USUARIO_BANCO[l.motivoSemUsuario]),
@@ -1804,6 +1871,7 @@
       tipo: l.ignorar ? null : (l.tipo || null),
       banco_origem: bancoExtratoEscolhido,
       chave_importacao: l.chaveImportacao,
+      lote_importacao_id: loteId,
     }));
 
     // upsert + ignoreDuplicates: se uma linha igual (mesma chave_importacao)
@@ -1831,6 +1899,7 @@
     document.getElementById('revisao-extrato').innerHTML = '';
     linhasExtratoRevisao = [];
     document.getElementById('input-extrato').value = '';
+    await carregarImportacoesRecentes();
   }
 
   // =========================================================
