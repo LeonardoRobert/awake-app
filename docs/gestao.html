@@ -592,20 +592,24 @@
         </div>`;
       iniciarCalendarioAdmin();
     } else if (secaoAtual === 'financeiro') {
+      // A tesouraria decidiu nao adotar o lancamento/import geral de
+      // dizimo/oferta (conversa com o Leo em 13/08/2026) -- as abas
+      // antigas (Lancamento manual/Importar extrato/Entradas) e as
+      // funcoes delas (renderizarSubFinanceiro e tudo que ela chama)
+      // ficam so sem uso, nao foram apagadas. O painel financeiro agora
+      // e so isso: eventos ingressados e quem ja pagou quanto de cada um.
       secaoEl.innerHTML = `
-        <nav class="abas-secao abas-secao-sub">
-          <button class="aba-secao ${subSecaoFinanceiro === 'lancamento' ? 'ativa' : ''}" data-sub="lancamento">Lançamento manual</button>
-          <button class="aba-secao ${subSecaoFinanceiro === 'importar' ? 'ativa' : ''}" data-sub="importar">Importar extrato</button>
-          <button class="aba-secao ${subSecaoFinanceiro === 'entradas' ? 'ativa' : ''}" data-sub="entradas">Entradas</button>
-        </nav>
-        <div id="sub-financeiro"></div>`;
-      secaoEl.querySelectorAll('.abas-secao-sub .aba-secao').forEach(btn => {
-        btn.addEventListener('click', () => {
-          subSecaoFinanceiro = btn.dataset.sub;
-          renderizarConteudo(papel);
-        });
-      });
-      renderizarSubFinanceiro();
+        <div class="calendario-layout" style="grid-template-columns: 340px 1fr;">
+          <div>
+            <div id="lista-eventos-financeiro" style="max-height:640px; overflow-y:auto;"></div>
+          </div>
+          <div>
+            <div id="painel-evento-financeiro">
+              <div class="vazio-lateral" style="padding:40px 0;">Selecione um evento ingressado à esquerda.</div>
+            </div>
+          </div>
+        </div>`;
+      iniciarEventosFinanceiro();
     } else if (secaoAtual === 'usuarios') {
       secaoEl.innerHTML = `
         <h2 style="margin-top:0;">Usuários</h2>
@@ -1354,7 +1358,196 @@
   }
 
   // =========================================================
-  // Importar extrato (PagBank / Cora / Stone)
+  // Eventos ingressados -- unico uso do Admin Financeiro hoje (ver
+  // secaoAtual === 'financeiro'). Abre um evento ingressado, mostra
+  // quem ja pagou quanto (participante = quem tem pelo menos uma linha
+  // em contribuicoes com esse evento_id -- nao existe tabela de
+  // inscricao separada) e deixa lancar um pagamento novo pra qualquer
+  // pessoa. A barra de progresso que o membro ve no app (evento
+  // ingressado / tela de Inicio) le direto de contribuicoes, entao
+  // atualiza sozinha, sem nada extra a fazer aqui.
+  // =========================================================
+  let eventosIngressadosFinanceiro = [];
+  let eventoFinanceiroSelecionado = null;
+
+  async function iniciarEventosFinanceiro() {
+    const el = document.getElementById('lista-eventos-financeiro');
+    el.innerHTML = '<div class="vazio-lateral">Carregando...</div>';
+
+    const { data } = await supa
+      .from('eventos')
+      .select('id, titulo, valor_total, parcelas_sugeridas, data_inicio')
+      .eq('ingressado', true)
+      .order('data_inicio', { ascending: false });
+    eventosIngressadosFinanceiro = data || [];
+
+    if (!todasPessoas.length) {
+      const { data: pessoas } = await supa.from('profiles').select('id, nome, valor_dizimo_padrao').order('nome');
+      todasPessoas = pessoas || [];
+    }
+
+    renderizarListaEventosFinanceiro();
+  }
+
+  function renderizarListaEventosFinanceiro() {
+    const el = document.getElementById('lista-eventos-financeiro');
+    if (eventosIngressadosFinanceiro.length === 0) {
+      el.innerHTML = '<div class="vazio-lateral">Nenhum evento ingressado cadastrado.</div>';
+      return;
+    }
+    el.innerHTML = eventosIngressadosFinanceiro.map(ev => `
+      <div class="item-pessoa ${eventoFinanceiroSelecionado?.id === ev.id ? 'selecionada' : ''}" data-id="${ev.id}">
+        ${escaparHtml(ev.titulo)}
+      </div>
+    `).join('');
+    el.querySelectorAll('.item-pessoa').forEach(item => {
+      item.addEventListener('click', () => {
+        eventoFinanceiroSelecionado = eventosIngressadosFinanceiro.find(e => e.id === item.dataset.id);
+        renderizarListaEventosFinanceiro();
+        renderizarDetalheEventoFinanceiro();
+      });
+    });
+  }
+
+  async function renderizarDetalheEventoFinanceiro() {
+    const el = document.getElementById('painel-evento-financeiro');
+    const evento = eventoFinanceiroSelecionado;
+    if (!evento) {
+      el.innerHTML = '<div class="vazio-lateral" style="padding:40px 0;">Selecione um evento ingressado à esquerda.</div>';
+      return;
+    }
+
+    el.innerHTML = '<div class="vazio-lateral">Carregando...</div>';
+
+    const { data, error } = await supa
+      .from('contribuicoes')
+      .select('id, profile_id, valor, data, meio_pagamento, profiles!contribuicoes_profile_id_fkey(nome)')
+      .eq('evento_id', evento.id)
+      .order('data', { ascending: false });
+
+    if (error) {
+      el.innerHTML = `<div class="vazio-lateral">Erro ao carregar: ${escaparHtml(error.message)}</div>`;
+      return;
+    }
+
+    // Participante = agrupamento client-side por profile_id -- nao
+    // existe tabela de inscricao/participacao separada (ver comentario
+    // da secao). profile_id nulo (credito sem identificacao vinculado
+    // ao evento) vira um grupo "Sem identificação" a parte.
+    const porPessoa = new Map();
+    for (const l of (data || [])) {
+      const chave = l.profile_id || '__sem_identificacao__';
+      if (!porPessoa.has(chave)) {
+        porPessoa.set(chave, { nome: l.profiles?.nome || 'Sem identificação', total: 0, lancamentos: [] });
+      }
+      const p = porPessoa.get(chave);
+      p.total += Number(l.valor);
+      p.lancamentos.push(l);
+    }
+    const valorTotal = Number(evento.valor_total) || 0;
+    const participantes = [...porPessoa.values()].sort((a, b) => b.total - a.total);
+
+    el.innerHTML = `
+      <h2 style="margin-top:0;">${escaparHtml(evento.titulo)}</h2>
+      <div class="meta-historico" style="margin-bottom:16px;">
+        Valor total: R$ ${valorTotal.toFixed(2)}
+        ${evento.parcelas_sugeridas ? ` · Parcelas sugeridas: ${evento.parcelas_sugeridas}x de R$ ${(valorTotal / evento.parcelas_sugeridas).toFixed(2)}` : ''}
+      </div>
+
+      <div class="cartao-lancamento">
+        <h3>Lançar pagamento</h3>
+        <div class="campo-form">
+          <label>Pessoa</label>
+          <select id="ef-select-pessoa">
+            <option value="">Selecionar...</option>
+            ${todasPessoas.map(p => `<option value="${p.id}">${escaparHtml(p.nome)}</option>`).join('')}
+          </select>
+        </div>
+        <div class="linha-form">
+          <div class="campo-form">
+            <label>Valor</label>
+            <input type="text" id="ef-valor" placeholder="0,00">
+          </div>
+          <div class="campo-form">
+            <label>Data</label>
+            <input type="date" id="ef-data" value="${new Date().toISOString().split('T')[0]}">
+          </div>
+        </div>
+        <div class="campo-form">
+          <label>Meio de pagamento</label>
+          <select id="ef-meio">
+            <option value="pix">Pix</option>
+            <option value="dinheiro">Dinheiro</option>
+            <option value="cartao">Cartão</option>
+            <option value="transferencia">Transferência</option>
+            <option value="boleto">Boleto</option>
+            <option value="outro">Outro</option>
+          </select>
+        </div>
+        <p class="erro-form" id="ef-erro"></p>
+        <button class="botao-primario" style="width:auto;padding:9px 20px;" id="ef-btn-lancar">Lançar</button>
+      </div>
+
+      <h3 style="margin-top:24px;">Participantes</h3>
+      ${participantes.length === 0 ? '<div class="vazio-lateral">Ninguém lançou pagamento pra esse evento ainda.</div>' : participantes.map(p => `
+        <div class="cartao-lancamento" style="margin-bottom:12px;">
+          <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+            <strong>${escaparHtml(p.nome)}</strong>
+            <span class="valor-simples">R$ ${p.total.toFixed(2)}${valorTotal ? ' de R$ ' + valorTotal.toFixed(2) : ''}</span>
+          </div>
+          ${valorTotal ? `<div class="barra-progresso-simples"><div class="preenchido" style="width:${Math.min(100, Math.round((p.total / valorTotal) * 100))}%;"></div></div>` : ''}
+          <div style="margin-top:8px;">
+            ${p.lancamentos.map(l => `
+              <div class="item-historico">
+                <div>
+                  <div class="valor-historico">R$ ${Number(l.valor).toFixed(2)}</div>
+                  <div class="meta-historico">${new Date(l.data).toLocaleDateString('pt-BR')} • ${LABEL_MEIO_EXTRATO[l.meio_pagamento] || l.meio_pagamento}</div>
+                </div>
+                <button class="excluir-lancamento" data-id="${l.id}">Excluir</button>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `).join('')}`;
+
+    document.getElementById('ef-btn-lancar').addEventListener('click', () => lancarPagamentoEvento(evento.id));
+    el.querySelectorAll('.excluir-lancamento').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Excluir esse lançamento?')) return;
+        await supa.from('contribuicoes').delete().eq('id', btn.dataset.id);
+        await renderizarDetalheEventoFinanceiro();
+      });
+    });
+  }
+
+  async function lancarPagamentoEvento(eventoId) {
+    const erroEl = document.getElementById('ef-erro');
+    erroEl.textContent = '';
+    const profileId = document.getElementById('ef-select-pessoa').value;
+    const valor = parseFloat(document.getElementById('ef-valor').value.replace(',', '.'));
+    const data = document.getElementById('ef-data').value;
+    const meio = document.getElementById('ef-meio').value;
+
+    if (!profileId) { erroEl.textContent = 'Escolha a pessoa.'; return; }
+    if (!valor || valor <= 0) { erroEl.textContent = 'Informe um valor válido.'; return; }
+
+    const { error } = await supa.from('contribuicoes').insert({
+      profile_id: profileId,
+      data,
+      valor,
+      meio_pagamento: meio,
+      evento_id: eventoId,
+    });
+
+    if (error) { erroEl.textContent = 'Erro ao lançar: ' + error.message; return; }
+
+    await renderizarDetalheEventoFinanceiro();
+  }
+
+  // =========================================================
+  // Importar extrato (PagBank / Cora / Stone) -- sem uso hoje (ver
+  // comentario da secao "Eventos ingressados" acima), mantido intacto
+  // caso a tesouraria mude de ideia.
   // =========================================================
   // Parsers testados isoladamente contra arquivos de exemplo reais antes
   // de integrar aqui -- ver decisoes tomadas com o Leo:
@@ -1906,7 +2099,8 @@
   // Entradas -- dashboard mensal (dizimo/oferta/oferta missionaria/
   // movimento da paz/evento ingressado), incluindo linhas sem usuario
   // vinculado. So conta pro total quem NAO foi marcado como "ignorado"
-  // na revisao do extrato.
+  // na revisao do extrato. Sem uso hoje (ver comentario da secao
+  // "Eventos ingressados"), mantido intacto.
   // =========================================================
   const LABEL_TIPO_ENTRADA = {
     dizimo: 'Dízimo', oferta: 'Oferta', oferta_missionaria: 'Oferta missionária',

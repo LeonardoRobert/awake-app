@@ -87,6 +87,11 @@ String gerarCodigoPixComValor(double valor) {
   return '$semCrc$crc';
 }
 
+// A tesouraria decidiu nao adotar o historico digital de dizimo/oferta
+// (conversa com o Leo em 13/08/2026) -- fica so escondido, nao apagado,
+// pra caso mude de ideia. O resto da tela (Pix, cartao, projetos) fica.
+const _mostrarMinhasContribuicoes = false;
+
 class FinanceiroScreen extends ConsumerStatefulWidget {
   const FinanceiroScreen({super.key});
 
@@ -456,96 +461,98 @@ class _FinanceiroScreenState extends ConsumerState<FinanceiroScreen> {
                 },
               ),
             ),
-            const SizedBox(height: 32),
-            Text('Minhas contribuições', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 4),
-            Text(
-              'Só você vê esse histórico. Reseta a cada mês.',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                IconButton(
-                  onPressed: () => _mudarMes(-1),
-                  icon: const Icon(Icons.chevron_left),
-                ),
-                Text(
-                  _capitalizar(DateFormat("MMMM 'de' yyyy", 'pt_BR').format(_mesSelecionado)),
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                IconButton(
-                  onPressed: _ehMesAtual ? null : () => _mudarMes(1),
-                  icon: const Icon(Icons.chevron_right),
-                ),
-              ],
-            ),
-            contribuicoesAsync.when(
-              loading: () => const Padding(
-                padding: EdgeInsets.symmetric(vertical: 24),
-                child: Center(child: CircularProgressIndicator()),
+            if (_mostrarMinhasContribuicoes) ...[
+              const SizedBox(height: 32),
+              Text('Minhas contribuições', style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 4),
+              Text(
+                'Só você vê esse histórico. Reseta a cada mês.',
+                style: Theme.of(context).textTheme.bodySmall,
               ),
-              error: (err, _) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                child: Text('Erro ao carregar: $err'),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  IconButton(
+                    onPressed: () => _mudarMes(-1),
+                    icon: const Icon(Icons.chevron_left),
+                  ),
+                  Text(
+                    _capitalizar(DateFormat("MMMM 'de' yyyy", 'pt_BR').format(_mesSelecionado)),
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  IconButton(
+                    onPressed: _ehMesAtual ? null : () => _mudarMes(1),
+                    icon: const Icon(Icons.chevron_right),
+                  ),
+                ],
               ),
-              data: (todasContribuicoes) {
-                final contribuicoes = todasContribuicoes
-                    .where((c) =>
-                        c.data.year == _mesSelecionado.year && c.data.month == _mesSelecionado.month)
-                    .toList();
+              contribuicoesAsync.when(
+                loading: () => const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+                error: (err, _) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  child: Text('Erro ao carregar: $err'),
+                ),
+                data: (todasContribuicoes) {
+                  final contribuicoes = todasContribuicoes
+                      .where((c) =>
+                          c.data.year == _mesSelecionado.year && c.data.month == _mesSelecionado.month)
+                      .toList();
 
-                if (contribuicoes.isEmpty) {
-                  return const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 24),
-                    child: Text('Nenhuma contribuição nesse mês.'),
-                  );
-                }
+                  if (contribuicoes.isEmpty) {
+                    return const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 24),
+                      child: Text('Nenhuma contribuição nesse mês.'),
+                    );
+                  }
 
-                final total = contribuicoes.fold<double>(0, (soma, c) => soma + c.valor);
+                  final total = contribuicoes.fold<double>(0, (soma, c) => soma + c.valor);
 
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Card(
-                      color: Theme.of(context).colorScheme.primary.withOpacity(0.08),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text('Total do mês',
-                                style: TextStyle(fontWeight: FontWeight.w600)),
-                            Text(
-                              formatoMoeda.format(total),
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                            ),
-                          ],
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Card(
+                        color: Theme.of(context).colorScheme.primary.withOpacity(0.08),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('Total do mês',
+                                  style: TextStyle(fontWeight: FontWeight.w600)),
+                              Text(
+                                formatoMoeda.format(total),
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    ...contribuicoes.map((c) => Card(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          child: ListTile(
-                            title: Text(
-                              '${formatoMoeda.format(c.valor)}'
-                              '${c.tipo != null ? ' • ${c.tipo!.label}' : ''}',
+                      const SizedBox(height: 12),
+                      ...contribuicoes.map((c) => Card(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            child: ListTile(
+                              title: Text(
+                                '${formatoMoeda.format(c.valor)}'
+                                '${c.tipo != null ? ' • ${c.tipo!.label}' : ''}',
+                              ),
+                              subtitle: Text(
+                                '${DateFormat("dd/MM/yyyy", 'pt_BR').format(c.data)}'
+                                '${c.horario != null ? ' às ${c.horario}' : ''}'
+                                ' • ${c.meioPagamento.label}'
+                                '${c.observacao != null && c.observacao!.isNotEmpty ? '\n${c.observacao}' : ''}',
+                              ),
+                              isThreeLine: c.observacao != null && c.observacao!.isNotEmpty,
                             ),
-                            subtitle: Text(
-                              '${DateFormat("dd/MM/yyyy", 'pt_BR').format(c.data)}'
-                              '${c.horario != null ? ' às ${c.horario}' : ''}'
-                              ' • ${c.meioPagamento.label}'
-                              '${c.observacao != null && c.observacao!.isNotEmpty ? '\n${c.observacao}' : ''}',
-                            ),
-                            isThreeLine: c.observacao != null && c.observacao!.isNotEmpty,
-                          ),
-                        )),
-                  ],
-                );
-              },
-            ),
+                          )),
+                    ],
+                  );
+                },
+              ),
+            ],
           ],
         ),
       ),
