@@ -1,0 +1,29 @@
+name: Robô de Teste Automatizado
+
+on:
+  schedule:
+    # A cada 8 horas.
+    - cron: '0 */8 * * *'
+  workflow_dispatch:
+
+jobs:
+  rodar-robo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dart-lang/setup-dart@v1
+
+      - name: Instalar dependências
+        working-directory: tool/robo_teste
+        run: dart pub get
+
+      - name: Rodar checagens
+        working-directory: tool/robo_teste
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          TESTE_MEMBRO_EMAIL: ${{ secrets.TESTE_MEMBRO_EMAIL }}
+          TESTE_MEMBRO_SENHA: ${{ secrets.TESTE_MEMBRO_SENHA }}
+        run: dart run bin/robo.dart

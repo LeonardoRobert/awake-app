@@ -1,0 +1,15 @@
+name: robo_teste
+description: >
+  Robo de teste automatizado do Shallom -- roda smoke tests periodicos
+  contra o banco de producao, usando contas de teste dedicadas, e
+  registra o resultado em testes_automatizados_execucoes. Pacote Dart
+  isolado (nao faz parte do app Flutter) porque supabase_flutter
+  depende de plugins de plataforma que nao existem fora de um app de
+  verdade -- aqui usamos o pacote "supabase" puro.
+publish_to: none
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  supabase: ^2.0.8

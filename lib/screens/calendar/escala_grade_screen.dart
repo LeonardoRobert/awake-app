@@ -233,6 +233,54 @@ class _EscalaGradeScreenState extends ConsumerState<EscalaGradeScreen>
     if (mounted) setState(() {});
   }
 
+  /// Monta o texto da aba de mes atualmente aberta, pronto pra colar
+  /// num grupo do WhatsApp (*asterisco* vira negrito la sozinho).
+  void _copiarParaWhatsApp(BuildContext context) {
+    final mes = _tabController.index + 1;
+    final linhas = _linhasPorMes[_chave(mes)];
+    if (linhas == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Espera a aba desse mês carregar antes de copiar.')),
+      );
+      return;
+    }
+    if (linhas.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nenhum culto nesse mês pra copiar.')),
+      );
+      return;
+    }
+
+    final buffer = StringBuffer(
+      '*Escala de ${widget.ministerio.labelMinisterio} — ${_nomeMes(mes)}/$_ano*',
+    );
+    for (final linha in linhas) {
+      buffer.writeln();
+      buffer.writeln();
+      buffer.writeln(
+        '*${DateFormat("EEEE, dd/MM", 'pt_BR').format(linha.data)}* — ${linha.evento.titulo}',
+      );
+      for (final coluna in _colunas!) {
+        final posicao = linha.porFuncao[coluna.funcao];
+        final quem = _ehDiaconos
+            ? _formatarCasal(posicao?.nomePessoa, posicao?.nomePessoa2)
+            : (posicao?.nomePessoa ?? '—');
+        buffer.writeln('${coluna.funcao}: $quem');
+      }
+    }
+
+    Clipboard.setData(ClipboardData(text: buffer.toString()));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Escala copiada! Já pode colar no grupo do WhatsApp.')),
+    );
+  }
+
+  String _formatarCasal(String? nome1, String? nome2) {
+    if (nome1 == null && nome2 == null) return '—';
+    if (nome1 != null && nome2 != null) return '$nome1 e $nome2';
+    return nome1 ?? nome2!;
+  }
+
   void _copiarLink(BuildContext context) {
     final mes = _tabController.index + 1;
     final link = '$_linkBase#/escala-grade/${widget.ministerio}?ano=$_ano&mes=$mes';
@@ -374,6 +422,11 @@ class _EscalaGradeScreenState extends ConsumerState<EscalaGradeScreen>
         title: 'Escala mensal — ${widget.ministerio.labelMinisterio}',
         showQrButton: false,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.copy_all_outlined),
+            tooltip: 'Copiar pro WhatsApp',
+            onPressed: () => _copiarParaWhatsApp(context),
+          ),
           IconButton(
             icon: const Icon(Icons.link),
             tooltip: 'Copiar link',

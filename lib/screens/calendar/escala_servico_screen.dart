@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../../models/escala_servico_model.dart';
 import '../../models/event_model.dart';
@@ -245,6 +246,39 @@ class _EscalaServicoScreenState extends State<EscalaServicoScreen> {
     await _recarregarOcorrencia(ocorrencia);
   }
 
+  /// Monta um texto pronto pra colar num grupo do WhatsApp (usa
+  /// *asterisco* pra negrito, que o WhatsApp já entende sozinho).
+  String _gerarTextoWhatsApp() {
+    final buffer = StringBuffer('*Escala de ${widget.ministerio.labelMinisterio}*');
+    for (final ocorrencia in _ocorrencias) {
+      buffer.writeln();
+      buffer.writeln();
+      buffer.writeln(
+        '*${DateFormat("EEEE, dd 'de' MMMM", 'pt_BR').format(ocorrencia.data)}* — ${ocorrencia.evento.titulo}',
+      );
+      for (final posicao in ocorrencia.posicoes) {
+        final quem = _ehDiaconos
+            ? _formatarCasal(posicao.nomePessoa, posicao.nomePessoa2)
+            : (posicao.nomePessoa ?? '—');
+        buffer.writeln('${posicao.funcao}: $quem');
+      }
+    }
+    return buffer.toString();
+  }
+
+  String _formatarCasal(String? nome1, String? nome2) {
+    if (nome1 == null && nome2 == null) return '—';
+    if (nome1 != null && nome2 != null) return '$nome1 e $nome2';
+    return nome1 ?? nome2!;
+  }
+
+  void _copiarParaWhatsApp(BuildContext context) {
+    Clipboard.setData(ClipboardData(text: _gerarTextoWhatsApp()));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Escala copiada! Já pode colar no grupo do WhatsApp.')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final titulo = _ocorrencias.length > 1
@@ -252,7 +286,17 @@ class _EscalaServicoScreenState extends State<EscalaServicoScreen> {
         : 'Escala de ${widget.ministerio.labelMinisterio}';
 
     return Scaffold(
-      appBar: AwakeAppBar(title: titulo, showQrButton: false),
+      appBar: AwakeAppBar(
+        title: titulo,
+        showQrButton: false,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.copy_all_outlined),
+            tooltip: 'Copiar pro WhatsApp',
+            onPressed: _carregando ? null : () => _copiarParaWhatsApp(context),
+          ),
+        ],
+      ),
       body: _carregando
           ? const Center(child: CircularProgressIndicator())
           : ListView(

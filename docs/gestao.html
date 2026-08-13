@@ -405,6 +405,36 @@
   /* ---------- importar extrato ---------- */
   .item-extrato-casado { border-color: #B7E4C7; }
   .item-pendente select.select-evento-extrato { margin-top: 6px; }
+  .tabela-revisao-wrap { overflow-x: auto; margin-top: 16px; border: 1px solid #E5EAEF; border-radius: 10px; }
+  .tabela-revisao { width: 100%; border-collapse: collapse; min-width: 980px; background: var(--branco); }
+  .tabela-revisao th {
+    text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;
+    color: var(--cinza-texto); padding: 10px; border-bottom: 2px solid var(--navy); white-space: nowrap;
+  }
+  .tabela-revisao td { padding: 8px 10px; border-bottom: 1px solid #E5EAEF; vertical-align: middle; font-size: 13px; }
+  .tabela-revisao tr:last-child td { border-bottom: none; }
+  .tabela-revisao tr.linha-casada td:first-child { border-left: 3px solid #4CAF50; }
+  .tabela-revisao tr.linha-sem-usuario td:first-child { border-left: 3px solid #F0A030; }
+  .tabela-revisao select, .tabela-revisao input[type="text"] {
+    padding: 6px 8px; border: 1px solid #D7DEE6; border-radius: 6px;
+    font-family: inherit; font-size: 12px; width: 100%; box-sizing: border-box;
+  }
+  .nome-extrato-original { font-size: 11px; color: var(--cinza-texto); margin-bottom: 4px; }
+
+  /* ---------- visao geral (dashboard do admin) ---------- */
+  .duas-colunas { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+  @media (max-width: 720px) { .duas-colunas { grid-template-columns: 1fr; } }
+  .lista-simples { background: var(--branco); border-radius: 10px; border: 1px solid #E5EAEF; overflow: hidden; }
+  .lista-simples .linha-simples {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 14px; font-size: 13px; border-bottom: 1px solid #E5EAEF;
+  }
+  .lista-simples .linha-simples:last-child { border-bottom: none; }
+  .lista-simples .linha-simples .valor-simples { font-weight: 700; }
+  .barra-progresso-simples {
+    background: var(--azul-claro); border-radius: 20px; height: 10px; overflow: hidden; margin: 6px 0 4px;
+  }
+  .barra-progresso-simples .preenchido { background: var(--navy); height: 100%; }
 </style>
 </head>
 <body>
@@ -565,6 +595,8 @@
     } else if (secaoAtual === 'usuarios') {
       secaoEl.innerHTML = `
         <h2 style="margin-top:0;">Usuários</h2>
+        <div id="visao-geral-usuarios"></div>
+        <h3>Por ministério/grupo</h3>
         <div id="agregados-usuarios" class="grade-agregados"></div>
         <div class="campo-form" style="max-width:320px;">
           <label>Buscar pessoa</label>
@@ -634,33 +666,58 @@
     return CORES_ESCOPO[ev.escopo] || '#60A5FA';
   }
 
+  // Mesma convencao ja usada no site.html: os digitos de data_inicio
+  // devem ser lidos literalmente, sem nenhuma conversao de fuso
+  // horario (Intl/Date local causava horario errado -- bug ja
+  // documentado). Pra evitar misturar Date "local" com Date "UTC" nas
+  // comparacoes, o modulo inteiro do calendario admin trata os objetos
+  // Date como se UTC = hora de Brasilia: sempre constroi/le/formata via
+  // metodos UTC, nunca os locais.
+  function parseDataHoraUtc(isoStr) {
+    const m = isoStr.match(/(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+    if (!m) return new Date(NaN);
+    const [, ano, mes, dia, hora, minuto] = m;
+    return new Date(Date.UTC(Number(ano), Number(mes) - 1, Number(dia), Number(hora), Number(minuto)));
+  }
+  // "Agora", nos mesmos moldes -- assume que quem administra esta no
+  // fuso de Brasilia (mesma premissa que o codigo antigo ja fazia
+  // implicitamente, so que agora de forma explicita/robusta).
+  function hojeUtc() {
+    const agora = new Date();
+    return new Date(Date.UTC(
+      agora.getFullYear(), agora.getMonth(), agora.getDate(),
+      agora.getHours(), agora.getMinutes(),
+    ));
+  }
+  const OPCOES_FUSO_UTC = { timeZone: 'UTC' };
+
   function ocorrenciasNoIntervalo(evento, inicio, fim) {
     const ocorrencias = [];
-    const dataBase = new Date(evento.data_inicio);
+    const dataBase = parseDataHoraUtc(evento.data_inicio);
     if (!evento.recorrente) {
       if (dataBase >= inicio && dataBase <= fim) ocorrencias.push(dataBase);
       return ocorrencias;
     }
-    const fimRecorrencia = evento.recorrencia_fim ? new Date(evento.recorrencia_fim + 'T23:59:59') : null;
+    const fimRecorrencia = evento.recorrencia_fim ? new Date(evento.recorrencia_fim + 'T23:59:59Z') : null;
     let cursor = new Date(dataBase);
-    while (cursor < inicio) cursor.setDate(cursor.getDate() + 7);
+    while (cursor < inicio) cursor.setUTCDate(cursor.getUTCDate() + 7);
     while (cursor <= fim) {
       if (!fimRecorrencia || cursor <= fimRecorrencia) {
         const semanasDoMes = evento.semanas_do_mes;
         if (!semanasDoMes || semanasDoMes.length === 0) {
           ocorrencias.push(new Date(cursor));
         } else {
-          const semana = Math.floor((cursor.getDate() - 1) / 7) + 1;
+          const semana = Math.floor((cursor.getUTCDate() - 1) / 7) + 1;
           if (semanasDoMes.includes(semana)) ocorrencias.push(new Date(cursor));
         }
       }
-      cursor.setDate(cursor.getDate() + 7);
+      cursor.setUTCDate(cursor.getUTCDate() + 7);
     }
     return ocorrencias;
   }
 
-  let mesAtual = new Date();
-  mesAtual.setDate(1);
+  let mesAtual = hojeUtc();
+  mesAtual.setUTCDate(1);
   let diaSelecionado = null;
   let todosEventos = [];
 
@@ -670,12 +727,12 @@
       .map(d => `<div class="dia-semana-label">${d}</div>`).join('');
 
     document.getElementById('mes-anterior').addEventListener('click', () => {
-      mesAtual.setMonth(mesAtual.getMonth() - 1);
+      mesAtual.setUTCMonth(mesAtual.getUTCMonth() - 1);
       diaSelecionado = null;
       renderizarMes();
     });
     document.getElementById('mes-proximo').addEventListener('click', () => {
-      mesAtual.setMonth(mesAtual.getMonth() + 1);
+      mesAtual.setUTCMonth(mesAtual.getUTCMonth() + 1);
       diaSelecionado = null;
       renderizarMes();
     });
@@ -687,33 +744,35 @@
 
   function renderizarMes() {
     const tituloEl = document.getElementById('titulo-mes');
-    tituloEl.textContent = mesAtual.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+    tituloEl.textContent = mesAtual.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric', ...OPCOES_FUSO_UTC });
 
-    const primeiroDiaMes = new Date(mesAtual.getFullYear(), mesAtual.getMonth(), 1);
+    const primeiroDiaMes = new Date(Date.UTC(mesAtual.getUTCFullYear(), mesAtual.getUTCMonth(), 1));
     const inicioGrade = new Date(primeiroDiaMes);
-    inicioGrade.setDate(inicioGrade.getDate() - inicioGrade.getDay());
+    inicioGrade.setUTCDate(inicioGrade.getUTCDate() - inicioGrade.getUTCDay());
     const fimGrade = new Date(inicioGrade);
-    fimGrade.setDate(fimGrade.getDate() + 41); // 6 semanas
+    fimGrade.setUTCDate(fimGrade.getUTCDate() + 41); // 6 semanas
 
-    // Mapa dia -> lista de {evento, data}
+    // Mapa dia -> lista de {evento, data} -- chave em YYYY-MM-DD (UTC),
+    // estavel independente do fuso do navegador.
     const porDia = {};
     todosEventos.forEach(ev => {
       ocorrenciasNoIntervalo(ev, inicioGrade, fimGrade).forEach(data => {
-        const chave = data.toDateString();
+        const chave = data.toISOString().slice(0, 10);
         (porDia[chave] = porDia[chave] || []).push({ evento: ev, data });
       });
     });
 
-    const hoje = new Date();
+    const hoje = hojeUtc();
+    const chaveHoje = hoje.toISOString().slice(0, 10);
     const gradeEl = document.getElementById('grade-dias');
     let html = '';
     for (let i = 0; i < 42; i++) {
       const dia = new Date(inicioGrade);
-      dia.setDate(dia.getDate() + i);
-      const chave = dia.toDateString();
-      const foraDoMes = dia.getMonth() !== mesAtual.getMonth();
-      const ehHoje = dia.toDateString() === hoje.toDateString();
-      const ehSelecionado = diaSelecionado && dia.toDateString() === diaSelecionado.toDateString();
+      dia.setUTCDate(dia.getUTCDate() + i);
+      const chave = dia.toISOString().slice(0, 10);
+      const foraDoMes = dia.getUTCMonth() !== mesAtual.getUTCMonth();
+      const ehHoje = chave === chaveHoje;
+      const ehSelecionado = diaSelecionado && chave === diaSelecionado.toISOString().slice(0, 10);
       const itensDoDia = porDia[chave] || [];
 
       const pontos = itensDoDia.slice(0, 4)
@@ -723,7 +782,7 @@
       html += `
         <div class="dia-celula ${foraDoMes ? 'fora-do-mes' : ''} ${ehHoje ? 'hoje' : ''} ${ehSelecionado ? 'selecionado' : ''}"
              data-dia="${dia.toISOString()}">
-          ${dia.getDate()}
+          ${dia.getUTCDate()}
           <div class="pontos">${pontos}</div>
         </div>`;
     }
@@ -745,11 +804,11 @@
 
     let itens;
     if (diaSelecionado) {
-      tituloEl.textContent = diaSelecionado.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit' });
-      itens = porDia[diaSelecionado.toDateString()] || [];
+      tituloEl.textContent = diaSelecionado.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit', ...OPCOES_FUSO_UTC });
+      itens = porDia[diaSelecionado.toISOString().slice(0, 10)] || [];
     } else {
       tituloEl.textContent = 'Próximos eventos';
-      const hoje = new Date();
+      const hoje = hojeUtc();
       const daquiA30 = new Date(hoje.getTime() + 30 * 24 * 60 * 60 * 1000);
       itens = [];
       todosEventos.forEach(ev => {
@@ -767,7 +826,7 @@
     listaEl.innerHTML = itens.map(item => `
       <div class="item-evento" data-evento-id="${item.evento.id}" data-data="${item.data.toISOString()}">
         <div class="titulo-evento"><span class="cor-tag" style="background:${corDoEvento(item.evento)}"></span>${escaparHtml(item.evento.titulo)}</div>
-        <div class="meta-evento">${item.data.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} às ${item.data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</div>
+        <div class="meta-evento">${item.data.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', ...OPCOES_FUSO_UTC })} às ${item.data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', ...OPCOES_FUSO_UTC })}</div>
       </div>
     `).join('');
 
@@ -790,7 +849,7 @@
         <span class="cor-tag" style="background:${corDoEvento(evento)}"></span>${escaparHtml(categoria)}
       </div>
       <h2>${escaparHtml(evento.titulo)}</h2>
-      <div class="linha-info">🕒 ${data.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit' })} às ${data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</div>
+      <div class="linha-info">🕒 ${data.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit', ...OPCOES_FUSO_UTC })} às ${data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', ...OPCOES_FUSO_UTC })}</div>
       ${evento.local ? `<div class="linha-info">📍 ${escaparHtml(evento.local)}</div>` : ''}
       ${evento.recorrente ? `<div class="linha-info">🔁 Evento recorrente</div>` : ''}
       ${evento.descricao ? `<div class="descricao-modal">${escaparHtml(evento.descricao)}</div>` : ''}
@@ -1085,7 +1144,7 @@
             <label><input type="radio" name="banco-extrato" value="stone"> Stone</label>
           </div>
         </div>
-        <div class="campo-form" style="max-width:420px; display:none;" id="campo-upload-extrato">
+        <div class="campo-form" style="max-width:420px;" id="campo-upload-extrato">
           <label>Arquivo CSV do extrato</label>
           <input type="file" id="input-extrato" accept=".csv">
         </div>
@@ -1422,7 +1481,6 @@
     document.querySelectorAll('input[name="banco-extrato"]').forEach(radio => {
       radio.addEventListener('change', (e) => {
         bancoExtratoEscolhido = e.target.value;
-        document.getElementById('campo-upload-extrato').style.display = 'block';
         document.getElementById('input-extrato').value = '';
         document.getElementById('erro-extrato').textContent = '';
         document.getElementById('resumo-extrato').innerHTML = '';
@@ -1438,6 +1496,13 @@
     if (!arquivo) return;
     const erroEl = document.getElementById('erro-extrato');
     erroEl.textContent = '';
+
+    if (!bancoExtratoEscolhido) {
+      erroEl.textContent = 'Escolha qual banco é esse extrato antes de anexar o arquivo.';
+      e.target.value = '';
+      return;
+    }
+
     document.getElementById('resumo-extrato').innerHTML = '<div class="vazio-lateral">Lendo arquivo...</div>';
     document.getElementById('revisao-extrato').innerHTML = '';
 
@@ -1465,7 +1530,15 @@
       // -- sem acento/case -- com uma UNICA pessoa).
       linhasExtratoRevisao = await Promise.all(linhasBrutas.map(async (linha) => {
         const { data: profileId } = await supa.rpc('tentar_casar_transacao', { p_nome_pagador: linha.nome });
-        return { ...linha, profileId: profileId || null, eventoId: null, ignorar: false };
+        return {
+          ...linha,
+          profileId: profileId || null,
+          motivoSemUsuario: null, // '__nao_cadastrado__' | '__sem_identificacao__' quando profileId for null
+          eventoId: null,
+          ignorar: false,
+          meioPagamento: 'pix',
+          observacao: OBSERVACAO_PADRAO_BANCO_EXTRATO[bancoExtratoEscolhido],
+        };
       }));
 
       renderizarResumoExtrato();
@@ -1491,33 +1564,98 @@
     document.getElementById('btn-confirmar-extrato').addEventListener('click', confirmarImportacaoExtrato);
   }
 
+  const LABEL_BANCO_EXTRATO = { pagbank: 'PagBank', cora: 'Cora', stone: 'Stone' };
+  const LABEL_MEIO_EXTRATO = {
+    pix: 'Pix', dinheiro: 'Dinheiro', cartao: 'Cartão',
+    transferencia: 'Transferência', boleto: 'Boleto', outro: 'Outro',
+  };
+
   function renderizarRevisaoExtrato() {
     const el = document.getElementById('revisao-extrato');
-    el.innerHTML = linhasExtratoRevisao.map((linha, i) => `
-      <div class="item-pendente ${linha.profileId ? 'item-extrato-casado' : ''}" data-indice="${i}">
-        <div class="topo-pendente">
-          <span>${escaparHtml(linha.nome)}</span>
-          <span class="valor-pendente">R$ ${linha.valor.toFixed(2)}</span>
-        </div>
-        <div class="meta-historico">${formatarDataBrExtrato(linha.data)}${linha.horario ? ' às ' + linha.horario.slice(0, 5) : ''}</div>
-        <select class="select-pessoa-extrato" data-indice="${i}">
-          <option value="">${linha.profileId ? 'Trocar pessoa...' : 'Selecionar pessoa...'}</option>
-          ${todasPessoas.map(p => `<option value="${p.id}" ${p.id === linha.profileId ? 'selected' : ''}>${escaparHtml(p.nome)}</option>`).join('')}
-        </select>
-        ${eventosIngressadosCache.length ? `
-          <select class="select-evento-extrato" data-indice="${i}">
-            <option value="">Dízimo/oferta (sem evento)</option>
-            ${eventosIngressadosCache.map(ev => `<option value="${ev.id}">${escaparHtml(ev.titulo)}</option>`).join('')}
-          </select>` : ''}
-        <label style="display:flex; align-items:center; gap:6px; font-size:12px; margin-top:8px; cursor:pointer;">
-          <input type="checkbox" class="chk-ignorar-extrato" data-indice="${i}"> Ignorar essa linha
-        </label>
-      </div>
-    `).join('');
+    const labelConta = LABEL_BANCO_EXTRATO[bancoExtratoEscolhido] || bancoExtratoEscolhido;
+
+    el.innerHTML = `
+      <div class="tabela-revisao-wrap">
+        <table class="tabela-revisao">
+          <thead>
+            <tr>
+              <th>Nome completo</th>
+              <th>Conta</th>
+              <th>Meio de pagamento</th>
+              <th>Valor</th>
+              <th>Data e horário</th>
+              <th>Descrição</th>
+              <th>Evento ingressado</th>
+              <th>Ignorar</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${linhasExtratoRevisao.map((linha, i) => {
+              const classeLinha = linha.profileId ? 'linha-casada' : (linha.motivoSemUsuario ? 'linha-sem-usuario' : '');
+              const valorSelecionado = linha.profileId || linha.motivoSemUsuario || '';
+              return `
+                <tr class="${classeLinha}">
+                  <td>
+                    <div class="nome-extrato-original">${escaparHtml(linha.nome)}</div>
+                    <select class="select-pessoa-extrato" data-indice="${i}">
+                      <option value="">Selecionar...</option>
+                      <option value="__nao_cadastrado__" ${valorSelecionado === '__nao_cadastrado__' ? 'selected' : ''}>Usuário não cadastrado</option>
+                      <option value="__sem_identificacao__" ${valorSelecionado === '__sem_identificacao__' ? 'selected' : ''}>Crédito sem identificação</option>
+                      ${todasPessoas.map(p => `<option value="${p.id}" ${p.id === linha.profileId ? 'selected' : ''}>${escaparHtml(p.nome)}</option>`).join('')}
+                    </select>
+                  </td>
+                  <td>${escaparHtml(labelConta)}</td>
+                  <td>
+                    <select class="select-meio-extrato" data-indice="${i}">
+                      ${Object.entries(LABEL_MEIO_EXTRATO).map(([v, l]) => `<option value="${v}" ${v === linha.meioPagamento ? 'selected' : ''}>${l}</option>`).join('')}
+                    </select>
+                  </td>
+                  <td style="white-space:nowrap;">R$ ${linha.valor.toFixed(2)}</td>
+                  <td style="white-space:nowrap;">${formatarDataBrExtrato(linha.data)}${linha.horario ? ' ' + linha.horario.slice(0, 5) : ''}</td>
+                  <td>
+                    <input type="text" class="input-observacao-extrato" data-indice="${i}" value="${escaparAtributo(linha.observacao)}">
+                  </td>
+                  <td>
+                    ${eventosIngressadosCache.length ? `
+                      <select class="select-evento-extrato" data-indice="${i}">
+                        <option value="">Dízimo/oferta</option>
+                        ${eventosIngressadosCache.map(ev => `<option value="${ev.id}" ${ev.id === linha.eventoId ? 'selected' : ''}>${escaparHtml(ev.titulo)}</option>`).join('')}
+                      </select>` : '—'}
+                  </td>
+                  <td style="text-align:center;">
+                    <input type="checkbox" class="chk-ignorar-extrato" data-indice="${i}" ${linha.ignorar ? 'checked' : ''}>
+                  </td>
+                </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>`;
 
     el.querySelectorAll('.select-pessoa-extrato').forEach(sel => {
       sel.addEventListener('change', (e) => {
-        linhasExtratoRevisao[e.target.dataset.indice].profileId = e.target.value || null;
+        const valor = e.target.value;
+        const linha = linhasExtratoRevisao[e.target.dataset.indice];
+        if (valor === '__nao_cadastrado__' || valor === '__sem_identificacao__') {
+          linha.profileId = null;
+          linha.motivoSemUsuario = valor;
+        } else {
+          linha.profileId = valor || null;
+          linha.motivoSemUsuario = null;
+        }
+        const tr = sel.closest('tr');
+        tr.classList.remove('linha-casada', 'linha-sem-usuario');
+        if (linha.profileId) tr.classList.add('linha-casada');
+        else if (linha.motivoSemUsuario) tr.classList.add('linha-sem-usuario');
+      });
+    });
+    el.querySelectorAll('.select-meio-extrato').forEach(sel => {
+      sel.addEventListener('change', (e) => {
+        linhasExtratoRevisao[e.target.dataset.indice].meioPagamento = e.target.value;
+      });
+    });
+    el.querySelectorAll('.input-observacao-extrato').forEach(inp => {
+      inp.addEventListener('input', (e) => {
+        linhasExtratoRevisao[e.target.dataset.indice].observacao = e.target.value;
       });
     });
     el.querySelectorAll('.select-evento-extrato').forEach(sel => {
@@ -1536,14 +1674,16 @@
     const erroEl = document.getElementById('erro-confirmar-extrato');
     erroEl.textContent = '';
 
-    const paraLancar = linhasExtratoRevisao.filter(l => !l.ignorar);
-    const semPessoa = paraLancar.filter(l => !l.profileId);
-    if (semPessoa.length > 0) {
-      erroEl.textContent = `${semPessoa.length} linha(s) sem pessoa selecionada. Escolha a pessoa ou marque "Ignorar essa linha".`;
+    const paraRevisar = linhasExtratoRevisao.filter(l => !l.ignorar);
+    const semEscolha = paraRevisar.filter(l => !l.profileId && !l.motivoSemUsuario);
+    if (semEscolha.length > 0) {
+      erroEl.textContent = `${semEscolha.length} linha(s) sem "Nome completo" escolhido. Selecione a pessoa, "Usuário não cadastrado", "Crédito sem identificação", ou marque "Ignorar".`;
       return;
     }
+
+    const paraLancar = paraRevisar.filter(l => l.profileId);
     if (paraLancar.length === 0) {
-      erroEl.textContent = 'Nenhuma linha pra lançar (tudo foi ignorado).';
+      erroEl.textContent = 'Nenhuma linha com pessoa vinculada pra lançar (as demais não geram lançamento).';
       return;
     }
 
@@ -1556,8 +1696,8 @@
       data: l.data,
       horario: l.horario,
       valor: l.valor,
-      meio_pagamento: 'pix',
-      observacao: OBSERVACAO_PADRAO_BANCO_EXTRATO[bancoExtratoEscolhido],
+      meio_pagamento: l.meioPagamento,
+      observacao: l.observacao || null,
       evento_id: l.eventoId || null,
     }));
 
@@ -1568,8 +1708,14 @@
 
     if (error) { erroEl.textContent = 'Erro ao lançar: ' + error.message; return; }
 
-    document.getElementById('resumo-extrato').innerHTML =
-      `<div class="cartao-lancamento" style="margin-top:16px;">✅ ${paraLancar.length} contribuição(ões) lançada(s) com sucesso.</div>`;
+    const semUsuario = paraRevisar.length - paraLancar.length;
+    const ignoradas = linhasExtratoRevisao.length - paraRevisar.length;
+    document.getElementById('resumo-extrato').innerHTML = `
+      <div class="cartao-lancamento" style="margin-top:16px;">
+        ✅ ${paraLancar.length} contribuição(ões) lançada(s) com sucesso.
+        ${semUsuario ? `<br>${semUsuario} linha(s) revisada(s) sem usuário vinculado (não lançadas).` : ''}
+        ${ignoradas ? `<br>${ignoradas} linha(s) ignorada(s).` : ''}
+      </div>`;
     document.getElementById('revisao-extrato').innerHTML = '';
     linhasExtratoRevisao = [];
     document.getElementById('input-extrato').value = '';
@@ -1604,7 +1750,9 @@
 
   async function iniciarPainelUsuarios() {
     const [{ data: perfis, error: erroPerfis }, { data: vinculos, error: erroVinculos }] = await Promise.all([
-      supa.from('profiles').select('id, nome, papel, ativo, categoria, grupo_casais').order('nome'),
+      supa.from('profiles')
+        .select('id, nome, papel, ativo, categoria, grupo_casais, data_nascimento, estado_civil, criado_em')
+        .order('nome'),
       supa.from('profile_ministerios').select('profile_id, ministerio, papel'),
     ]);
 
@@ -1617,9 +1765,153 @@
     todosUsuarios = perfis || [];
     todosVinculosMinisterio = vinculos || [];
 
+    renderizarVisaoGeral();
     renderizarAgregados();
     renderizarListaUsuarios();
     document.getElementById('busca-usuario').addEventListener('input', renderizarListaUsuarios);
+  }
+
+  const FAIXAS_ETARIAS_ADMIN = ['awake', 'homens', 'mulheres'];
+  const MINISTERIOS_SERVICO_ADMIN = ['diaconos', 'louvor', 'danca', 'midia', 'multimidia'];
+  const LABEL_ESTADO_CIVIL_ADMIN = {
+    solteiro: 'Solteiro(a)', namorando: 'Namorando', noivo: 'Noivo(a)',
+    casado: 'Casado(a)', outro: 'Outro', nao_informado: 'Não informado',
+  };
+
+  function calcularIdadeAdmin(dataNascStr, hoje) {
+    const nasc = new Date(dataNascStr);
+    let idade = hoje.getFullYear() - nasc.getFullYear();
+    if (hoje.getMonth() < nasc.getMonth() || (hoje.getMonth() === nasc.getMonth() && hoje.getDate() < nasc.getDate())) {
+      idade--;
+    }
+    return idade;
+  }
+
+  function linhaBarraAdmin(rotulo, valor, total) {
+    const pct = total ? Math.round((valor / total) * 100) : 0;
+    return `
+      <div class="linha-simples" style="display:block;">
+        <div style="display:flex; justify-content:space-between;">
+          <span>${escaparHtml(rotulo)}</span>
+          <span class="valor-simples">${valor} · ${pct}%</span>
+        </div>
+        <div class="barra-progresso-simples"><div class="preenchido" style="width:${pct}%;"></div></div>
+      </div>`;
+  }
+
+  async function renderizarVisaoGeral() {
+    const el = document.getElementById('visao-geral-usuarios');
+    el.innerHTML = '<div class="vazio-lateral">Calculando...</div>';
+
+    const hoje = new Date();
+    const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+
+    const totalUsuarios = todosUsuarios.length;
+    const novosNoMes = todosUsuarios.filter(p => p.criado_em && new Date(p.criado_em) >= inicioMes).length;
+
+    const idades = todosUsuarios.filter(p => p.data_nascimento).map(p => calcularIdadeAdmin(p.data_nascimento, hoje));
+    const idadeMedia = idades.length ? Math.round(idades.reduce((a, b) => a + b, 0) / idades.length) : null;
+
+    const contagemEstadoCivil = {};
+    todosUsuarios.forEach(p => {
+      const chave = p.estado_civil || 'nao_informado';
+      contagemEstadoCivil[chave] = (contagemEstadoCivil[chave] || 0) + 1;
+    });
+
+    const contagemFaixaEtaria = {};
+    const contagemAreaServico = {};
+    todosVinculosMinisterio.forEach(v => {
+      if (FAIXAS_ETARIAS_ADMIN.includes(v.ministerio)) {
+        contagemFaixaEtaria[v.ministerio] = (contagemFaixaEtaria[v.ministerio] || 0) + 1;
+      } else if (MINISTERIOS_SERVICO_ADMIN.includes(v.ministerio)) {
+        contagemAreaServico[v.ministerio] = (contagemAreaServico[v.ministerio] || 0) + 1;
+      }
+    });
+
+    // Ranking combinado (todas as areas de servico juntas), ultimos 60
+    // dias -- comeca todo mundo que esta em alguma area de servico com
+    // 0, pra tambem aparecer quem nunca foi escalado.
+    const contagemServindo = {};
+    todosVinculosMinisterio
+      .filter(v => MINISTERIOS_SERVICO_ADMIN.includes(v.ministerio))
+      .forEach(v => {
+        const nome = todosUsuarios.find(p => p.id === v.profile_id)?.nome;
+        if (nome) contagemServindo[nome] = contagemServindo[nome] || 0;
+      });
+
+    const seiscentosDiasAtras = new Date(hoje.getTime() - 60 * 24 * 60 * 60 * 1000);
+    const { data: escalas } = await supa
+      .from('escalas_servico')
+      .select('id')
+      .in('ministerio', MINISTERIOS_SERVICO_ADMIN)
+      .gte('data_ocorrencia', seiscentosDiasAtras.toISOString().split('T')[0]);
+
+    if (escalas && escalas.length) {
+      const escalaIds = escalas.map(e => e.id);
+      const { data: posicoes } = await supa
+        .from('escala_servico_posicoes')
+        .select(
+          'profile_id, profile_id_2, '
+          + 'profiles!escala_servico_posicoes_profile_id_fkey(nome), '
+          + 'profiles2:profiles!escala_servico_posicoes_profile_id_2_fkey(nome)',
+        )
+        .in('escala_id', escalaIds);
+
+      (posicoes || []).forEach(p => {
+        const nome1 = p.profiles?.nome;
+        const nome2 = p.profiles2?.nome;
+        if (nome1) contagemServindo[nome1] = (contagemServindo[nome1] || 0) + 1;
+        if (nome2) contagemServindo[nome2] = (contagemServindo[nome2] || 0) + 1;
+      });
+    }
+
+    const totalNaAreaServico = Object.keys(contagemServindo).length;
+    const quantosServindo = Object.values(contagemServindo).filter(v => v > 0).length;
+    const entradasRanking = Object.entries(contagemServindo).sort((a, b) => b[1] - a[1]);
+    const maisAtivos = entradasRanking.slice(0, 10);
+    const menosAtivos = entradasRanking.slice(-10).reverse();
+
+    const listaRanking = (entradas) => entradas.length
+      ? `<div class="lista-simples">${entradas.map(([nome, qtd]) => `
+          <div class="linha-simples"><span>${escaparHtml(nome)}</span><span class="valor-simples">${qtd}x</span></div>
+        `).join('')}</div>`
+      : '<div class="vazio-lateral">Sem dados ainda.</div>';
+
+    el.innerHTML = `
+      <div class="grade-agregados" style="margin-bottom:16px;">
+        <div class="cartao-agregado"><div class="nome-agregado">Usuários no total</div><div class="contagem-agregado">${totalUsuarios}</div></div>
+        <div class="cartao-agregado"><div class="nome-agregado">Novos esse mês</div><div class="contagem-agregado">${novosNoMes}</div></div>
+        <div class="cartao-agregado"><div class="nome-agregado">Idade média</div><div class="contagem-agregado">${idadeMedia ?? '—'}</div></div>
+        <div class="cartao-agregado"><div class="nome-agregado">Servindo (áreas de serviço)</div><div class="contagem-agregado">${totalNaAreaServico ? Math.round((quantosServindo / totalNaAreaServico) * 100) + '%' : '—'}</div></div>
+      </div>
+      <div class="duas-colunas">
+        <div>
+          <h4 style="margin:0 0 8px;">Estado civil</h4>
+          <div class="lista-simples">
+            ${Object.entries(contagemEstadoCivil).sort((a, b) => b[1] - a[1])
+              .map(([chave, qtd]) => linhaBarraAdmin(LABEL_ESTADO_CIVIL_ADMIN[chave] || chave, qtd, totalUsuarios)).join('')}
+          </div>
+        </div>
+        <div>
+          <h4 style="margin:0 0 8px;">Faixa etária × área de serviço</h4>
+          <div class="lista-simples">
+            ${Object.entries(contagemFaixaEtaria).sort((a, b) => b[1] - a[1])
+              .map(([chave, qtd]) => linhaBarraAdmin(LABEL_MINISTERIO_AGREGADO[chave] || chave, qtd, totalUsuarios)).join('')}
+            ${Object.entries(contagemAreaServico).sort((a, b) => b[1] - a[1])
+              .map(([chave, qtd]) => linhaBarraAdmin(LABEL_MINISTERIO_AGREGADO[chave] || chave, qtd, totalUsuarios)).join('')}
+          </div>
+        </div>
+      </div>
+      <div class="duas-colunas">
+        <div>
+          <h4 style="margin:0 0 8px;">Mais participativos (últimos 60 dias, todas as áreas)</h4>
+          ${listaRanking(maisAtivos)}
+        </div>
+        <div>
+          <h4 style="margin:0 0 8px;">Menos participativos (últimos 60 dias, todas as áreas)</h4>
+          ${listaRanking(menosAtivos)}
+        </div>
+      </div>`;
   }
 
   function renderizarAgregados() {
