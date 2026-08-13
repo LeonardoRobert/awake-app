@@ -409,32 +409,79 @@
     igreja: 'Geral', homens: 'Homens', mulheres: 'Mulheres', awake: 'Jovens',
   };
 
-  function proximaOcorrenciaSemanal(evento) {
-    // Le a data e o horario DIRETO do texto (sem passar por conversao
-    // de fuso horario nenhuma) -- o app tambem mostra os numeros
-    // exatamente como estao gravados, entao o site precisa fazer
-    // igual, senao os horarios batem diferente.
-    const match = evento.data_inicio.match(/(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+  // Le data/hora DIRETO do texto (sem conversao de fuso nenhuma -- mesma
+  // convencao ja usada no resto do site) e devolve um Date "fake UTC":
+  // os digitos gravados viram os campos UTC do objeto, entao dar
+  // getUTCDay()/getUTCHours()/etc devolve exatamente o que esta gravado,
+  // imune ao fuso de quem esta vendo a pagina.
+  function parseDataHoraSemFuso(isoStr) {
+    const match = isoStr.match(/(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
     const [, ano, mes, dia, hora, minuto] = match;
-    const dataSemHora = new Date(Date.UTC(Number(ano), Number(mes) - 1, Number(dia)));
-    return { diaSemana: dataSemHora.getUTCDay(), horario: `${hora}:${minuto}` };
+    return new Date(Date.UTC(Number(ano), Number(mes) - 1, Number(dia), Number(hora), Number(minuto)));
   }
 
+  /// Gera as ocorrencias REAIS de um evento dentro de [inicio, fim],
+  /// respeitando recorrencia semanal, "quais semanas do mes" (nao
+  /// repete toda semana se semanas_do_mes estiver preenchido) e
+  /// excecoes -- mesma logica de EventModel.occurrencesBetween() no
+  /// app Flutter, portada pra js.
   function ocorrenciasNoIntervalo(evento, inicio, fim) {
-    const ocorrencias = [];
-    const dataBase = new Date(evento.data_inicio);
+    const dataBase = parseDataHoraSemFuso(evento.data_inicio);
+    const excecoes = (evento.excecoes || []).map(e => parseDataHoraSemFuso(e));
+    const ehExcecao = (d) => excecoes.some(e =>
+      e.getUTCFullYear() === d.getUTCFullYear() && e.getUTCMonth() === d.getUTCMonth() && e.getUTCDate() === d.getUTCDate()
+    );
+
     if (!evento.recorrente) {
-      if (dataBase >= inicio && dataBase <= fim) ocorrencias.push(dataBase);
-      return ocorrencias;
+      if (dataBase >= inicio && dataBase <= fim && !ehExcecao(dataBase)) return [dataBase];
+      return [];
     }
-    const fimRecorrencia = evento.recorrencia_fim ? new Date(evento.recorrencia_fim + 'T23:59:59') : null;
-    let cursor = new Date(dataBase);
-    while (cursor < inicio) cursor.setDate(cursor.getDate() + 7);
-    while (cursor <= fim) {
-      if (!fimRecorrencia || cursor <= fimRecorrencia) ocorrencias.push(new Date(cursor));
-      cursor.setDate(cursor.getDate() + 7);
+
+    const recorrenciaFim = evento.recorrencia_fim ? parseDataHoraSemFuso(evento.recorrencia_fim + 'T23:59') : null;
+    const semanasDoMes = evento.semanas_do_mes;
+
+    if (!semanasDoMes || semanasDoMes.length === 0) {
+      // Sem semanas especificas: repete toda semana, como sempre.
+      const resultado = [];
+      let cursor = new Date(dataBase);
+      while (cursor < inicio) cursor.setUTCDate(cursor.getUTCDate() + 7);
+      while (cursor <= fim) {
+        if ((!recorrenciaFim || cursor <= recorrenciaFim) && !ehExcecao(cursor)) {
+          resultado.push(new Date(cursor));
+        }
+        cursor.setUTCDate(cursor.getUTCDate() + 7);
+      }
+      return resultado;
     }
-    return ocorrencias;
+
+    // Com semanas especificas (quinzenal, mensal, etc): percorre mes a
+    // mes dentro do intervalo, acha a Nesima ocorrencia daquele dia da
+    // semana, mantem so as que caem na semana escolhida.
+    const resultado = [];
+    const weekday = dataBase.getUTCDay();
+    let mesCursor = new Date(Date.UTC(inicio.getUTCFullYear(), inicio.getUTCMonth(), 1));
+    const limiteMes = new Date(Date.UTC(fim.getUTCFullYear(), fim.getUTCMonth(), 1));
+
+    while (mesCursor <= limiteMes) {
+      let dia = new Date(Date.UTC(mesCursor.getUTCFullYear(), mesCursor.getUTCMonth(), 1, dataBase.getUTCHours(), dataBase.getUTCMinutes()));
+      let numeroSemana = 0;
+      while (dia.getUTCMonth() === mesCursor.getUTCMonth()) {
+        if (dia.getUTCDay() === weekday) {
+          numeroSemana++;
+          if (semanasDoMes.includes(numeroSemana)) {
+            const depoisDoInicio = dia >= dataBase;
+            const dentroDoIntervalo = dia >= inicio && dia <= fim;
+            const dentroDoFim = !recorrenciaFim || dia <= recorrenciaFim;
+            if (depoisDoInicio && dentroDoIntervalo && dentroDoFim && !ehExcecao(dia)) {
+              resultado.push(new Date(dia));
+            }
+          }
+        }
+        dia.setUTCDate(dia.getUTCDate() + 1);
+      }
+      mesCursor.setUTCMonth(mesCursor.getUTCMonth() + 1);
+    }
+    return resultado;
   }
 
   const NOMES_DIAS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
@@ -450,25 +497,41 @@
       );
       const eventos = await resp.json();
 
-      const recorrentes = eventos.filter(e => e.recorrente);
       // So mostra como "especial" (tipo Retiro) quem o admin marcou
       // de verdade como Evento Ingressado -- um evento comum que so
       // aconteceu de nao ser recorrente (ex: culto avulso) nao deveria
       // aparecer aqui.
       const especiais = eventos.filter(e => e.ingressado && new Date(e.data_inicio) > new Date());
 
-      if (recorrentes.length === 0) {
+      // So a semana atual (segunda a domingo) -- um evento recorrente
+      // que so acontece em semanas especificas do mes (ex: Comunhao,
+      // so 2a sexta) nao deve aparecer toda semana, so na que realmente
+      // acontece.
+      const hoje = new Date();
+      const hojeSemFuso = new Date(Date.UTC(hoje.getFullYear(), hoje.getMonth(), hoje.getDate()));
+      const diaSemanaHoje = hojeSemFuso.getUTCDay(); // 0 = domingo
+      const offsetSegunda = diaSemanaHoje === 0 ? 6 : diaSemanaHoje - 1;
+      const inicioSemana = new Date(hojeSemFuso);
+      inicioSemana.setUTCDate(inicioSemana.getUTCDate() - offsetSegunda);
+      const fimSemana = new Date(inicioSemana);
+      fimSemana.setUTCDate(fimSemana.getUTCDate() + 6);
+      fimSemana.setUTCHours(23, 59, 59, 999);
+
+      const linhas = [];
+      eventos.filter(e => e.recorrente).forEach(ev => {
+        ocorrenciasNoIntervalo(ev, inicioSemana, fimSemana).forEach(oc => {
+          linhas.push({
+            titulo: ev.titulo,
+            diaSemana: oc.getUTCDay(),
+            horario: `${String(oc.getUTCHours()).padStart(2, '0')}:${String(oc.getUTCMinutes()).padStart(2, '0')}`,
+            categoria: MAPA_ESCOPO_PUBLICO[ev.escopo] || '',
+          });
+        });
+      });
+
+      if (linhas.length === 0) {
         corpoTabela.innerHTML = '<tr><td colspan="3" style="text-align:center;">Agenda em atualização.</td></tr>';
       } else {
-        const linhas = recorrentes.map(ev => {
-          const { diaSemana, horario } = proximaOcorrenciaSemanal(ev);
-          return {
-            titulo: ev.titulo,
-            diaSemana,
-            horario,
-            categoria: MAPA_ESCOPO_PUBLICO[ev.escopo] || '',
-          };
-        });
 
         // Agrupa por dia da semana -- se tem mais de um encontro no
         // mesmo dia, mostra os dois juntos numa linha so, em vez de
@@ -501,7 +564,14 @@
       }
 
       if (especiais.length > 0) {
-        const agora = new Date();
+        // agora/daquiA90 tem que estar no mesmo "fake UTC" que
+        // ocorrenciasNoIntervalo usa por dentro -- senao a comparacao
+        // fica desalinhada pelo fuso de quem esta vendo a pagina.
+        const agoraReal = new Date();
+        const agora = new Date(Date.UTC(
+          agoraReal.getFullYear(), agoraReal.getMonth(), agoraReal.getDate(),
+          agoraReal.getHours(), agoraReal.getMinutes()
+        ));
         const daquiA90 = new Date(agora.getTime() + 90 * 24 * 60 * 60 * 1000);
         let proximaEspecial = null;
         for (const ev of especiais) {
@@ -511,7 +581,7 @@
           }
         }
         if (proximaEspecial) {
-          const dataFormatada = proximaEspecial.data.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' });
+          const dataFormatada = proximaEspecial.data.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', timeZone: 'UTC' });
           especiaisEl.innerHTML = `
             <div class="cartao-especial">
               <span class="rotulo-secao">Inscrições abertas</span>
