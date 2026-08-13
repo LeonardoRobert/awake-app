@@ -57,6 +57,7 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
 
   // ---- Evento ingressado ----
   bool _ingressado = false;
+  bool _visivelSitePublico = false;
   final _valorTotalController = TextEditingController();
   final _parcelasController = TextEditingController();
   final Set<String> _metodosPagamentoSelecionados = {};
@@ -100,6 +101,7 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
     }
 
     _ingressado = evento?.ingressado ?? false;
+    _visivelSitePublico = evento?.visivelSitePublico ?? false;
     _valorTotalController.text =
         evento?.valorTotal != null ? evento!.valorTotal!.toStringAsFixed(2) : '';
     _parcelasController.text = evento?.parcelasSugeridas?.toString() ?? '';
@@ -289,6 +291,7 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
         metodosPagamento: _ingressado && _metodosPagamentoSelecionados.isNotEmpty
             ? _metodosPagamentoSelecionados.toList()
             : null,
+        visivelSitePublico: _visivelSitePublico,
       );
 
       if (_isEdicao) {
@@ -577,6 +580,14 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
                 ],
               ],
               const SizedBox(height: 24),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                value: _visivelSitePublico,
+                onChanged: (v) => setState(() => _visivelSitePublico = v),
+                title: const Text('Mostrar no site público'),
+                subtitle: const Text('Aparece na agenda de leonardorobert.github.io/awake-app, sem precisar de login'),
+              ),
+              const SizedBox(height: 12),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
                 value: _ingressado,

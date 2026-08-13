@@ -931,6 +931,10 @@
         <input type="checkbox" id="f-recorrente" ${ev.recorrente ? 'checked' : ''}>
         <label for="f-recorrente">Evento recorrente (toda semana)</label>
       </div>
+      <div class="campo-form check">
+        <input type="checkbox" id="f-visivel-site" ${ev.visivel_site_publico ? 'checked' : ''}>
+        <label for="f-visivel-site">Mostrar no site público (agenda sem login)</label>
+      </div>
       <div id="campos-recorrencia" style="display:${ev.recorrente ? 'block' : 'none'};">
         <div class="campo-form">
           <label>Repetir até (opcional)</label>
@@ -1075,6 +1079,7 @@
       publico_alvo: (publicoAlvo && publicoAlvo.length) ? publicoAlvo : null,
       publico_genero: (publicoGenero && publicoGenero.length) ? publicoGenero : null,
       publico_casais: (publicoCasais && publicoCasais.length) ? publicoCasais : null,
+      visivel_site_publico: document.getElementById('f-visivel-site').checked,
     };
 
     const botao = document.getElementById('btn-salvar-form');

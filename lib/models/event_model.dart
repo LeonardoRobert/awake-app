@@ -356,6 +356,12 @@ class EventModel {
   final int? parcelasSugeridas;
   final List<String>? metodosPagamento;
 
+  /// Controle manual de visibilidade na agenda publica do site.html --
+  /// independente do escopo (ex: dentro de Awake, so "Comunhao" pode
+  /// estar marcado, nao os GCs). Default false: precisa ser ligado
+  /// evento a evento por quem cria/edita.
+  final bool visivelSitePublico;
+
   EventModel({
     required this.id,
     required this.titulo,
@@ -379,6 +385,7 @@ class EventModel {
     this.valorTotal,
     this.parcelasSugeridas,
     this.metodosPagamento,
+    this.visivelSitePublico = false,
   });
 
   Color get cor => corDoEvento(tipo, escopo);
@@ -415,6 +422,7 @@ class EventModel {
       valorTotal: (map['valor_total'] as num?)?.toDouble(),
       parcelasSugeridas: map['parcelas_sugeridas'] as int?,
       metodosPagamento: (map['metodos_pagamento'] as List?)?.map((e) => e.toString()).toList(),
+      visivelSitePublico: map['visivel_site_publico'] as bool? ?? false,
     );
   }
 
@@ -440,6 +448,7 @@ class EventModel {
       'valor_total': valorTotal,
       'parcelas_sugeridas': parcelasSugeridas,
       'metodos_pagamento': metodosPagamento,
+      'visivel_site_publico': visivelSitePublico,
     };
   }
 
