@@ -427,11 +427,17 @@ Future<void> _testarCriarEventoEEscalaTodasAreas() async {
 /// So dos Diaconos: escala_servico_casais (lembrar par) -- upsert
 /// idempotente, testa a RLS dessa tabela separada.
 Future<void> _testarCasalDiaconos() async {
+  // A tabela tem CHECK (profile_id_a < profile_id_b) -- ordem canonica
+  // pra nunca duplicar o par como A-B e B-A. O app de verdade
+  // (escala_servico_service.dart: salvarPar()) sempre ordena os dois
+  // ids antes de montar o insert; o teste precisa fazer o mesmo.
+  final ids = [_clienteLider.auth.currentUser!.id, _clienteMembro.auth.currentUser!.id]..sort();
+
   await _clienteLider.from('escala_servico_casais').upsert(
     {
       'ministerio': 'diaconos',
-      'profile_id_a': _clienteLider.auth.currentUser!.id,
-      'profile_id_b': _clienteMembro.auth.currentUser!.id,
+      'profile_id_a': ids[0],
+      'profile_id_b': ids[1],
       'atualizado_em': DateTime.now().toIso8601String(),
     },
     onConflict: 'ministerio,profile_id_a,profile_id_b',
@@ -440,8 +446,8 @@ Future<void> _testarCasalDiaconos() async {
       .from('escala_servico_casais')
       .delete()
       .eq('ministerio', 'diaconos')
-      .eq('profile_id_a', _clienteLider.auth.currentUser!.id)
-      .eq('profile_id_b', _clienteMembro.auth.currentUser!.id);
+      .eq('profile_id_a', ids[0])
+      .eq('profile_id_b', ids[1]);
 }
 
 /// O ponto inteiro da escala: cria evento+escala+posicao de "louvor",
