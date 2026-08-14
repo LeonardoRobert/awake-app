@@ -402,9 +402,14 @@ Future<void> _testarCasamentoAjustaMinisterios() async {
   final membroId = _clienteMembro.auth.currentUser!.id;
   final original = await _admin.from('profiles').select('estado_civil, sexo').eq('id', membroId).single();
   final estadoCivilOriginal = original['estado_civil'] as String?;
-  final sexo = original['sexo'] as String?;
-  if (sexo != 'masculino' && sexo != 'feminino') {
-    throw Exception('Conta de teste do Membro não tem sexo definido -- não dá pra testar o ajuste automático.');
+  final sexoOriginal = original['sexo'] as String?;
+  // A conta de teste do Membro pode nao ter "sexo" preenchido -- em vez
+  // de depender desse dado ja existir (e o teste falhar por causa de
+  // cadastro incompleto, nao de bug de verdade), define um valor pra
+  // esse teste e desfaz no finally, junto com o resto.
+  final sexo = (sexoOriginal == 'masculino' || sexoOriginal == 'feminino') ? sexoOriginal : 'masculino';
+  if (sexo != sexoOriginal) {
+    await _clienteMembro.from('profiles').update({'sexo': sexo}).eq('id', membroId);
   }
   final ministerioEsperado = sexo == 'masculino' ? 'homens' : 'mulheres';
 
@@ -440,9 +445,12 @@ Future<void> _testarCasamentoAjustaMinisterios() async {
         .maybeSingle();
     if (aindaNoAwake != null) throw Exception('Continuou no Awake depois de casar (deveria ter saído).');
   } finally {
-    // Desfaz tudo: estado civil original, tira do ministerio novo que
-    // o teste criou, devolve o vinculo do Awake se ele existia antes.
+    // Desfaz tudo: estado civil e sexo originais, tira do ministerio
+    // novo que o teste criou, devolve o vinculo do Awake se existia.
     await _clienteMembro.from('profiles').update({'estado_civil': estadoCivilOriginal}).eq('id', membroId);
+    if (sexo != sexoOriginal) {
+      await _clienteMembro.from('profiles').update({'sexo': sexoOriginal}).eq('id', membroId);
+    }
     await _admin.from('profile_ministerios').delete().eq('profile_id', membroId).eq('ministerio', ministerioEsperado);
     if (vinculoAwakeOriginal != null) {
       await _admin.from('profile_ministerios').upsert(
