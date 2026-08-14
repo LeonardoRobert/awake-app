@@ -1603,4 +1603,11 @@ Future<void> main() async {
     stderr.writeln('Falharam: ${falhas.map((f) => f.nome).join(', ')}');
     exit(1); // workflow fica vermelho -- GitHub avisa por e-mail sozinho
   }
+
+  // Termina o processo na marra -- os SupabaseClient (sessoes com
+  // renovacao automatica de token em segundo plano) deixam o event
+  // loop vivo, entao sem isso o "dart run" nunca sai sozinho mesmo com
+  // tudo ja impresso, e o job fica pendurado ate o timeout do GitHub
+  // Actions.
+  exit(0);
 }
