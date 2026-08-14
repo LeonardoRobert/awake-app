@@ -1401,6 +1401,11 @@ Future<void> _testarCheckInEvento(SupabaseClient quemFazCheckin) async {
     'escopo': 'igreja',
     'tipo': 'outro',
     'recorrente': false,
+    // CRITICO: sem criado_por, trigger_notificar_novo_evento() pula
+    // inteiro o filtro de "eh conta de teste" e manda push DE VERDADE
+    // pra igreja toda (escopo='igreja' = audiencia geral) -- bug real
+    // que ja aconteceu em producao antes dessa correcao.
+    'criado_por': quemFazCheckin.auth.currentUser!.id,
   });
 
   try {
