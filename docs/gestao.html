@@ -2292,7 +2292,10 @@
   async function iniciarPainelUsuarios() {
     const [{ data: perfis, error: erroPerfis }, { data: vinculos, error: erroVinculos }] = await Promise.all([
       supa.from('profiles')
-        .select('id, nome, papel, ativo, categoria, grupo_casais, data_nascimento, estado_civil, criado_em')
+        .select(
+          'id, nome, telefone, endereco, sexo, papel, ativo, categoria, grupo_casais, '
+          + 'data_nascimento, estado_civil, criado_em',
+        )
         .order('nome'),
       supa.from('profile_ministerios').select('profile_id, ministerio, papel'),
     ]);
@@ -2305,6 +2308,16 @@
 
     todosUsuarios = perfis || [];
     todosVinculosMinisterio = vinculos || [];
+
+    // E-mail vive em auth.users, nao em profiles -- so' admin consegue
+    // ler (RPC com security definer), por isso busca separado e junta
+    // por id. Se der erro (ex: SQL da funcao ainda nao rodou), so'
+    // segue sem e-mail em vez de travar a tela inteira.
+    const { data: emails } = await supa.rpc('admin_listar_emails');
+    if (emails) {
+      const mapaEmail = Object.fromEntries(emails.map(e => [e.id, e.email]));
+      todosUsuarios.forEach(p => { p.email = mapaEmail[p.id] || null; });
+    }
 
     renderizarVisaoGeral();
     renderizarAgregados();
@@ -2584,6 +2597,7 @@
       return `
         <div class="linha-usuario">
           <span class="nome-usuario">${escaparHtml(pessoa.nome || '(sem nome)')}</span>${badgePapel}${badgeInativo}
+          ${pessoa.email ? `<div style="font-size:12px; color:#888;">${escaparHtml(pessoa.email)}</div>` : ''}
           <div class="chips-ministerios">${chipsMinisterios}${chipCasal}</div>
           <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; align-items:center;">
             <button type="button" class="botao-secundario" style="flex:none; padding:5px 10px; font-size:12px;"
@@ -2656,6 +2670,10 @@
     document.getElementById('caixa-modal').innerHTML = `
       <button class="fechar-modal" id="fechar-modal">✕</button>
       <h2>Editar perfil</h2>
+      <div class="campo-form">
+        <label>E-mail (login -- não editável aqui)</label>
+        <input type="text" value="${escaparAtributo(pessoa.email || 'não encontrado')}" disabled>
+      </div>
       ${_CAMPOS_EDITAR_USUARIO.map(([campo, label, tipo]) => `
         <div class="campo-form">
           <label>${label}</label>

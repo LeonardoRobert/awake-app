@@ -977,6 +977,14 @@ Future<void> _testarLoginAdmin() async {
   if (resposta.session == null) throw Exception('Login não retornou sessão.');
 }
 
+/// Admin lê a lista de e-mails (auth.users) via RPC -- gestao.html usa
+/// isso pra mostrar o e-mail no modal "Editar perfil" e na listagem
+/// de Usuários (e-mail não vive em profiles, só em auth.users).
+Future<void> _testarAdminListarEmails() async {
+  final data = await _clienteAdmin.rpc('admin_listar_emails');
+  if ((data as List).isEmpty) throw Exception('admin_listar_emails não devolveu nenhum e-mail.');
+}
+
 Future<void> _testarVerTodosUsuarios() async {
   // Admin ve profiles de todo mundo (tela de Usuarios do gestao.html) --
   // um Membro so veria o proprio.
@@ -1130,14 +1138,19 @@ Future<void> _testarCrudTreinamento() async {
 
 /// Admin promove alguem a Admin e depois reverte (gestao.html: botao
 /// "Tornar admin"/"Remover admin" na tela de Usuarios) -- so
-/// profiles_update_admin (is_admin()), sem RPC/function nenhuma.
+/// profiles_update_admin (is_admin()), sem RPC/function nenhuma. A
+/// checagem le com o cliente REAL do Membro (nao o bypass) -- confirma
+/// que a MUDANCA FEITA PELO ADMIN chega mesmo na sessao de quem foi
+/// alterado, nao so' que o banco gravou.
 Future<void> _testarPromoverERemoverAdmin() async {
   final membroId = _clienteMembro.auth.currentUser!.id;
 
   await _clienteAdmin.from('profiles').update({'papel': 'admin'}).eq('id', membroId);
   try {
-    final atual = await _admin.from('profiles').select('papel').eq('id', membroId).single();
-    if (atual['papel'] != 'admin') throw Exception('profiles_update_admin não promoveu o Membro.');
+    final atual = await _clienteMembro.from('profiles').select('papel').eq('id', membroId).single();
+    if (atual['papel'] != 'admin') {
+      throw Exception('Sessão do Membro não vê a promoção a admin feita pelo admin.');
+    }
   } finally {
     // Sempre reverte -- as outras fases do robo esperam o Membro de
     // teste com papel='membro'.
@@ -1147,6 +1160,7 @@ Future<void> _testarPromoverERemoverAdmin() async {
 
 /// Admin edita o perfil de OUTRA pessoa (gestao.html: "Editar perfil"
 /// na tela de Usuarios) e reverte -- mesma policy profiles_update_admin.
+/// Checagem com o cliente REAL do Membro, mesmo motivo do teste acima.
 Future<void> _testarEditarPerfilDeOutraPessoa() async {
   final membroId = _clienteMembro.auth.currentUser!.id;
   final original = await _admin.from('profiles').select('telefone').eq('id', membroId).single();
@@ -1154,9 +1168,9 @@ Future<void> _testarEditarPerfilDeOutraPessoa() async {
 
   try {
     await _clienteAdmin.from('profiles').update({'telefone': '(21) 90000-0000'}).eq('id', membroId);
-    final atual = await _admin.from('profiles').select('telefone').eq('id', membroId).single();
+    final atual = await _clienteMembro.from('profiles').select('telefone').eq('id', membroId).single();
     if (atual['telefone'] != '(21) 90000-0000') {
-      throw Exception('profiles_update_admin não editou o telefone do Membro.');
+      throw Exception('Sessão do Membro não vê o telefone editado pelo admin.');
     }
   } finally {
     await _admin.from('profiles').update({'telefone': telefoneOriginal}).eq('id', membroId);
@@ -1520,6 +1534,7 @@ Future<void> main() async {
 
   if (resultadoLoginAdmin.sucesso) {
     resultados.add(await _rodar('admin_ver_todos_usuarios', _testarVerTodosUsuarios));
+    resultados.add(await _rodar('admin_listar_emails', _testarAdminListarEmails));
     resultados.add(await _rodar('admin_criar_evento', _testarCriarEventoAdmin));
     resultados.add(await _rodar('admin_editar_apagar_evento', _testarEditarEApagarEventoAdmin));
     resultados.add(await _rodar('admin_criar_outdoor', _testarCriarOutdoor));
