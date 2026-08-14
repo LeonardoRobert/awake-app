@@ -12,6 +12,11 @@
 -- mudou de faixa. Nao mexe em data_nascimento/estado_civil (so em
 -- categoria), entao nao reaciona a trigger existente -- sem loop.
 --
+-- categoria e' coluna "text" pura em producao (nao o enum
+-- categoria_type que o schema.sql desatualizado sugeria -- confirmado
+-- pelo erro "operator does not exist: text = categoria_type" ao rodar
+-- a 1a versao deste arquivo), por isso os literais aqui NAO levam cast.
+--
 -- Cole no Supabase Dashboard -> SQL Editor e rode manualmente.
 
 create or replace function public.recalcular_categorias_diario()
@@ -22,19 +27,19 @@ as $$
 begin
   update public.profiles
   set categoria = case
-    when estado_civil in ('noivo', 'casado') then 'one'::categoria_type
+    when estado_civil in ('noivo', 'casado') then 'one'
     when data_nascimento is not null and extract(year from age(data_nascimento)) between 13 and 16
-      then 'genesis'::categoria_type
+      then 'genesis'
     when data_nascimento is not null and extract(year from age(data_nascimento)) >= 17
-      then 'next'::categoria_type
+      then 'next'
     else null
   end
   where categoria is distinct from (case
-    when estado_civil in ('noivo', 'casado') then 'one'::categoria_type
+    when estado_civil in ('noivo', 'casado') then 'one'
     when data_nascimento is not null and extract(year from age(data_nascimento)) between 13 and 16
-      then 'genesis'::categoria_type
+      then 'genesis'
     when data_nascimento is not null and extract(year from age(data_nascimento)) >= 17
-      then 'next'::categoria_type
+      then 'next'
     else null
   end);
 end;
