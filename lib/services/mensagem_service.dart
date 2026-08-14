@@ -34,4 +34,8 @@ class MensagemService {
   Future<void> marcarComoLida(String id) async {
     await _client.from(tabela).update({'lido': true}).eq('id', id);
   }
+
+  Future<void> apagar(String id) async {
+    await _client.from(tabela).delete().eq('id', id);
+  }
 }

@@ -2554,16 +2554,162 @@
         ? `<span class="chip-casal">${escaparHtml(LABEL_GRUPO_CASAIS[pessoa.grupo_casais] || pessoa.grupo_casais)}</span>`
         : '';
 
+      const ehAdminAtual = pessoa.papel === 'admin' || pessoa.papel === 'admin_financeiro';
+
       return `
         <div class="linha-usuario">
           <span class="nome-usuario">${escaparHtml(pessoa.nome || '(sem nome)')}</span>${badgePapel}${badgeInativo}
           <div class="chips-ministerios">${chipsMinisterios}${chipCasal}</div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
+            <button type="button" class="botao-secundario" style="flex:none; padding:5px 10px; font-size:12px;"
+                    data-acao="editar" data-profile-id="${pessoa.id}">Editar perfil</button>
+            <button type="button" class="botao-secundario" style="flex:none; padding:5px 10px; font-size:12px;"
+                    data-acao="admin" data-profile-id="${pessoa.id}" data-eh-admin="${ehAdminAtual}">
+              ${ehAdminAtual ? 'Remover admin' : 'Tornar admin'}
+            </button>
+            <button type="button" class="botao-secundario botao-perigo" style="flex:none; padding:5px 10px; font-size:12px;"
+                    data-acao="apagar" data-profile-id="${pessoa.id}">Apagar conta</button>
+          </div>
         </div>`;
     }).join('');
 
     listaEl.querySelectorAll('.chip-ministerio').forEach(chip => {
       chip.addEventListener('click', () => alternarLiderMinisterio(chip));
     });
+    listaEl.querySelectorAll('[data-acao="editar"]').forEach(btn => {
+      btn.addEventListener('click', () => abrirFormularioEditarUsuario(btn.dataset.profileId));
+    });
+    listaEl.querySelectorAll('[data-acao="admin"]').forEach(btn => {
+      btn.addEventListener('click', () => alternarAdmin(btn.dataset.profileId, btn.dataset.ehAdmin === 'true'));
+    });
+    listaEl.querySelectorAll('[data-acao="apagar"]').forEach(btn => {
+      btn.addEventListener('click', () => apagarUsuario(btn.dataset.profileId));
+    });
+  }
+
+  async function alternarAdmin(profileId, ehAdminAtual) {
+    const pessoa = todosUsuarios.find(p => p.id === profileId);
+    const nome = pessoa?.nome || 'essa pessoa';
+    const novoPapel = ehAdminAtual ? 'membro' : 'admin';
+    const mensagem = ehAdminAtual
+      ? `Remover ${nome} do cargo de Admin?`
+      : `Tornar ${nome} Admin? Isso dá acesso total ao sistema (financeiro, usuários, tudo).`;
+    if (!confirm(mensagem)) return;
+
+    const { error } = await supa.from('profiles').update({ papel: novoPapel }).eq('id', profileId);
+    if (error) { alert(`Erro: ${error.message}`); return; }
+    if (pessoa) pessoa.papel = novoPapel;
+    renderizarListaUsuarios();
+  }
+
+  const _CAMPOS_EDITAR_USUARIO = [
+    ['nome', 'Nome completo', 'text'],
+    ['telefone', 'Telefone (WhatsApp)', 'text'],
+    ['endereco', 'Endereço', 'text'],
+    ['data_nascimento', 'Data de nascimento', 'date'],
+  ];
+  const _OPCOES_ESTADO_CIVIL = [
+    ['solteiro', 'Solteiro(a)'], ['namorando', 'Namorando'], ['noivo', 'Noivo(a)'],
+    ['casado', 'Casado(a)'], ['outro', 'Outro'],
+  ];
+  const _OPCOES_SEXO = [['masculino', 'Masculino'], ['feminino', 'Feminino']];
+
+  function abrirFormularioEditarUsuario(profileId) {
+    const pessoa = todosUsuarios.find(p => p.id === profileId);
+    if (!pessoa) return;
+
+    document.getElementById('caixa-modal').innerHTML = `
+      <button class="fechar-modal" id="fechar-modal">✕</button>
+      <h2>Editar perfil</h2>
+      ${_CAMPOS_EDITAR_USUARIO.map(([campo, label, tipo]) => `
+        <div class="campo-form">
+          <label>${label}</label>
+          <input type="${tipo}" id="edit-${campo}" value="${escaparAtributo(pessoa[campo] || '')}">
+        </div>
+      `).join('')}
+      <div class="campo-form">
+        <label>Estado civil</label>
+        <select id="edit-estado_civil">
+          <option value="">Não informado</option>
+          ${_OPCOES_ESTADO_CIVIL.map(([v, l]) => `<option value="${v}" ${pessoa.estado_civil === v ? 'selected' : ''}>${l}</option>`).join('')}
+        </select>
+      </div>
+      <div class="campo-form">
+        <label>Sexo</label>
+        <select id="edit-sexo">
+          <option value="">Não informado</option>
+          ${_OPCOES_SEXO.map(([v, l]) => `<option value="${v}" ${pessoa.sexo === v ? 'selected' : ''}>${l}</option>`).join('')}
+        </select>
+      </div>
+      <div class="campo-form">
+        <label>Grupo de casais</label>
+        <select id="edit-grupo_casais">
+          <option value="">Nenhum</option>
+          ${Object.entries(LABEL_GRUPO_CASAIS).map(([v, l]) => `<option value="${v}" ${pessoa.grupo_casais === v ? 'selected' : ''}>${l}</option>`).join('')}
+        </select>
+      </div>
+      <p class="erro-form" id="erro-editar-usuario"></p>
+      <div class="acoes-modal">
+        <button class="botao-secundario" id="cancelar-editar-usuario">Cancelar</button>
+        <button class="botao-primario" style="flex:1;" id="salvar-editar-usuario">Salvar</button>
+      </div>
+    `;
+    document.getElementById('fundo-modal').classList.add('aberto');
+    document.getElementById('fechar-modal').addEventListener('click', fecharModal);
+    document.getElementById('cancelar-editar-usuario').addEventListener('click', fecharModal);
+    document.getElementById('salvar-editar-usuario').addEventListener('click', async () => {
+      const campos = {
+        nome: document.getElementById('edit-nome').value.trim(),
+        telefone: document.getElementById('edit-telefone').value.trim() || null,
+        endereco: document.getElementById('edit-endereco').value.trim() || null,
+        data_nascimento: document.getElementById('edit-data_nascimento').value || null,
+        estado_civil: document.getElementById('edit-estado_civil').value || null,
+        sexo: document.getElementById('edit-sexo').value || null,
+        grupo_casais: document.getElementById('edit-grupo_casais').value || null,
+      };
+      if (!campos.nome) {
+        document.getElementById('erro-editar-usuario').textContent = 'Informe o nome.';
+        return;
+      }
+      const { error } = await supa.from('profiles').update(campos).eq('id', profileId);
+      if (error) {
+        document.getElementById('erro-editar-usuario').textContent = `Erro: ${error.message}`;
+        return;
+      }
+      Object.assign(pessoa, campos);
+      fecharModal();
+      renderizarListaUsuarios();
+    });
+  }
+
+  async function apagarUsuario(profileId) {
+    const pessoa = todosUsuarios.find(p => p.id === profileId);
+    const nome = pessoa?.nome || 'essa pessoa';
+    const digitado = prompt(
+      `Isso apaga a conta de "${nome}" e TODOS os dados dela pra sempre (dízimos, escalas, filhos...). `
+      + `Não pode ser desfeito.\n\nDigite APAGAR pra confirmar:`,
+    );
+    if (digitado?.trim().toUpperCase() !== 'APAGAR') return;
+
+    const { data: sessao } = await supa.auth.getSession();
+    const resp = await fetch(`${SUPABASE_URL}/functions/v1/admin-apagar-usuario`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${sessao.session.access_token}`,
+      },
+      body: JSON.stringify({ profileId }),
+    });
+    const resultado = await resp.json();
+    if (!resp.ok) {
+      alert(`Erro ao apagar: ${resultado.error || 'desconhecido'}`);
+      return;
+    }
+    todosUsuarios = todosUsuarios.filter(p => p.id !== profileId);
+    todosVinculosMinisterio = todosVinculosMinisterio.filter(v => v.profile_id !== profileId);
+    renderizarVisaoGeral();
+    renderizarAgregados();
+    renderizarListaUsuarios();
   }
 
   // Clicar num chip de ministerio alterna papel membro<->lider daquele

@@ -80,6 +80,31 @@ class _ListaMensagensState extends State<_ListaMensagens> {
     await _futuro;
   }
 
+  Future<void> _confirmarEApagar(MensagemModel m) async {
+    final confirmou = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Apagar'),
+        content: const Text('Essa ação não pode ser desfeita.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Apagar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmou != true) return;
+
+    await MensagemService(widget.tabela).apagar(m.id);
+    _recarregar();
+  }
+
   @override
   Widget build(BuildContext context) {
     return RefreshIndicator(
@@ -140,19 +165,25 @@ class _ListaMensagensState extends State<_ListaMensagens> {
                       ),
                       const SizedBox(height: 8),
                       Text(m.texto),
-                      if (!m.lido) ...[
-                        const SizedBox(height: 8),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton(
-                            onPressed: () async {
-                              await MensagemService(widget.tabela).marcarComoLida(m.id);
-                              _recarregar();
-                            },
-                            child: const Text('Marcar como lido'),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          if (!m.lido)
+                            TextButton(
+                              onPressed: () async {
+                                await MensagemService(widget.tabela).marcarComoLida(m.id);
+                                _recarregar();
+                              },
+                              child: const Text('Marcar como lido'),
+                            ),
+                          TextButton(
+                            onPressed: () => _confirmarEApagar(m),
+                            style: TextButton.styleFrom(foregroundColor: Colors.red),
+                            child: const Text('Apagar'),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ],
                   ),
                 ),

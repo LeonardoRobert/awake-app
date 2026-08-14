@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../../models/visitante_model.dart';
 import '../../services/visitante_service.dart';
@@ -23,6 +24,26 @@ class _AdminVisitantesScreenState extends State<AdminVisitantesScreen> {
   Future<void> _recarregar() async {
     setState(() => _futuro = VisitanteService().listarTodos());
     await _futuro;
+  }
+
+  // ---- copiar pro WhatsApp ----
+
+  /// Texto pronto pra colar no WhatsApp -- nome, contato e situação de
+  /// fé são o que mais importa pra quem vai fazer o acompanhamento.
+  String _textoParaWhatsApp(VisitanteModel v) {
+    final nome = v.dados['Nome completo']?.toString() ?? '(sem nome)';
+    final contato = v.dados['Celular/WhatsApp']?.toString() ?? '—';
+    final situacao = v.dados['Situação de fé']?.toString() ?? '—';
+    return 'Nome: $nome\nContato: $contato\nSituação de fé: $situacao';
+  }
+
+  Future<void> _copiar(String texto) async {
+    await Clipboard.setData(ClipboardData(text: texto));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Copiado! Já pode colar no WhatsApp.')),
+      );
+    }
   }
 
   // ---- calculos das estatisticas ----
@@ -165,59 +186,107 @@ class _AdminVisitantesScreenState extends State<AdminVisitantesScreen> {
                 ),
                 const SizedBox(height: 20),
                 Text('Todos os visitantes', style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: 8),
-                ...lista.map((v) {
-                  final idade = _idade(v);
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    child: ExpansionTile(
-                      title: Text(v.dados['Nome completo']?.toString() ?? '(sem nome)'),
-                      subtitle: Text(
-                        '${DateFormat('dd/MM/yyyy HH:mm').format(v.criadoEm)}'
-                        '${idade != null ? ' • $idade anos' : ''}'
-                        '${v.nomeRegistrador != null ? ' • registrado por ${v.nomeRegistrador}' : ''}',
-                      ),
-                      trailing:
-                          v.lido ? null : const Icon(Icons.circle, color: Colors.red, size: 10),
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              ...v.dados.entries.map((e) => Padding(
-                                    padding: const EdgeInsets.only(bottom: 10),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(e.key,
-                                            style: const TextStyle(fontWeight: FontWeight.w600)),
-                                        Text('${e.value}'.isEmpty ? '—' : '${e.value}'),
-                                      ],
-                                    ),
-                                  )),
-                              if (!v.lido)
-                                Align(
-                                  alignment: Alignment.centerRight,
-                                  child: TextButton(
-                                    onPressed: () async {
-                                      await VisitanteService().marcarComoLido(v.id);
-                                      _recarregar();
-                                    },
-                                    child: const Text('Marcar como lido'),
-                                  ),
-                                ),
-                            ],
+                ..._agruparPorDia(lista).expand((grupo) {
+                  final dataFormatada =
+                      DateFormat('EEEE, dd/MM/yyyy', 'pt_BR').format(grupo.first.criadoEm);
+                  final textoDoDia = grupo.map(_textoParaWhatsApp).join('\n\n');
+                  return [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(0, 16, 0, 4),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(dataFormatada, style: Theme.of(context).textTheme.titleSmall),
                           ),
-                        ),
-                      ],
+                          TextButton.icon(
+                            onPressed: () => _copiar(
+                              'Visitantes de $dataFormatada (${grupo.length}):\n\n$textoDoDia',
+                            ),
+                            icon: const Icon(Icons.copy_outlined, size: 16),
+                            label: const Text('Copiar dia'),
+                          ),
+                        ],
+                      ),
                     ),
-                  );
+                    ...grupo.map(_cardVisitante),
+                  ];
                 }),
               ],
             );
           },
         ),
+      ),
+    );
+  }
+
+  /// Agrupa por dia do cadastro (a lista ja vem ordenada do mais
+  /// recente pro mais antigo, e a ordem se mantem dentro de cada
+  /// grupo).
+  List<List<VisitanteModel>> _agruparPorDia(List<VisitanteModel> lista) {
+    final porDia = <String, List<VisitanteModel>>{};
+    final ordemDias = <String>[];
+    for (final v in lista) {
+      final chave = DateFormat('yyyy-MM-dd').format(v.criadoEm);
+      if (!porDia.containsKey(chave)) {
+        porDia[chave] = [];
+        ordemDias.add(chave);
+      }
+      porDia[chave]!.add(v);
+    }
+    return ordemDias.map((chave) => porDia[chave]!).toList();
+  }
+
+  Widget _cardVisitante(VisitanteModel v) {
+    final idade = _idade(v);
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ExpansionTile(
+        title: Text(v.dados['Nome completo']?.toString() ?? '(sem nome)'),
+        subtitle: Text(
+          '${DateFormat('dd/MM/yyyy HH:mm').format(v.criadoEm)}'
+          '${idade != null ? ' • $idade anos' : ''}'
+          '${v.nomeRegistrador != null ? ' • registrado por ${v.nomeRegistrador}' : ''}',
+        ),
+        trailing: v.lido ? null : const Icon(Icons.circle, color: Colors.red, size: 10),
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ...v.dados.entries.map((e) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(e.key, style: const TextStyle(fontWeight: FontWeight.w600)),
+                          Text('${e.value}'.isEmpty ? '—' : '${e.value}'),
+                        ],
+                      ),
+                    )),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton.icon(
+                      onPressed: () => _copiar(_textoParaWhatsApp(v)),
+                      icon: const Icon(Icons.copy_outlined, size: 16),
+                      label: const Text('Copiar'),
+                    ),
+                    if (!v.lido)
+                      TextButton(
+                        onPressed: () async {
+                          await VisitanteService().marcarComoLido(v.id);
+                          _recarregar();
+                        },
+                        child: const Text('Marcar como lido'),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

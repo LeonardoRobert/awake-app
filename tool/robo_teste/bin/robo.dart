@@ -102,6 +102,26 @@ Future<_Resultado> _rodar(String nome, Future<void> Function() teste) async {
   }
 }
 
+/// Variante do _rodar() pra checagens NEGATIVAS -- casos em que a RLS
+/// deve BLOQUEAR a acao (lancando excecao). Se o teste passar sem
+/// excecao, isso é a falha (permissão vazou). So serve pra INSERT
+/// (WITH CHECK falho lanca PostgrestException de verdade); UPDATE/
+/// DELETE bloqueado por USING nao lanca excecao (so afeta 0 linhas),
+/// entao esses usam _rodar() normal comparando o dado antes/depois.
+Future<_Resultado> _rodarEsperandoFalha(String nome, Future<void> Function() teste) async {
+  final cronometro = Stopwatch()..start();
+  try {
+    await teste();
+    cronometro.stop();
+    stdout.writeln('FALHOU  $nome: deveria ter sido bloqueado pela RLS mas passou.');
+    return _Resultado(nome, false, 'Deveria ter sido bloqueado pela RLS mas passou.', cronometro.elapsedMilliseconds);
+  } catch (e) {
+    cronometro.stop();
+    stdout.writeln('OK      $nome (bloqueado corretamente, ${cronometro.elapsedMilliseconds}ms)');
+    return _Resultado(nome, true, null, cronometro.elapsedMilliseconds);
+  }
+}
+
 // ---------- checagens (conta teste 1: Membro) ----------
 
 Future<void> _testarLogin() async {
@@ -282,6 +302,92 @@ Future<void> _testarCadastrarFilho() async {
     'data_nascimento': DateTime(DateTime.now().year - 5).toIso8601String().split('T').first,
   });
   await _admin.from('filhos').delete().eq('responsavel_id', userId).eq('nome', '[Robô de teste] Filho');
+}
+
+/// Envia o Questionario de Novo Servo (LinkQuestionarioNovoServo ->
+/// questionario_service.dart) -- testa questionarios_novo_servo_insert
+/// (profile_id = auth.uid()).
+Future<void> _testarEnviarQuestionarioNovoServo() async {
+  final userId = _clienteMembro.auth.currentUser!.id;
+  final inserido = await _clienteMembro.from('questionarios_novo_servo').insert({
+    'profile_id': userId,
+    'respostas': {'Por que quer servir?': '[Robô de teste] Verificação automática -- pode ignorar.'},
+  }).select('id').single();
+  await _admin.from('questionarios_novo_servo').delete().eq('id', inserido['id'] as String);
+}
+
+/// Apaga o proprio filho cadastrado -- filhos_delete exige
+/// responsavel_id = auth.uid() (2026_corrige_insert_faltando.sql).
+/// _testarCadastrarFilho ja testa o insert; esse aqui testa o delete
+/// pelo cliente REAL do Membro, nao o bypass de limpeza.
+Future<void> _testarApagarFilho() async {
+  final userId = _clienteMembro.auth.currentUser!.id;
+  final criado = await _clienteMembro
+      .from('filhos')
+      .insert({
+        'responsavel_id': userId,
+        'nome': '[Robô de teste] Filho pra apagar',
+        'data_nascimento': DateTime(DateTime.now().year - 5).toIso8601String().split('T').first,
+      })
+      .select('id')
+      .single();
+  final id = criado['id'] as String;
+
+  try {
+    await _clienteMembro.from('filhos').delete().eq('id', id);
+    final restante = await _admin.from('filhos').select('id').eq('id', id).maybeSingle();
+    if (restante != null) throw Exception('filhos_delete não apagou o filho (ainda existe).');
+  } finally {
+    await _admin.from('filhos').delete().eq('id', id);
+  }
+}
+
+/// Negativo: Membro comum tentando criar evento -- eventos_insert
+/// exige is_lider_ministerio(escopo), e o Membro de teste nao lidera
+/// ministerio nenhum, entao o WITH CHECK deve lançar erro.
+Future<void> _testarMembroNaoPodeCriarEvento() async {
+  final eventoId = _gerarUuidV4();
+  try {
+    await _clienteMembro.from('eventos').insert({
+      'id': eventoId,
+      'titulo': '[Robô de teste] Não deveria conseguir',
+      'data_inicio': DateTime.now().add(const Duration(days: 30)).toIso8601String(),
+      'escopo': 'igreja',
+      'tipo': 'outro',
+      'recorrente': false,
+    });
+  } finally {
+    // So limpa se por algum bug o insert passou mesmo assim.
+    await _admin.from('eventos').delete().eq('id', eventoId);
+  }
+}
+
+/// Negativo: Membro comum tentando editar um treinamento -- so admin
+/// gerencia (treinamentos_update usa is_admin()). UPDATE bloqueado por
+/// USING nao lanca excecao (0 linhas afetadas, sem erro) -- por isso
+/// confirma comparando o titulo antes/depois, em vez de esperar uma
+/// excecao (ao contrario dos negativos de INSERT).
+Future<void> _testarMembroNaoPodeEditarTreinamento() async {
+  final criado = await _admin
+      .from('treinamentos')
+      .insert({
+        'titulo': '[Robô de teste] Alvo de teste negativo',
+        'descricao': 'Pode ignorar.',
+        'url_video': 'https://youtube.com/watch?v=robo_de_teste_negativo',
+      })
+      .select('id')
+      .single();
+  final id = criado['id'] as String;
+
+  try {
+    await _clienteMembro.from('treinamentos').update({'titulo': 'Não deveria conseguir'}).eq('id', id);
+    final atual = await _admin.from('treinamentos').select('titulo').eq('id', id).single();
+    if (atual['titulo'] != '[Robô de teste] Alvo de teste negativo') {
+      throw Exception('Membro conseguiu editar treinamento -- RLS vazou permissão.');
+    }
+  } finally {
+    await _admin.from('treinamentos').delete().eq('id', id);
+  }
 }
 
 Future<void> _testarMinhasContribuicoes() async {
@@ -628,6 +734,87 @@ Future<void> _testarApagarEventoTodaSerie() async {
   }
 }
 
+/// Lider cria, edita e apaga um MODELO de escala Awake (a linha em
+/// "escalas" em si -- shift_form_screen.dart/ShiftService.
+/// createShiftTemplate/updateShiftTemplate/deleteShiftTemplate),
+/// diferente de _comEscalaAwakeDeHoje que so monta cenario via bypass.
+/// Confirma que escalas_insert/update/delete liberam "qualquer lider",
+/// nao so admin (is_admin() OR is_lider_de_algum_ministerio()).
+Future<void> _testarLiderCriarEditarApagarModeloEscalaAwake() async {
+  final escalaId = _gerarUuidV4();
+  final dataStr = DateTime.now().add(const Duration(days: 10)).toIso8601String().split('T').first;
+
+  await _clienteLider.from('escalas').insert({
+    'id': escalaId,
+    'nome': '[Robô de teste] Modelo de escala',
+    'area_id': null,
+    'data': dataStr,
+    'horario_inicio': '09:00',
+    'horario_fim': '10:00',
+    'vagas': 3,
+    'recorrente': false,
+  });
+
+  try {
+    await _clienteLider.from('escalas').update({'vagas': 5}).eq('id', escalaId);
+    final atual = await _admin.from('escalas').select('vagas').eq('id', escalaId).single();
+    if (atual['vagas'] != 5) throw Exception('escalas_update não persistiu a edição.');
+
+    await _clienteLider.from('escalas').delete().eq('id', escalaId);
+    final restante = await _admin.from('escalas').select('id').eq('id', escalaId).maybeSingle();
+    if (restante != null) throw Exception('escalas_delete não apagou o modelo (ainda existe).');
+  } finally {
+    await _admin.from('escalas').delete().eq('id', escalaId);
+  }
+}
+
+/// Le os inscritos de uma ocorrencia de escala Awake -- mesma consulta
+/// de ShiftService.listSignupsForOccurrence(), que tambem alimenta o
+/// botao de copiar pro WhatsApp na tela de inscritos. Confirma que
+/// inscricoes_select libera is_lider_de_algum_ministerio(), nao so o
+/// proprio inscrito. (O copia-e-cola de escala SEMANAL/MENSAL dos
+/// ministerios de servico usa escala_servico_posicoes por baixo, ja
+/// coberto por _testarCriarEventoEEscalaTodasAreas/
+/// _testarEscaladoApareceNaInicio -- e o mesmo "Copiar pro WhatsApp"
+/// que ja existia em escala_servico_screen.dart/
+/// escala_grade_screen.dart antes de hoje.)
+Future<void> _testarLiderVerInscritosEscala() async {
+  await _comEscalaAwakeDeHoje(
+    areaId: null,
+    dentroDoCenario: (escalaId, dataStr) async {
+      final inscritos = await _clienteLider
+          .from('inscricoes')
+          .select('id, status, profiles(nome)')
+          .eq('escala_id', escalaId)
+          .eq('data_ocorrencia', dataStr)
+          .inFilter('status', ['inscrito', 'check_in_feito']);
+      if ((inscritos as List).isEmpty) {
+        throw Exception('Líder não viu nenhum inscrito na ocorrência (deveria ver ao menos o Membro de teste).');
+      }
+    },
+  );
+}
+
+/// Negativo: Lider de Areas de Servico tentando criar evento de escopo
+/// que ele NAO lidera (so lidera as 5 areas em _todasAreasServico) --
+/// is_lider_ministerio('homens') deve ser falso pra essa conta, RLS
+/// deve bloquear.
+Future<void> _testarLiderNaoPodeCriarEventoForaDoQueLidera() async {
+  final eventoId = _gerarUuidV4();
+  try {
+    await _clienteLider.from('eventos').insert({
+      'id': eventoId,
+      'titulo': '[Robô de teste] Não deveria conseguir',
+      'data_inicio': DateTime.now().add(const Duration(days: 30)).toIso8601String(),
+      'escopo': 'homens',
+      'tipo': 'outro',
+      'recorrente': false,
+    });
+  } finally {
+    await _admin.from('eventos').delete().eq('id', eventoId);
+  }
+}
+
 Future<void> _testarDashboardMinisterio() async {
   // Mesma consulta base que dashboard_ministerio_screen.dart faz --
   // so chegar sem excecao ja confirma que a RLS de profile_ministerios
@@ -795,6 +982,132 @@ Future<void> _testarCrudTreinamento() async {
   }
 }
 
+/// Admin promove alguem a Admin e depois reverte (gestao.html: botao
+/// "Tornar admin"/"Remover admin" na tela de Usuarios) -- so
+/// profiles_update_admin (is_admin()), sem RPC/function nenhuma.
+Future<void> _testarPromoverERemoverAdmin() async {
+  final membroId = _clienteMembro.auth.currentUser!.id;
+
+  await _clienteAdmin.from('profiles').update({'papel': 'admin'}).eq('id', membroId);
+  try {
+    final atual = await _admin.from('profiles').select('papel').eq('id', membroId).single();
+    if (atual['papel'] != 'admin') throw Exception('profiles_update_admin não promoveu o Membro.');
+  } finally {
+    // Sempre reverte -- as outras fases do robo esperam o Membro de
+    // teste com papel='membro'.
+    await _admin.from('profiles').update({'papel': 'membro'}).eq('id', membroId);
+  }
+}
+
+/// Admin edita o perfil de OUTRA pessoa (gestao.html: "Editar perfil"
+/// na tela de Usuarios) e reverte -- mesma policy profiles_update_admin.
+Future<void> _testarEditarPerfilDeOutraPessoa() async {
+  final membroId = _clienteMembro.auth.currentUser!.id;
+  final original = await _admin.from('profiles').select('telefone').eq('id', membroId).single();
+  final telefoneOriginal = original['telefone'] as String?;
+
+  try {
+    await _clienteAdmin.from('profiles').update({'telefone': '(21) 90000-0000'}).eq('id', membroId);
+    final atual = await _admin.from('profiles').select('telefone').eq('id', membroId).single();
+    if (atual['telefone'] != '(21) 90000-0000') {
+      throw Exception('profiles_update_admin não editou o telefone do Membro.');
+    }
+  } finally {
+    await _admin.from('profiles').update({'telefone': telefoneOriginal}).eq('id', membroId);
+  }
+}
+
+/// Admin apaga a conta de OUTRA pessoa (gestao.html: "Apagar conta" na
+/// tela de Usuarios -> Edge Function admin-apagar-usuario). Cria uma
+/// conta descartavel só pra isso (nunca uma das 4 fixas!) e confirma
+/// que ela some de auth.users de verdade.
+Future<void> _testarAdminApagarContaDeUsuario() async {
+  final clienteTemp = SupabaseClient(_url, _anonKey, authOptions: _semPkce);
+  final marca = DateTime.now().millisecondsSinceEpoch;
+  final emailDescartavel = 'teste.descartavel.admin.$marca@shallom.app';
+  final senhaDescartavel = 'Descartavel$marca!';
+
+  final resposta = await clienteTemp.auth.signUp(email: emailDescartavel, password: senhaDescartavel);
+  final idDescartavel = resposta.user?.id;
+  if (idDescartavel == null) throw Exception('Cadastro descartável não retornou usuário.');
+  await _admin.from('profiles').update({'eh_conta_teste': true}).eq('id', idDescartavel);
+
+  final resultado = await _clienteAdmin.functions.invoke(
+    'admin-apagar-usuario',
+    body: {'profileId': idDescartavel},
+  );
+  if (resultado.status != 200) {
+    // Se a function falhar por algum motivo, ainda tenta limpar a
+    // conta descartavel via bypass, pra nao deixar sujeira.
+    await _admin.auth.admin.deleteUser(idDescartavel);
+    throw Exception('admin-apagar-usuario devolveu status ${resultado.status}: ${resultado.data}');
+  }
+
+  // Confirma que sumiu de auth.users de verdade -- getUserById lanca
+  // excecao (nao devolve null) quando o usuario nao existe mais.
+  try {
+    await _admin.auth.admin.getUserById(idDescartavel);
+    throw Exception('Usuário descartável ainda existe depois do admin-apagar-usuario.');
+  } catch (e) {
+    if (e.toString().contains('ainda existe')) rethrow;
+    // Qualquer outro erro aqui (ex: "User not found") É o resultado
+    // esperado -- confirma que a conta sumiu de verdade.
+  }
+}
+
+/// Admin marca como lido e apaga uma linha de uma tabela de mensagem
+/// (pedidos_oracao/testemunhos/visitantes_primeira_vez) -- mesmos
+/// botoes "Marcar como lido"/"Apagar" de admin_mensagens_screen.dart e
+/// admin_visitantes_screen.dart. [dadosInsercao] ja inclui quem e o
+/// dono da linha.
+Future<void> _testarAdminMarcarLidoEApagar(String tabela, Map<String, dynamic> dadosInsercao) async {
+  final criado = await _admin.from(tabela).insert(dadosInsercao).select('id').single();
+  final id = criado['id'] as String;
+
+  try {
+    await _clienteAdmin.from(tabela).update({'lido': true}).eq('id', id);
+    final atual = await _admin.from(tabela).select('lido').eq('id', id).single();
+    if (atual['lido'] != true) throw Exception('Admin não conseguiu marcar "$tabela" como lido.');
+
+    await _clienteAdmin.from(tabela).delete().eq('id', id);
+    final restante = await _admin.from(tabela).select('id').eq('id', id).maybeSingle();
+    if (restante != null) throw Exception('Admin não conseguiu apagar de "$tabela".');
+  } finally {
+    await _admin.from(tabela).delete().eq('id', id);
+  }
+}
+
+/// Admin ve, marca como lido e apaga um Questionario de Novo Servo
+/// (aparece junto com pedidos/testemunhos em admin_mensagens_screen.dart)
+/// -- testa questionarios_novo_servo_select/update/delete (is_admin()).
+Future<void> _testarAdminGerenciarQuestionario() async {
+  final membroId = _clienteMembro.auth.currentUser!.id;
+  final criado = await _admin
+      .from('questionarios_novo_servo')
+      .insert({
+        'profile_id': membroId,
+        'respostas': {'Por que quer servir?': '[Robô de teste] Alvo de teste.'},
+      })
+      .select('id')
+      .single();
+  final id = criado['id'] as String;
+
+  try {
+    final visto = await _clienteAdmin.from('questionarios_novo_servo').select('id').eq('id', id).maybeSingle();
+    if (visto == null) throw Exception('Admin não conseguiu ver o questionário (select bloqueado).');
+
+    await _clienteAdmin.from('questionarios_novo_servo').update({'lido': true}).eq('id', id);
+    final atual = await _admin.from('questionarios_novo_servo').select('lido').eq('id', id).single();
+    if (atual['lido'] != true) throw Exception('Admin não conseguiu marcar o questionário como lido.');
+
+    await _clienteAdmin.from('questionarios_novo_servo').delete().eq('id', id);
+    final restante = await _admin.from('questionarios_novo_servo').select('id').eq('id', id).maybeSingle();
+    if (restante != null) throw Exception('Admin não conseguiu apagar o questionário.');
+  } finally {
+    await _admin.from('questionarios_novo_servo').delete().eq('id', id);
+  }
+}
+
 /// Anexa um "PDF" (bytes fake, so testando o caminho de storage +
 /// tabela, nao o conteudo) a um video-id fake -- mesmo fluxo de "Meus
 /// Conteúdos" (meus_conteudos_screen.dart -> VideoMaterialService).
@@ -952,13 +1265,17 @@ Future<void> main() async {
     resultados.add(await _rodar('membro_qr_code_proprio', _testarQrCode));
     resultados.add(await _rodar('membro_enviar_pedido_oracao', _testarPedidoOracao));
     resultados.add(await _rodar('membro_enviar_testemunho', _testarTestemunho));
+    resultados.add(await _rodar('membro_enviar_questionario_novo_servo', _testarEnviarQuestionarioNovoServo));
     resultados.add(await _rodar('membro_editar_perfil', _testarEditarPerfil));
     resultados.add(await _rodar('membro_cadastro_primeira_vez', _testarCadastroPrimeiraVez));
     resultados.add(await _rodar('membro_inscrever_e_cancelar_escala', _testarInscreverECancelarEscalaAwake));
     resultados.add(await _rodar('membro_cadastrar_filho', _testarCadastrarFilho));
+    resultados.add(await _rodar('membro_apagar_filho', _testarApagarFilho));
     resultados.add(await _rodar('membro_minhas_contribuicoes', _testarMinhasContribuicoes));
     resultados.add(await _rodar('membro_minhas_metas', _testarMinhasMetas));
     resultados.add(await _rodar('membro_listar_treinamentos', _testarListarTreinamentos));
+    resultados.add(await _rodarEsperandoFalha('membro_nao_pode_criar_evento', _testarMembroNaoPodeCriarEvento));
+    resultados.add(await _rodar('membro_nao_pode_editar_treinamento', _testarMembroNaoPodeEditarTreinamento));
   } else {
     stdout.writeln('Login do Membro falhou -- pulando checagens que dependem dessa sessão.');
   }
@@ -978,10 +1295,14 @@ Future<void> main() async {
     resultados.add(await _rodar('lider_editar_ocorrencia_unica', _testarEditarOcorrenciaUnica));
     resultados.add(await _rodar('lider_editar_evento_toda_serie', _testarEditarEventoTodaSerie));
     resultados.add(await _rodar('lider_apagar_evento_toda_serie', _testarApagarEventoTodaSerie));
+    resultados.add(await _rodar('lider_modelo_escala_awake', _testarLiderCriarEditarApagarModeloEscalaAwake));
+    resultados.add(await _rodarEsperandoFalha(
+        'lider_nao_pode_criar_evento_fora_do_que_lidera', _testarLiderNaoPodeCriarEventoForaDoQueLidera));
     if (resultadoLoginMembro.sucesso) {
       // Dependem do Membro tambem estar logado.
       resultados.add(await _rodar('lider_casal_diaconos', _testarCasalDiaconos));
       resultados.add(await _rodar('lider_escalado_aparece_na_inicio', _testarEscaladoApareceNaInicio));
+      resultados.add(await _rodar('lider_ver_inscritos_escala', _testarLiderVerInscritosEscala));
       // Lider (de qualquer ministerio, nao so Awake -- ver comentario
       // em _testarCheckInEscala) tambem pode fazer check-in.
       resultados.add(await _rodar('lider_check_in_escala', () => _testarCheckInEscala(_clienteLider)));
@@ -1007,10 +1328,36 @@ Future<void> main() async {
     resultados.add(await _rodar('admin_anexar_material', _testarAnexarMaterial));
     if (resultadoLoginMembro.sucesso) {
       // Dependem do Membro estar logado (lancar contribuicao pra ele,
-      // fazer check-in usando o qr_code_id dele).
+      // fazer check-in usando o qr_code_id dele, marcar como
+      // lido/apagar mensagens dele, promover/editar o perfil dele).
       resultados.add(await _rodar('admin_lancar_contribuicao', _testarLancarContribuicao));
       resultados.add(await _rodar('admin_check_in_escala', () => _testarCheckInEscala(_clienteAdmin)));
       resultados.add(await _rodar('admin_check_in_evento', () => _testarCheckInEvento(_clienteAdmin)));
+      resultados.add(await _rodar('admin_promover_e_remover_admin', _testarPromoverERemoverAdmin));
+      resultados.add(await _rodar('admin_editar_perfil_de_outra_pessoa', _testarEditarPerfilDeOutraPessoa));
+      resultados.add(await _rodar('admin_apagar_conta_de_usuario', _testarAdminApagarContaDeUsuario));
+      resultados.add(await _rodar('admin_gerenciar_questionario_novo_servo', _testarAdminGerenciarQuestionario));
+      final membroId = _clienteMembro.auth.currentUser!.id;
+      resultados.add(await _rodar(
+          'admin_marcar_lido_e_apagar_pedido_oracao',
+          () => _testarAdminMarcarLidoEApagar('pedidos_oracao', {
+                'profile_id': membroId,
+                'anonimo': false,
+                'texto': '[Robô de teste] Alvo de teste.',
+              })));
+      resultados.add(await _rodar(
+          'admin_marcar_lido_e_apagar_testemunho',
+          () => _testarAdminMarcarLidoEApagar('testemunhos', {
+                'profile_id': membroId,
+                'anonimo': false,
+                'texto': '[Robô de teste] Alvo de teste.',
+              })));
+      resultados.add(await _rodar(
+          'admin_marcar_lido_e_apagar_visitante',
+          () => _testarAdminMarcarLidoEApagar('visitantes_primeira_vez', {
+                'registrado_por': membroId,
+                'dados': {'Nome completo': '[Robô de teste] Visitante alvo'},
+              })));
     }
   } else {
     stdout.writeln('Login do Admin falhou -- pulando checagens que dependem dessa sessão.');
