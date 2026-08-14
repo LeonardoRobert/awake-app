@@ -294,7 +294,7 @@
     display: block; font-size: 12px; font-weight: 700;
     margin-bottom: 5px; color: var(--navy);
   }
-  .campo-form input, .campo-form select, .campo-form textarea {
+  .campo-form input:not([type="checkbox"]), .campo-form select, .campo-form textarea {
     width: 100%;
     padding: 9px 10px;
     border: 1px solid #D7DEE6;
@@ -306,6 +306,9 @@
   .linha-form { display: flex; gap: 10px; }
   .linha-form .campo-form { flex: 1; }
   .campo-form.check { display: flex; align-items: center; gap: 8px; }
+  .campo-form.check input[type="checkbox"] {
+    width: 16px; height: 16px; flex-shrink: 0; margin: 0; accent-color: var(--navy);
+  }
   .campo-form.check label { margin: 0; }
   .erro-form { color: var(--vermelho); font-size: 12px; margin-top: 4px; min-height: 14px; }
   .grupo-checkbox { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
@@ -517,18 +520,16 @@
     await carregarPainel(session);
   }
 
-  // Cada papel enxerga um conjunto de secoes -- a primeira da lista e a
-  // que abre por padrao ao logar (mantem o comportamento de antes).
-  const SECOES_POR_PAPEL = {
-    admin: [
-      { id: 'calendario', label: 'Calendário' },
-      { id: 'usuarios', label: 'Usuários' },
-    ],
-    admin_financeiro: [
-      { id: 'financeiro', label: 'Financeiro' },
-      { id: 'usuarios', label: 'Usuários' },
-    ],
-  };
+  // Admin e Admin Financeiro tem, na pratica, as mesmas permissoes de
+  // banco (is_admin() cobre os dois) -- e agora que Financeiro virou so
+  // a tela de pagamento de evento ingressado (bem mais simples que o
+  // lancamento geral de antes), nao faz mais sentido dividir a
+  // navegacao por papel. Os dois veem as 3 abas, nessa ordem.
+  const SECOES = [
+    { id: 'calendario', label: 'Calendário' },
+    { id: 'financeiro', label: 'Financeiro' },
+    { id: 'usuarios', label: 'Usuários' },
+  ];
   let secaoAtual = null;
   // Sub-aba de 2o nivel, so dentro da secao Financeiro.
   let subSecaoFinanceiro = 'lancamento';
@@ -545,17 +546,16 @@
       return;
     }
 
-    nomeUsuarioEl.textContent = `${perfil.nome} — ${perfil.papel === 'admin' ? 'Admin' : 'Admin Financeiro'}`;
-    secaoAtual = SECOES_POR_PAPEL[perfil.papel][0].id;
+    nomeUsuarioEl.textContent = `${perfil.nome} — Admin`;
+    secaoAtual = SECOES[0].id;
     renderizarConteudo(perfil.papel);
     mostrarSomente(appEl);
   }
 
   function renderizarConteudo(papel) {
-    const secoes = SECOES_POR_PAPEL[papel] || [];
     const abasHtml = `
       <nav class="abas-secao">
-        ${secoes.map(s => `<button class="aba-secao ${s.id === secaoAtual ? 'ativa' : ''}" data-secao="${s.id}">${s.label}</button>`).join('')}
+        ${SECOES.map(s => `<button class="aba-secao ${s.id === secaoAtual ? 'ativa' : ''}" data-secao="${s.id}">${s.label}</button>`).join('')}
       </nav>`;
 
     conteudoEl.innerHTML = abasHtml + `<div id="secao-conteudo"></div>`;
@@ -2500,11 +2500,12 @@
     listaEl.innerHTML = filtrados.map(pessoa => {
       const vinculos = todosVinculosMinisterio.filter(v => v.profile_id === pessoa.id);
 
-      const badgePapel = pessoa.papel === 'admin'
+      // 'admin_financeiro' deixou de ser um papel separado -- trata
+      // igual 'admin' aqui tambem, mesmo antes de rodar a migracao
+      // (supabase/sql/2026_merge_admin_financeiro.sql).
+      const badgePapel = (pessoa.papel === 'admin' || pessoa.papel === 'admin_financeiro')
         ? '<span class="badge badge-admin">Admin</span>'
-        : pessoa.papel === 'admin_financeiro'
-          ? '<span class="badge badge-financeiro">Admin Financeiro</span>'
-          : '';
+        : '';
       const badgeInativo = pessoa.ativo === false ? '<span class="badge badge-inativo">Inativo</span>' : '';
 
       const chipsMinisterios = vinculos.map(v => {

@@ -38,9 +38,9 @@ class _AdminFinanceiroScreenState extends ConsumerState<AdminFinanceiroScreen> {
     if (profileAsync.isLoading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-    if (profile == null || !profile.isAdminFinanceiro) {
+    if (profile == null || !profile.isAdmin) {
       return const Scaffold(
-        body: Center(child: Text('Essa página é restrita ao Admin Financeiro.')),
+        body: Center(child: Text('Essa página é restrita ao Admin.')),
       );
     }
 

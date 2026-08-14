@@ -368,24 +368,62 @@
   }
 
   // --- videos ---
+  // Pra quando maxresdefault.jpg cair no placeholder (ver comentario
+  // abaixo) ou nao existir de verdade -- volta pro hqdefault, que
+  // sempre existe.
+  function _voltarProHqdefault(img, id) {
+    img.onerror = null;
+    img.onload = null;
+    img.src = `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
+  }
+
   async function carregarVideos() {
     const el = document.getElementById('videos-conteudo');
     try {
+      // Pede mais que os 5 que vamos mostrar -- lives as vezes geram
+      // uma segunda entrada na playlist (a "sala" que fica offline
+      // depois), com o MESMO titulo do video de verdade mas ID
+      // diferente, e a gente filtra essas duplicatas por titulo. Sem
+      // pedir uma folga, uma duplicata filtrada deixaria a lista com
+      // menos de 5 itens.
       const resp = await fetch(
-        `https://www.googleapis.com/youtube/v3/playlistItems?key=${YOUTUBE_API_KEY}&playlistId=${YOUTUBE_PLAYLIST}&part=snippet&maxResults=5`
+        `https://www.googleapis.com/youtube/v3/playlistItems?key=${YOUTUBE_API_KEY}&playlistId=${YOUTUBE_PLAYLIST}&part=snippet&maxResults=8`
       );
       const dados = await resp.json();
-      const itens = dados.items || [];
+      const todosItens = dados.items || [];
+
+      const titulosVistos = new Set();
+      const itens = todosItens.filter(v => {
+        const titulo = v.snippet.title;
+        if (titulosVistos.has(titulo)) return false;
+        titulosVistos.add(titulo);
+        return true;
+      }).slice(0, 5);
+
       if (itens.length === 0) { el.innerHTML = '<p class="texto-secao">Nenhum vídeo encontrado.</p>'; return; }
 
       const [destaque, ...outros] = itens;
       const idDestaque = destaque.snippet.resourceId.videoId;
 
+      // hqdefault.jpg vem sempre 4:3 (480x360) -- pra videos 16:9 (quase
+      // todos), isso deixa tarja preta em cima/embaixo baked na propria
+      // imagem. maxresdefault.jpg e o 16:9 de verdade, mas nem sempre
+      // existe -- e quando nao existe, o YouTube NAO devolve erro 404
+      // (o que disparia onerror), devolve uma imagem placeholder
+      // pequena (120x90, cinza) com status 200. Por isso checa
+      // naturalWidth no onload tambem, nao so onerror -- senao esse
+      // placeholder esticado e' exatamente o "quadrado maior que o
+      // video" que aparecia. Em qualquer um dos dois casos, o
+      // container fica travado em aspect-ratio 16:9 com object-fit:cover,
+      // que corta a tarja preta do hqdefault quando precisar cair nele.
       el.innerHTML = `
         <a href="https://www.youtube.com/watch?v=${idDestaque}" target="_blank" rel="noopener"
            style="text-decoration:none;color:inherit;display:block;margin-bottom:24px;">
-          <div style="position:relative;border-radius:14px;overflow:hidden;box-shadow:0 8px 24px rgba(43,39,30,0.12);">
-            <img src="https://i.ytimg.com/vi/${idDestaque}/hqdefault.jpg" style="width:100%;display:block;">
+          <div style="position:relative;border-radius:14px;overflow:hidden;box-shadow:0 8px 24px rgba(43,39,30,0.12);aspect-ratio:16/9;">
+            <img src="https://i.ytimg.com/vi/${idDestaque}/maxresdefault.jpg"
+                 onerror="_voltarProHqdefault(this,'${idDestaque}')"
+                 onload="if(this.naturalWidth<400)_voltarProHqdefault(this,'${idDestaque}')"
+                 style="width:100%;height:100%;object-fit:cover;display:block;">
           </div>
           <p style="font-size:17px;font-weight:700;margin:14px 0 0;">${escaparHtml(destaque.snippet.title)}</p>
         </a>
@@ -394,7 +432,9 @@
             const id = v.snippet.resourceId.videoId;
             return `
               <a href="https://www.youtube.com/watch?v=${id}" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;">
-                <img src="https://i.ytimg.com/vi/${id}/hqdefault.jpg" style="width:100%;border-radius:10px;display:block;">
+                <div style="border-radius:10px;overflow:hidden;aspect-ratio:16/9;">
+                  <img src="https://i.ytimg.com/vi/${id}/hqdefault.jpg" style="width:100%;height:100%;object-fit:cover;display:block;">
+                </div>
                 <p style="font-size:13px;font-weight:600;margin:8px 0 0;">${escaparHtml(v.snippet.title)}</p>
               </a>`;
           }).join('')}
@@ -485,7 +525,6 @@
   }
 
   const NOMES_DIAS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
-  const ORDEM_DIAS = [1, 2, 3, 4, 5, 6, 0]; // Segunda primeiro, Domingo por ultimo
 
   async function carregarAgenda() {
     const corpoTabela = document.getElementById('corpo-tabela-horarios');
@@ -503,25 +542,23 @@
       // aparecer aqui.
       const especiais = eventos.filter(e => e.ingressado && new Date(e.data_inicio) > new Date());
 
-      // So a semana atual (segunda a domingo) -- um evento recorrente
-      // que so acontece em semanas especificas do mes (ex: Comunhao,
-      // so 2a sexta) nao deve aparecer toda semana, so na que realmente
-      // acontece.
+      // Proximos 7 dias, hoje incluso (mesma janela usada na tela de
+      // Inicio do app). Entram TODOS os eventos -- recorrentes ou
+      // avulsos, de qualquer escopo -- que o admin marcou manualmente
+      // como "Mostrar no site público" (visivel_site_publico), que e
+      // pensado pra funcionar independente do escopo.
       const hoje = new Date();
       const hojeSemFuso = new Date(Date.UTC(hoje.getFullYear(), hoje.getMonth(), hoje.getDate()));
-      const diaSemanaHoje = hojeSemFuso.getUTCDay(); // 0 = domingo
-      const offsetSegunda = diaSemanaHoje === 0 ? 6 : diaSemanaHoje - 1;
-      const inicioSemana = new Date(hojeSemFuso);
-      inicioSemana.setUTCDate(inicioSemana.getUTCDate() - offsetSegunda);
-      const fimSemana = new Date(inicioSemana);
-      fimSemana.setUTCDate(fimSemana.getUTCDate() + 6);
-      fimSemana.setUTCHours(23, 59, 59, 999);
+      const fimJanela = new Date(hojeSemFuso);
+      fimJanela.setUTCDate(fimJanela.getUTCDate() + 6);
+      fimJanela.setUTCHours(23, 59, 59, 999);
 
       const linhas = [];
-      eventos.filter(e => e.recorrente).forEach(ev => {
-        ocorrenciasNoIntervalo(ev, inicioSemana, fimSemana).forEach(oc => {
+      eventos.filter(e => e.visivel_site_publico).forEach(ev => {
+        ocorrenciasNoIntervalo(ev, hojeSemFuso, fimJanela).forEach(oc => {
           linhas.push({
             titulo: ev.titulo,
+            data: oc,
             diaSemana: oc.getUTCDay(),
             horario: `${String(oc.getUTCHours()).padStart(2, '0')}:${String(oc.getUTCMinutes()).padStart(2, '0')}`,
             categoria: MAPA_ESCOPO_PUBLICO[ev.escopo] || '',
@@ -533,17 +570,23 @@
         corpoTabela.innerHTML = '<tr><td colspan="3" style="text-align:center;">Agenda em atualização.</td></tr>';
       } else {
 
-        // Agrupa por dia da semana -- se tem mais de um encontro no
-        // mesmo dia, mostra os dois juntos numa linha so, em vez de
-        // repetir o nome do dia varias vezes.
+        // Agrupa por data exata (nao so dia da semana, ja que dentro
+        // de 7 dias corridos cada dia da semana so aparece uma vez de
+        // qualquer forma) -- se tem mais de um encontro no mesmo dia,
+        // mostra os dois juntos numa linha so. Ordem cronologica a
+        // partir de hoje (nao mais fixa comecando na Segunda).
+        linhas.sort((a, b) => a.data - b.data);
         const porDia = {};
+        const datasOrdenadas = [];
         linhas.forEach(l => {
-          (porDia[l.diaSemana] = porDia[l.diaSemana] || []).push(l);
+          const chave = l.data.toISOString().slice(0, 10);
+          if (!porDia[chave]) { porDia[chave] = []; datasOrdenadas.push(chave); }
+          porDia[chave].push(l);
         });
-        const diasOrdenados = ORDEM_DIAS.filter(d => porDia[d]);
 
-        corpoTabela.innerHTML = diasOrdenados.map(dia => {
-          const encontros = porDia[dia].sort((a, b) => a.horario.localeCompare(b.horario));
+        corpoTabela.innerHTML = datasOrdenadas.map(chave => {
+          const encontros = porDia[chave].sort((a, b) => a.horario.localeCompare(b.horario));
+          const diaSemana = encontros[0].diaSemana;
           const colunaEncontro = encontros
             .map(e => `
               ${escaparHtml(e.titulo)}
@@ -555,7 +598,7 @@
             .join('<br>');
           return `
             <tr>
-              <td class="dia-semana-cell">${NOMES_DIAS[dia]}</td>
+              <td class="dia-semana-cell">${NOMES_DIAS[diaSemana]}</td>
               <td>${colunaEncontro}</td>
               <td style="text-align:right;">${colunaHorario}</td>
             </tr>
