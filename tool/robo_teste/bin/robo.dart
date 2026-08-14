@@ -710,9 +710,12 @@ Future<void> _testarAnexarMaterial() async {
 
 /// Check-in por QR Code numa escala Awake -- exige que a pessoa esteja
 /// inscrita naquela ocorrencia (checkin_scanner_screen.dart). Monta o
-/// cenario (Membro inscrito numa escala de teste) e o Admin faz o
-/// check-in via a mesma RPC que o app usa.
-Future<void> _testarCheckInEscala() async {
+/// cenario (Membro inscrito numa escala de teste) e [quemFazCheckin]
+/// faz o check-in via a mesma RPC que o app usa. check_in_member() usa
+/// is_admin() OR is_lider_de_algum_ministerio() -- ou seja, QUALQUER
+/// lider pode fazer check-in, nao so lider do Awake -- por isso o
+/// mesmo teste roda com o Admin e com o Lider de Areas de Servico.
+Future<void> _testarCheckInEscala(SupabaseClient quemFazCheckin) async {
   await _comEscalaAwakeDeHoje(
     areaId: null,
     dentroDoCenario: (escalaId, dataStr) async {
@@ -722,7 +725,7 @@ Future<void> _testarCheckInEscala() async {
           .eq('id', _clienteMembro.auth.currentUser!.id)
           .single();
 
-      final nome = await _clienteAdmin.rpc('check_in_member', params: {
+      final nome = await quemFazCheckin.rpc('check_in_member', params: {
         'p_qr_code_id': perfil['qr_code_id'],
         'p_escala_id': escalaId,
         'p_data_ocorrencia': dataStr,
@@ -735,8 +738,9 @@ Future<void> _testarCheckInEscala() async {
 }
 
 /// Check-in num evento do calendario -- NAO exige inscricao previa
-/// (diferente do check-in de escala).
-Future<void> _testarCheckInEvento() async {
+/// (diferente do check-in de escala). check_in_evento() usa a mesma
+/// regra "qualquer lider" que check_in_member().
+Future<void> _testarCheckInEvento(SupabaseClient quemFazCheckin) async {
   final eventoId = _gerarUuidV4();
   await _admin.from('eventos').insert({
     'id': eventoId,
@@ -754,7 +758,7 @@ Future<void> _testarCheckInEvento() async {
         .eq('id', _clienteMembro.auth.currentUser!.id)
         .single();
 
-    final nome = await _clienteAdmin.rpc('check_in_evento', params: {
+    final nome = await quemFazCheckin.rpc('check_in_evento', params: {
       'p_qr_code_id': perfil['qr_code_id'],
       'p_evento_id': eventoId,
       'p_data_ocorrencia': DateTime.now().toIso8601String().split('T').first,
@@ -765,6 +769,24 @@ Future<void> _testarCheckInEvento() async {
   } finally {
     await _admin.from('presencas_eventos').delete().eq('evento_id', eventoId);
     await _admin.from('eventos').delete().eq('id', eventoId);
+  }
+}
+
+/// Le o catalogo de funcoes (escala_servico_funcoes_catalogo) das 5
+/// areas -- e o que alimenta tanto as colunas da Escala Mensal
+/// (escala_grade_screen.dart) quanto o formulario da Escala Semanal
+/// (EscalaServicoService.listarCatalogo/buscarOuCriarEscala). A
+/// escrita em si (criar escala/posicao/atribuir pessoa) ja e testada
+/// em _testarCriarEventoEEscalaTodasAreas e
+/// _testarEscaladoApareceNaInicio -- mensal e semanal usam as MESMAS
+/// tabelas por baixo, só a apresentação (grade vs. formulário) muda.
+Future<void> _testarCatalogoFuncoesTodasAreas() async {
+  for (final ministerio in _todasAreasServico) {
+    await _clienteLider
+        .from('escala_servico_funcoes_catalogo')
+        .select('funcao, ordem')
+        .eq('ministerio', ministerio)
+        .order('ordem');
   }
 }
 
@@ -833,12 +855,17 @@ Future<void> main() async {
 
   if (resultadoLoginLider.sucesso) {
     resultados.add(await _rodar('lider_criar_evento_e_escala_todas_areas', _testarCriarEventoEEscalaTodasAreas));
+    resultados.add(await _rodar('lider_catalogo_funcoes_todas_areas', _testarCatalogoFuncoesTodasAreas));
     resultados.add(await _rodar('lider_dashboard_ministerio', _testarDashboardMinisterio));
     resultados.add(await _rodar('lider_editar_ocorrencia_unica', _testarEditarOcorrenciaUnica));
     if (resultadoLoginMembro.sucesso) {
       // Dependem do Membro tambem estar logado.
       resultados.add(await _rodar('lider_casal_diaconos', _testarCasalDiaconos));
       resultados.add(await _rodar('lider_escalado_aparece_na_inicio', _testarEscaladoApareceNaInicio));
+      // Lider (de qualquer ministerio, nao so Awake -- ver comentario
+      // em _testarCheckInEscala) tambem pode fazer check-in.
+      resultados.add(await _rodar('lider_check_in_escala', () => _testarCheckInEscala(_clienteLider)));
+      resultados.add(await _rodar('lider_check_in_evento', () => _testarCheckInEvento(_clienteLider)));
     }
   } else {
     stdout.writeln('Login do Líder falhou -- pulando checagens que dependem dessa sessão.');
@@ -860,8 +887,8 @@ Future<void> main() async {
       // Dependem do Membro estar logado (lancar contribuicao pra ele,
       // fazer check-in usando o qr_code_id dele).
       resultados.add(await _rodar('admin_lancar_contribuicao', _testarLancarContribuicao));
-      resultados.add(await _rodar('admin_check_in_escala', _testarCheckInEscala));
-      resultados.add(await _rodar('admin_check_in_evento', _testarCheckInEvento));
+      resultados.add(await _rodar('admin_check_in_escala', () => _testarCheckInEscala(_clienteAdmin)));
+      resultados.add(await _rodar('admin_check_in_evento', () => _testarCheckInEvento(_clienteAdmin)));
     }
   } else {
     stdout.writeln('Login do Admin falhou -- pulando checagens que dependem dessa sessão.');
