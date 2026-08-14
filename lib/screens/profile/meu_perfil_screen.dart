@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../models/profile_model.dart';
 import '../../providers/auth_provider.dart';
+import '../../services/notification_service.dart';
 import '../../widgets/awake_app_bar.dart';
 import 'editar_perfil_screen.dart';
 
@@ -10,6 +11,80 @@ import 'editar_perfil_screen.dart';
 /// no Menu. Mostra tudo que a pessoa cadastrou.
 class MeuPerfilScreen extends ConsumerWidget {
   const MeuPerfilScreen({super.key});
+
+  Future<void> _confirmarEApagarConta(BuildContext context, WidgetRef ref) async {
+    final confirmacaoController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    final confirmou = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Apagar minha conta'),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Isso apaga sua conta e TODOS os seus dados pessoais pra sempre '
+                '(dízimos/ofertas, escalas, filhos cadastrados, pedidos de oração...). '
+                'Não pode ser desfeito.',
+              ),
+              const SizedBox(height: 16),
+              Text('Digite APAGAR pra confirmar:', style: Theme.of(dialogContext).textTheme.bodySmall),
+              const SizedBox(height: 4),
+              TextFormField(
+                controller: confirmacaoController,
+                autofocus: true,
+                textCapitalization: TextCapitalization.characters,
+                validator: (v) => v?.trim().toUpperCase() == 'APAGAR' ? null : 'Digite exatamente "APAGAR"',
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () {
+              if (formKey.currentState!.validate()) {
+                Navigator.of(dialogContext).pop(true);
+              }
+            },
+            child: const Text('Apagar pra sempre'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmou != true || !context.mounted) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      await ref.read(authServiceProvider).apagarMinhaConta();
+      await NotificationService.logoutUser();
+      await ref.read(authServiceProvider).signOut();
+      // O redirect do GoRouter cuida da navegacao pra tela de login
+      // depois do signOut -- so precisa fechar o dialogo de loading.
+      if (context.mounted) Navigator.of(context).pop();
+    } catch (e) {
+      if (context.mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Não foi possível apagar a conta: $e')),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -97,6 +172,15 @@ class MeuPerfilScreen extends ConsumerWidget {
                   title: const Text('Grupo de casais'),
                   subtitle: Text(profile.grupoCasais?.label ?? 'Ainda não tenho grupo'),
                 ),
+              const SizedBox(height: 32),
+              const Divider(),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+                onPressed: () => _confirmarEApagarConta(context, ref),
+                icon: const Icon(Icons.delete_forever_outlined),
+                label: const Text('Apagar minha conta'),
+              ),
             ],
           );
         },

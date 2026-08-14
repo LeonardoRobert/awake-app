@@ -93,6 +93,23 @@ class AuthService {
     return _client.auth.signOut();
   }
 
+  /// Apaga a PROPRIA conta pra sempre (hard delete) -- chama a Edge
+  /// Function `apagar-conta`, que roda com a service role key (so ela
+  /// tem permissao de apagar de auth.users; o app nunca tem essa
+  /// chave). A funcao so apaga o usuario dono do token que ela mesma
+  /// recebe, nunca um id passado por fora -- ninguem apaga a conta de
+  /// outra pessoa por aqui. Com as FKs de profiles/auth.users ajustadas
+  /// (supabase/sql/2026_fix_fk_delete_perfil.sql), apagar o usuario ja
+  /// cai em cascata por tudo (perfil, filhos, escalas, etc.) sozinho.
+  Future<void> apagarMinhaConta() async {
+    final resposta = await _client.functions.invoke('apagar-conta');
+    if (resposta.status != 200) {
+      final corpo = resposta.data;
+      final mensagem = corpo is Map && corpo['error'] != null ? corpo['error'] : 'Erro desconhecido';
+      throw Exception(mensagem);
+    }
+  }
+
   /// Manda um e-mail de recuperacao de senha. `redirectTo` deve ser uma
   /// URL cadastrada em Authentication > URL Configuration no Supabase.
   Future<void> resetPassword(String email, {required String redirectTo}) {
