@@ -615,7 +615,7 @@
         <h2 style="margin-top:0;">Usuários</h2>
         <div id="visao-geral-usuarios"></div>
         <h3>Por ministério/grupo</h3>
-        <div id="agregados-usuarios" class="grade-agregados"></div>
+        <div id="agregados-usuarios"></div>
         <div class="campo-form" style="max-width:320px;">
           <label>Buscar pessoa</label>
           <input type="text" id="busca-usuario" placeholder="Nome...">
@@ -2265,16 +2265,16 @@
   // =========================================================
   // Painel de Usuarios (Fase 5)
   // =========================================================
-  // Faixa etaria + ministerios de servico -- mesmos valores aceitos pela
-  // CHECK constraint de profile_ministerios.ministerio.
-  const MINISTERIOS_AGREGADOS = [
-    'awake', 'homens', 'mulheres', 'criancas',
-    'diaconos', 'louvor', 'danca', 'midia', 'multimidia', 'teatro', 'coral',
-  ];
+  // Os 3 blocos que a tela de Usuarios divide o "Por ministério/grupo".
+  // Discipulado (grupo de casais + categoria Awake) nao usa isso --
+  // ele vem de colunas diretas em profiles (grupo_casais/categoria),
+  // ver LABEL_GRUPO_CASAIS/LABEL_CATEGORIA logo abaixo.
+  const GRUPO_FAIXA_ETARIA = ['awake', 'homens', 'mulheres', 'criancas'];
+  const GRUPO_SERVICO = ['diaconos', 'louvor', 'danca', 'midia', 'multimidia', 'teatro', 'coral', 'intercessao'];
   const LABEL_MINISTERIO_AGREGADO = {
     awake: 'Awake', homens: 'Homens', mulheres: 'Mulheres', criancas: 'Crianças',
     diaconos: 'Diáconos', louvor: 'Louvor', danca: 'Dança', midia: 'Mídia',
-    multimidia: 'Multimídia', teatro: 'Teatro', coral: 'Coral',
+    multimidia: 'Multimídia', teatro: 'Teatro', coral: 'Coral', intercessao: 'Intercessão',
   };
   // Discipulado (Grupo de Casais) -- coluna direta em profiles, nao um
   // vinculo em profile_ministerios, e sem conceito de "lider" (o grupo
@@ -2312,7 +2312,7 @@
     document.getElementById('busca-usuario').addEventListener('input', renderizarListaUsuarios);
   }
 
-  const FAIXAS_ETARIAS_ADMIN = ['awake', 'homens', 'mulheres'];
+  const FAIXAS_ETARIAS_ADMIN = ['awake', 'homens', 'mulheres', 'criancas'];
   const MINISTERIOS_SERVICO_ADMIN = ['diaconos', 'louvor', 'danca', 'midia', 'multimidia'];
   const LABEL_ESTADO_CIVIL_ADMIN = {
     solteiro: 'Solteiro(a)', namorando: 'Namorando', noivo: 'Noivo(a)',
@@ -2434,13 +2434,18 @@
           </div>
         </div>
         <div>
-          <h4 style="margin:0 0 8px;">Faixa etária × área de serviço</h4>
+          <h4 style="margin:0 0 8px;">Faixa etária</h4>
           <div class="lista-simples">
             ${Object.entries(contagemFaixaEtaria).sort((a, b) => b[1] - a[1])
               .map(([chave, qtd]) => linhaBarraAdmin(LABEL_MINISTERIO_AGREGADO[chave] || chave, qtd, totalUsuarios)).join('')}
-            ${Object.entries(contagemAreaServico).sort((a, b) => b[1] - a[1])
-              .map(([chave, qtd]) => linhaBarraAdmin(LABEL_MINISTERIO_AGREGADO[chave] || chave, qtd, totalUsuarios)).join('')}
           </div>
+        </div>
+      </div>
+      <div style="margin-bottom:24px;">
+        <h4 style="margin:0 0 8px;">Área de serviço</h4>
+        <div class="lista-simples">
+          ${Object.entries(contagemAreaServico).sort((a, b) => b[1] - a[1])
+            .map(([chave, qtd]) => linhaBarraAdmin(LABEL_MINISTERIO_AGREGADO[chave] || chave, qtd, totalUsuarios)).join('')}
         </div>
       </div>
       <div class="duas-colunas">
@@ -2455,33 +2460,47 @@
       </div>`;
   }
 
+  function cartaoMinisterioAgregado(ministerio) {
+    const vinculosDoMinisterio = todosVinculosMinisterio.filter(v => v.ministerio === ministerio);
+    const lideres = vinculosDoMinisterio
+      .filter(v => v.papel === 'lider')
+      .map(v => todosUsuarios.find(p => p.id === v.profile_id)?.nome)
+      .filter(Boolean);
+    return `
+      <div class="cartao-agregado">
+        <div class="nome-agregado">${LABEL_MINISTERIO_AGREGADO[ministerio]}</div>
+        <div class="contagem-agregado">${vinculosDoMinisterio.length}</div>
+        <div class="lideres-agregado">${lideres.length ? 'Líder: ' + escaparHtml(lideres.join(', ')) : 'Sem líder definido'}</div>
+      </div>`;
+  }
+
   function renderizarAgregados() {
     const el = document.getElementById('agregados-usuarios');
 
-    const cartoesMinisterio = MINISTERIOS_AGREGADOS.map(ministerio => {
-      const vinculosDoMinisterio = todosVinculosMinisterio.filter(v => v.ministerio === ministerio);
-      const lideres = vinculosDoMinisterio
-        .filter(v => v.papel === 'lider')
-        .map(v => todosUsuarios.find(p => p.id === v.profile_id)?.nome)
-        .filter(Boolean);
-      return `
-        <div class="cartao-agregado">
-          <div class="nome-agregado">${LABEL_MINISTERIO_AGREGADO[ministerio]}</div>
-          <div class="contagem-agregado">${vinculosDoMinisterio.length}</div>
-          <div class="lideres-agregado">${lideres.length ? 'Líder: ' + escaparHtml(lideres.join(', ')) : 'Sem líder definido'}</div>
-        </div>`;
-    }).join('');
+    const cartoesFaixaEtaria = GRUPO_FAIXA_ETARIA.map(cartaoMinisterioAgregado).join('');
 
+    // Discipulado = grupo de casais (coluna grupo_casais) + categoria
+    // do Awake (coluna categoria) -- as duas moram direto em profiles,
+    // sem vinculo em profile_ministerios, entao nao tem "lider" aqui.
     const cartoesCasais = Object.entries(LABEL_GRUPO_CASAIS).map(([valor, label]) => {
       const qtd = todosUsuarios.filter(p => p.grupo_casais === valor).length;
-      return `
-        <div class="cartao-agregado">
-          <div class="nome-agregado">${label}</div>
-          <div class="contagem-agregado">${qtd}</div>
-        </div>`;
+      return `<div class="cartao-agregado"><div class="nome-agregado">${label}</div><div class="contagem-agregado">${qtd}</div></div>`;
+    }).join('');
+    const cartoesCategoria = Object.entries(LABEL_CATEGORIA).map(([valor, label]) => {
+      const qtd = todosUsuarios.filter(p => p.categoria === valor).length;
+      return `<div class="cartao-agregado"><div class="nome-agregado">${label}</div><div class="contagem-agregado">${qtd}</div></div>`;
     }).join('');
 
-    el.innerHTML = cartoesMinisterio + cartoesCasais;
+    const cartoesServico = GRUPO_SERVICO.map(cartaoMinisterioAgregado).join('');
+
+    el.innerHTML = `
+      <h4 style="margin:0 0 8px;">Ministério de faixas etárias</h4>
+      <div class="grade-agregados" style="margin-bottom:24px;">${cartoesFaixaEtaria}</div>
+      <h4 style="margin:0 0 8px;">Ministério de discipulado</h4>
+      <div class="grade-agregados" style="margin-bottom:24px;">${cartoesCasais}${cartoesCategoria}</div>
+      <h4 style="margin:0 0 8px;">Ministérios de serviço</h4>
+      <div class="grade-agregados">${cartoesServico}</div>
+    `;
   }
 
   function renderizarListaUsuarios() {
