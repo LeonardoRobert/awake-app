@@ -2544,10 +2544,15 @@
           : '';
         const label = LABEL_MINISTERIO_AGREGADO[v.ministerio] || v.ministerio;
         return `
-          <button type="button" class="chip-ministerio ${v.papel === 'lider' ? 'eh-lider' : ''}"
-                  data-profile-id="${pessoa.id}" data-ministerio="${v.ministerio}" data-papel-atual="${v.papel}">
-            ${escaparHtml(label)}${categoriaTexto}${v.papel === 'lider' ? ' ★' : ''}
-          </button>`;
+          <span style="display:inline-flex; align-items:center; gap:2px;">
+            <button type="button" class="chip-ministerio ${v.papel === 'lider' ? 'eh-lider' : ''}"
+                    data-profile-id="${pessoa.id}" data-ministerio="${v.ministerio}" data-papel-atual="${v.papel}">
+              ${escaparHtml(label)}${categoriaTexto}${v.papel === 'lider' ? ' ★' : ''}
+            </button>
+            <button type="button" class="botao-remover-ministerio" title="Remover ${escaparHtml(label)}"
+                    data-profile-id="${pessoa.id}" data-ministerio="${v.ministerio}"
+                    style="flex:none; border:none; background:none; cursor:pointer; color:#999; font-size:14px; padding:0 4px;">✕</button>
+          </span>`;
       }).join('');
 
       const chipCasal = pessoa.grupo_casais
@@ -2596,6 +2601,9 @@
 
     listaEl.querySelectorAll('.chip-ministerio').forEach(chip => {
       chip.addEventListener('click', () => alternarLiderMinisterio(chip));
+    });
+    listaEl.querySelectorAll('.botao-remover-ministerio').forEach(btn => {
+      btn.addEventListener('click', () => removerDoMinisterio(btn.dataset.profileId, btn.dataset.ministerio));
     });
     listaEl.querySelectorAll('[data-acao="editar"]').forEach(btn => {
       btn.addEventListener('click', () => abrirFormularioEditarUsuario(btn.dataset.profileId));
@@ -2794,6 +2802,27 @@
     if (error) { alert('Erro ao adicionar: ' + error.message); return; }
 
     todosVinculosMinisterio.push({ profile_id: profileId, ministerio, papel });
+    renderizarAgregados();
+    renderizarListaUsuarios();
+  }
+
+  // Tira a pessoa de um ministério por completo (apaga o vínculo, nao
+  // so tira a lideranca) -- ex: alguem saiu do Coral.
+  async function removerDoMinisterio(profileId, ministerio) {
+    const nomePessoa = todosUsuarios.find(p => p.id === profileId)?.nome || 'essa pessoa';
+    const labelMinisterio = LABEL_MINISTERIO_AGREGADO[ministerio] || ministerio;
+    if (!confirm(`Tirar ${nomePessoa} de ${labelMinisterio}?`)) return;
+
+    const { error } = await supa
+      .from('profile_ministerios')
+      .delete()
+      .eq('profile_id', profileId)
+      .eq('ministerio', ministerio);
+    if (error) { alert('Erro ao remover: ' + error.message); return; }
+
+    todosVinculosMinisterio = todosVinculosMinisterio.filter(
+      v => !(v.profile_id === profileId && v.ministerio === ministerio),
+    );
     renderizarAgregados();
     renderizarListaUsuarios();
   }

@@ -1109,9 +1109,11 @@ Future<void> _testarAdminGerenciarQuestionario() async {
 }
 
 /// Admin adiciona o Membro de teste a um ministério que ele ainda não
-/// tem vínculo e depois promove pra líder -- mesmo fluxo dos botões
-/// "+ Membro"/"+ Líder" e do chip clicável em gestao.html (Usuários).
-/// Testa profile_ministerios_insert e _update pra is_admin().
+/// tem vínculo, promove pra líder, e por fim tira ele do ministério
+/// por completo -- mesmo fluxo dos botões "+ Membro"/"+ Líder", do
+/// chip clicável (lider<->membro) e do "✕" (remover) em gestao.html
+/// (Usuários). Testa profile_ministerios_insert/_update/_delete pra
+/// is_admin().
 Future<void> _testarAdminGerenciarMinisterioDeUsuario() async {
   final membroId = _clienteMembro.auth.currentUser!.id;
   const ministerio = 'coral';
@@ -1141,6 +1143,19 @@ Future<void> _testarAdminGerenciarMinisterioDeUsuario() async {
         .eq('ministerio', ministerio)
         .single();
     if (atual['papel'] != 'lider') throw Exception('profile_ministerios_update não promoveu a líder.');
+
+    await _clienteAdmin
+        .from('profile_ministerios')
+        .delete()
+        .eq('profile_id', membroId)
+        .eq('ministerio', ministerio);
+    final restante = await _admin
+        .from('profile_ministerios')
+        .select('profile_id')
+        .eq('profile_id', membroId)
+        .eq('ministerio', ministerio)
+        .maybeSingle();
+    if (restante != null) throw Exception('profile_ministerios_delete não removeu o vínculo (ainda existe).');
   } finally {
     await _admin.from('profile_ministerios').delete().eq('profile_id', membroId).eq('ministerio', ministerio);
   }
