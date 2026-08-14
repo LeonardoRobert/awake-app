@@ -1198,28 +1198,41 @@ Future<void> _testarAdminApagarContaDeUsuario() async {
   final resposta = await clienteTemp.auth.signUp(email: emailDescartavel, password: senhaDescartavel);
   final idDescartavel = resposta.user?.id;
   if (idDescartavel == null) throw Exception('Cadastro descartável não retornou usuário.');
-  await _admin.from('profiles').update({'eh_conta_teste': true}).eq('id', idDescartavel);
 
-  final resultado = await _clienteAdmin.functions.invoke(
-    'admin-apagar-usuario',
-    body: {'profileId': idDescartavel},
-  );
-  if (resultado.status != 200) {
-    // Se a function falhar por algum motivo, ainda tenta limpar a
-    // conta descartavel via bypass, pra nao deixar sujeira.
-    await _admin.auth.admin.deleteUser(idDescartavel);
-    throw Exception('admin-apagar-usuario devolveu status ${resultado.status}: ${resultado.data}');
-  }
-
-  // Confirma que sumiu de auth.users de verdade -- getUserById lanca
-  // excecao (nao devolve null) quando o usuario nao existe mais.
+  // Dali pra frente, QUALQUER excecao (erro de rede, Supabase fora do
+  // ar no meio da chamada, etc.) tenta limpar a conta descartavel via
+  // bypass antes de propagar -- antes so' cobria o caso especifico de
+  // status != 200, deixando conta orfa em qualquer outra falha (foi o
+  // que aconteceu num 503 do Supabase em 14/08).
   try {
-    await _admin.auth.admin.getUserById(idDescartavel);
-    throw Exception('Usuário descartável ainda existe depois do admin-apagar-usuario.');
+    await _admin.from('profiles').update({'eh_conta_teste': true}).eq('id', idDescartavel);
+
+    final resultado = await _clienteAdmin.functions.invoke(
+      'admin-apagar-usuario',
+      body: {'profileId': idDescartavel},
+    );
+    if (resultado.status != 200) {
+      throw Exception('admin-apagar-usuario devolveu status ${resultado.status}: ${resultado.data}');
+    }
+
+    // Confirma que sumiu de auth.users de verdade -- getUserById lanca
+    // excecao (nao devolve null) quando o usuario nao existe mais.
+    try {
+      await _admin.auth.admin.getUserById(idDescartavel);
+      throw Exception('Usuário descartável ainda existe depois do admin-apagar-usuario.');
+    } catch (e) {
+      if (e.toString().contains('ainda existe')) rethrow;
+      // Qualquer outro erro aqui (ex: "User not found") É o resultado
+      // esperado -- confirma que a conta sumiu de verdade.
+    }
   } catch (e) {
-    if (e.toString().contains('ainda existe')) rethrow;
-    // Qualquer outro erro aqui (ex: "User not found") É o resultado
-    // esperado -- confirma que a conta sumiu de verdade.
+    // Best-effort: se a conta ainda existir, tenta apagar; se ja tiver
+    // sumido (o admin-apagar-usuario pode ter funcionado mesmo com a
+    // excecao vindo de outro lugar), so' ignora o erro da limpeza.
+    try {
+      await _admin.auth.admin.deleteUser(idDescartavel);
+    } catch (_) {}
+    rethrow;
   }
 }
 
