@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import '../../core/erro_amigavel.dart';
 import '../../models/event_model.dart';
 import '../../providers/checkin_provider.dart';
 import '../../providers/event_provider.dart';
@@ -139,7 +140,7 @@ class _CheckinScannerScreenState extends ConsumerState<CheckinScannerScreen>
       });
     } catch (e) {
       setState(() {
-        _feedback = 'Não foi possível confirmar: $e';
+        _feedback = 'Não foi possível confirmar: ${mensagemDeErroAmigavel(e)}';
         _feedbackIsError = true;
       });
     } finally {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../core/erro_amigavel.dart';
 import '../../models/contribuicao_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/contribuicao_provider.dart';
@@ -204,7 +205,7 @@ class _PainelLancamentoState extends ConsumerState<_PainelLancamento> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Erro ao lançar: $e')));
+            .showSnackBar(SnackBar(content: Text('Erro ao lançar: ${mensagemDeErroAmigavel(e)}')));
       }
     } finally {
       if (mounted) setState(() => _salvando = false);
@@ -383,6 +384,7 @@ class _PainelLancamentoState extends ConsumerState<_PainelLancamento> {
                             isThreeLine: (c.observacao != null && c.observacao!.isNotEmpty) ||
                                 c.eventoId != null,
                             trailing: IconButton(
+                              tooltip: 'Apagar lançamento',
                               icon: const Icon(Icons.delete_outline, color: Colors.red),
                               onPressed: () => _excluir(c.id),
                             ),

@@ -80,6 +80,7 @@ class OutdoorsAdminScreen extends ConsumerWidget {
                     MaterialPageRoute(builder: (_) => OutdoorFormScreen(outdoorParaEditar: outdoor)),
                   ),
                   trailing: IconButton(
+                    tooltip: 'Apagar outdoor',
                     icon: const Icon(Icons.delete_outline, color: Colors.red),
                     onPressed: () => _apagar(context, ref, outdoor),
                   ),

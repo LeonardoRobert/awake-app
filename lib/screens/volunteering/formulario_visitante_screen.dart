@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../../core/erro_amigavel.dart';
 import '../../services/visitante_service.dart';
 import '../../widgets/awake_app_bar.dart';
 
@@ -110,7 +111,7 @@ class _FormularioVisitanteScreenState extends State<FormularioVisitanteScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Erro ao registrar: $e')));
+            .showSnackBar(SnackBar(content: Text('Erro ao registrar: ${mensagemDeErroAmigavel(e)}')));
       }
     } finally {
       if (mounted) setState(() => _enviando = false);

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/erro_amigavel.dart';
 import '../../models/profile_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/cep_service.dart';
@@ -106,7 +107,7 @@ class _EditarPerfilScreenState extends ConsumerState<EditarPerfilScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Erro ao salvar: $e')));
+            .showSnackBar(SnackBar(content: Text('Erro ao salvar: ${mensagemDeErroAmigavel(e)}')));
       }
     } finally {
       if (mounted) setState(() => _saving = false);

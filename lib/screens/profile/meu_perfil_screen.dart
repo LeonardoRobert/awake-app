@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import '../../core/erro_amigavel.dart';
 import '../../models/profile_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/notification_service.dart';
@@ -80,7 +81,7 @@ class MeuPerfilScreen extends ConsumerWidget {
       if (context.mounted) {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Não foi possível apagar a conta: $e')),
+          SnackBar(content: Text('Não foi possível apagar a conta: ${mensagemDeErroAmigavel(e)}')),
         );
       }
     }

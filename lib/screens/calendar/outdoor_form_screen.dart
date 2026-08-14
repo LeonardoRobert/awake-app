@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
+import '../../core/erro_amigavel.dart';
 import '../../models/event_model.dart';
 import '../../models/outdoor_model.dart';
 import '../../providers/outdoor_provider.dart';
@@ -174,7 +175,7 @@ class _OutdoorFormScreenState extends ConsumerState<OutdoorFormScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Não foi possível salvar o outdoor: $e')),
+          SnackBar(content: Text('Não foi possível salvar o outdoor: ${mensagemDeErroAmigavel(e)}')),
         );
       }
     } finally {

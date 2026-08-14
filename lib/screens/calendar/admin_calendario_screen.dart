@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
+import '../../core/erro_amigavel.dart';
 import '../../models/event_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/event_provider.dart';
@@ -280,7 +281,7 @@ class _PainelDetalhes extends ConsumerWidget {
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Erro ao excluir: $e')));
+            .showSnackBar(SnackBar(content: Text('Erro ao excluir: ${mensagemDeErroAmigavel(e)}')));
       }
     }
   }

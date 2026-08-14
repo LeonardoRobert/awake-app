@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../core/erro_amigavel.dart';
 import '../../models/profile_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/cep_service.dart';
@@ -445,7 +446,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     } catch (e) {
       // Mostra o erro de verdade (em vez de uma mensagem generica) --
       // assim da pra saber exatamente o que deu errado.
-      setState(() => _errorMessage = 'Não foi possível concluir o cadastro: $e');
+      setState(() => _errorMessage = 'Não foi possível concluir o cadastro: ${mensagemDeErroAmigavel(e)}');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -611,6 +612,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                   title: Text(filho.nome),
                   subtitle: Text('${filho.idade} anos'),
                   trailing: IconButton(
+                    tooltip: 'Remover',
                     icon: const Icon(Icons.close, size: 20),
                     onPressed: () => setState(() => _filhos.removeAt(index)),
                   ),

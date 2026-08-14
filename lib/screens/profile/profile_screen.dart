@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../core/erro_amigavel.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../screens/financeiro/financeiro_screen.dart';
@@ -52,7 +53,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Erro ao enviar foto: $e')));
+            .showSnackBar(SnackBar(content: Text('Erro ao enviar foto: ${mensagemDeErroAmigavel(e)}')));
       }
     } finally {
       if (mounted) setState(() => _enviandoFoto = false);

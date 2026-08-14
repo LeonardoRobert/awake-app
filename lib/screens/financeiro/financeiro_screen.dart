@@ -474,6 +474,7 @@ class _FinanceiroScreenState extends ConsumerState<FinanceiroScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   IconButton(
+                    tooltip: 'Mês anterior',
                     onPressed: () => _mudarMes(-1),
                     icon: const Icon(Icons.chevron_left),
                   ),
@@ -482,6 +483,7 @@ class _FinanceiroScreenState extends ConsumerState<FinanceiroScreen> {
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   IconButton(
+                    tooltip: 'Próximo mês',
                     onPressed: _ehMesAtual ? null : () => _mudarMes(1),
                     icon: const Icon(Icons.chevron_right),
                   ),

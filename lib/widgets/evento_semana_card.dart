@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
+import '../core/erro_amigavel.dart';
 import '../models/escala_servico_model.dart';
 import '../models/event_model.dart';
 import '../models/profile_model.dart';
@@ -93,7 +94,7 @@ class _EventoSemanaCardState extends State<EventoSemanaCard> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Não foi possível compartilhar: $e')));
+            .showSnackBar(SnackBar(content: Text('Não foi possível compartilhar: ${mensagemDeErroAmigavel(e)}')));
       }
     } finally {
       if (mounted) setState(() => _compartilhando = false);
@@ -116,7 +117,7 @@ class _EventoSemanaCardState extends State<EventoSemanaCard> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Não foi possível compartilhar: $e')));
+            .showSnackBar(SnackBar(content: Text('Não foi possível compartilhar: ${mensagemDeErroAmigavel(e)}')));
       }
     } finally {
       if (mounted) setState(() => _compartilhandoInstagram = false);

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/erro_amigavel.dart';
 import '../../models/treinamento_model.dart';
 import '../../providers/treinamento_provider.dart';
 
@@ -56,7 +57,7 @@ class _TreinamentoFormScreenState extends ConsumerState<TreinamentoFormScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Erro ao salvar: $e')));
+            .showSnackBar(SnackBar(content: Text('Erro ao salvar: ${mensagemDeErroAmigavel(e)}')));
       }
     } finally {
       if (mounted) setState(() => _saving = false);

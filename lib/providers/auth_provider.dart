@@ -23,3 +23,37 @@ final currentProfileProvider = FutureProvider<ProfileModel?>((ref) async {
 
   return profile;
 });
+
+/// Escuta o Realtime do Supabase na PROPRIA linha de profiles da pessoa
+/// logada -- quando um admin edita o perfil dela em outro lugar (ex:
+/// gestao.html), essa mudanca chega sozinha, sem precisar de pull-to-
+/// refresh manual. So essa tabela, so a propria linha (escopo minimo
+/// de proposito): e' aditivo, nao substitui currentProfileProvider (que
+/// continua buscando via REST normal) -- so passa a invalida-lo sozinho
+/// quando alguem de fora mexe no perfil. Se a conexao cair, o app
+/// continua funcionando exatamente como hoje, so sem a atualizacao
+/// instantanea.
+///
+/// Precisa ficar "watched" em algum lugar sempre montado durante a
+/// sessao (HomeShell) pra subscription nao morrer.
+final profileRealtimeProvider = Provider.autoDispose<void>((ref) {
+  // So reage a login/logout (nao a currentProfileProvider -- watcher
+  // nele criaria um loop de re-inscrever o canal a cada invalidacao
+  // disparada por esse mesmo provider).
+  ref.watch(authStateProvider);
+  final userId = Supabase.instance.client.auth.currentUser?.id;
+  if (userId == null) return;
+
+  final canal = Supabase.instance.client
+      .channel('profile-realtime-$userId')
+      .onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'profiles',
+        filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'id', value: userId),
+        callback: (_) => ref.invalidate(currentProfileProvider),
+      )
+      .subscribe();
+
+  ref.onDispose(() => Supabase.instance.client.removeChannel(canal));
+});

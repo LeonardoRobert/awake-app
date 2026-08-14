@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
+import '../../core/erro_amigavel.dart';
 import '../../models/event_model.dart';
 import '../../models/profile_model.dart';
 import '../../providers/auth_provider.dart';
@@ -361,7 +362,7 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao salvar evento: $e')),
+          SnackBar(content: Text('Erro ao salvar evento: ${mensagemDeErroAmigavel(e)}')),
         );
       }
     } finally {
@@ -501,6 +502,7 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
                     suffixIcon: _dataFim == null
                         ? null
                         : IconButton(
+                            tooltip: 'Remover data de término',
                             icon: const Icon(Icons.close, size: 18),
                             onPressed: () => setState(() => _dataFim = null),
                           ),

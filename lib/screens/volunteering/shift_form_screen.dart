@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../core/erro_amigavel.dart';
 import '../../models/shift_model.dart';
 import '../../providers/shift_provider.dart';
 
@@ -177,7 +178,7 @@ class _ShiftFormScreenState extends ConsumerState<ShiftFormScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Erro ao salvar escala: $e')));
+            .showSnackBar(SnackBar(content: Text('Erro ao salvar escala: ${mensagemDeErroAmigavel(e)}')));
       }
     } finally {
       if (mounted) setState(() => _saving = false);

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/erro_amigavel.dart';
 import '../../models/treinamento_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/treinamento_provider.dart';
@@ -20,6 +21,7 @@ class TreinamentosScreen extends ConsumerWidget {
         title: 'Treinamentos',
         showQrButton: false,
         leading: IconButton(
+          tooltip: 'Voltar',
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
             if (context.canPop()) {
@@ -137,7 +139,7 @@ class TreinamentosScreen extends ConsumerWidget {
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Erro ao excluir: $e')));
+            .showSnackBar(SnackBar(content: Text('Erro ao excluir: ${mensagemDeErroAmigavel(e)}')));
       }
     }
   }

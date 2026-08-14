@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/erro_amigavel.dart';
 import '../../providers/auth_provider.dart';
 
 /// Tela aberta quando a pessoa clica no link de recuperacao de senha
@@ -33,7 +34,7 @@ class _RedefinirSenhaScreenState extends ConsumerState<RedefinirSenhaScreen> {
       await ref.read(authServiceProvider).updatePassword(_senhaController.text);
       setState(() => _sucesso = true);
     } catch (e) {
-      setState(() => _erro = 'Não foi possível salvar a nova senha: $e');
+      setState(() => _erro = 'Não foi possível salvar a nova senha: ${mensagemDeErroAmigavel(e)}');
     } finally {
       if (mounted) setState(() => _loading = false);
     }

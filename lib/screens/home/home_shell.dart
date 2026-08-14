@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/erro_amigavel.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
 import '../calendar/calendar_screen.dart';
@@ -79,11 +80,14 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   @override
   Widget build(BuildContext context) {
     final profileAsync = ref.watch(currentProfileProvider);
+    // Mantem a subscription do Realtime viva durante toda a sessao --
+    // ver o comentario em profileRealtimeProvider (auth_provider.dart).
+    ref.watch(profileRealtimeProvider);
 
     return profileAsync.when(
       loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (err, _) => Scaffold(
-        body: Center(child: Text('Erro ao carregar perfil: $err')),
+        body: Center(child: Text('Erro ao carregar perfil: ${mensagemDeErroAmigavel(err)}')),
       ),
       data: (profile) {
         final ehAwake = profile?.pertenceAwake ?? true;

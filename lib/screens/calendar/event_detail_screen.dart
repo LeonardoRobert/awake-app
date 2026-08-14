@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../core/erro_amigavel.dart';
 import '../../models/contribuicao_model.dart';
 import '../../models/event_model.dart';
 import '../../models/profile_model.dart';
@@ -285,7 +286,7 @@ class EventDetailScreen extends ConsumerWidget {
         } catch (e) {
           if (context.mounted) {
             ScaffoldMessenger.of(context)
-                .showSnackBar(SnackBar(content: Text('Erro ao excluir: $e')));
+                .showSnackBar(SnackBar(content: Text('Erro ao excluir: ${mensagemDeErroAmigavel(e)}')));
           }
         }
         return;

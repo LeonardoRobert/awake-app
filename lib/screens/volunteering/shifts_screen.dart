@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../core/erro_amigavel.dart';
 import '../../models/shift_model.dart';
 import '../../models/signup_model.dart';
 import '../../providers/auth_provider.dart';
@@ -329,7 +330,7 @@ class _ShiftsScreenState extends ConsumerState<ShiftsScreen> {
         } catch (e) {
           if (context.mounted) {
             ScaffoldMessenger.of(context)
-                .showSnackBar(SnackBar(content: Text('Erro ao excluir: $e')));
+                .showSnackBar(SnackBar(content: Text('Erro ao excluir: ${mensagemDeErroAmigavel(e)}')));
           }
         }
         return;
@@ -372,7 +373,7 @@ class _ShiftsScreenState extends ConsumerState<ShiftsScreen> {
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Erro ao excluir: $e')));
+            .showSnackBar(SnackBar(content: Text('Erro ao excluir: ${mensagemDeErroAmigavel(e)}')));
       }
     }
   }

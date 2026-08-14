@@ -1,6 +1,7 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../../core/erro_amigavel.dart';
 import '../../models/video_youtube_model.dart';
 import '../../services/video_material_service.dart';
 import '../../services/youtube_service.dart';
@@ -49,7 +50,7 @@ class _MeusConteudosScreenState extends State<MeusConteudosScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Não foi possível enviar o material: $e')),
+          SnackBar(content: Text('Não foi possível enviar o material: ${mensagemDeErroAmigavel(e)}')),
         );
       }
     } finally {
@@ -84,7 +85,7 @@ class _MeusConteudosScreenState extends State<MeusConteudosScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Não foi possível remover o material: $e')),
+          SnackBar(content: Text('Não foi possível remover o material: ${mensagemDeErroAmigavel(e)}')),
         );
       }
     } finally {

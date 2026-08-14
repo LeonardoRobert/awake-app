@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/erro_amigavel.dart';
 import '../../services/mensagem_service.dart';
 import '../../widgets/awake_app_bar.dart';
 
@@ -49,7 +50,7 @@ class _EnviarMensagemScreenState extends State<EnviarMensagemScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Erro ao enviar: $e')));
+            .showSnackBar(SnackBar(content: Text('Erro ao enviar: ${mensagemDeErroAmigavel(e)}')));
       }
     } finally {
       if (mounted) setState(() => _enviando = false);

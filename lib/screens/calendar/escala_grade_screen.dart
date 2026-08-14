@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../core/erro_amigavel.dart';
 import '../../models/escala_servico_model.dart';
 import '../../models/event_model.dart';
 import '../../models/profile_model.dart';
@@ -130,7 +131,7 @@ class _EscalaGradeScreenState extends ConsumerState<EscalaGradeScreen>
     } catch (e) {
       // Sem isso, qualquer falha aqui deixava a aba desse mes presa em
       // "carregando" pra sempre, sem nenhum aviso.
-      if (mounted) setState(() => _erroPorMes[chave] = e.toString());
+      if (mounted) setState(() => _erroPorMes[chave] = mensagemDeErroAmigavel(e));
     } finally {
       if (mounted) setState(() => _carregandoMes[chave] = false);
     }
@@ -493,11 +494,13 @@ class _EscalaGradeScreenState extends ConsumerState<EscalaGradeScreen>
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       IconButton(
+                        tooltip: 'Ano anterior',
                         icon: const Icon(Icons.chevron_left),
                         onPressed: () => _trocarAno(-1),
                       ),
                       Text('$_ano', style: Theme.of(context).textTheme.titleLarge),
                       IconButton(
+                        tooltip: 'Próximo ano',
                         icon: const Icon(Icons.chevron_right),
                         onPressed: () => _trocarAno(1),
                       ),
@@ -559,6 +562,7 @@ class _CelulaAutocomplete extends StatelessWidget {
               hintText: '—',
               suffixIcon: temPessoa
                   ? IconButton(
+                      tooltip: 'Limpar seleção',
                       icon: const Icon(Icons.close, size: 14),
                       onPressed: () {
                         controller.clear();
