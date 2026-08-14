@@ -570,6 +570,64 @@ Future<void> _testarEditarOcorrenciaUnica() async {
   }
 }
 
+/// "Toda a série": UPDATE comum na linha do evento recorrente (mexe em
+/// TODAS as ocorrencias futuras de uma vez, ao contrario da excecao de
+/// _testarEditarOcorrenciaUnica). Testa eventos_update pro Lider com o
+/// CLIENTE REAL dele (nao o bypass de limpeza).
+Future<void> _testarEditarEventoTodaSerie() async {
+  final userId = _clienteLider.auth.currentUser!.id;
+  final eventoId = _gerarUuidV4();
+
+  await _clienteLider.from('eventos').insert({
+    'id': eventoId,
+    'titulo': '[Robô de teste] Série recorrente',
+    'data_inicio': DateTime.now().add(const Duration(days: 21)).toIso8601String(),
+    'escopo': 'louvor',
+    'tipo': 'outro',
+    'recorrente': true,
+    'criado_por': userId,
+  });
+
+  try {
+    await _clienteLider.from('eventos').update({'titulo': '[Robô de teste] Série editada'}).eq('id', eventoId);
+
+    final atual = await _admin.from('eventos').select('titulo').eq('id', eventoId).single();
+    if (atual['titulo'] != '[Robô de teste] Série editada') {
+      throw Exception('eventos_update não persistiu a edição.');
+    }
+  } finally {
+    await _admin.from('eventos').delete().eq('id', eventoId);
+  }
+}
+
+/// Apaga a serie INTEIRA (nao so uma ocorrencia) -- testa eventos_delete
+/// pro Lider com o cliente real dele, nao o bypass de limpeza que os
+/// outros testes usam pra se auto-limpar.
+Future<void> _testarApagarEventoTodaSerie() async {
+  final userId = _clienteLider.auth.currentUser!.id;
+  final eventoId = _gerarUuidV4();
+
+  await _clienteLider.from('eventos').insert({
+    'id': eventoId,
+    'titulo': '[Robô de teste] Pra apagar',
+    'data_inicio': DateTime.now().add(const Duration(days: 21)).toIso8601String(),
+    'escopo': 'louvor',
+    'tipo': 'outro',
+    'recorrente': true,
+    'criado_por': userId,
+  });
+
+  await _clienteLider.from('eventos').delete().eq('id', eventoId);
+
+  final restante = await _admin.from('eventos').select('id').eq('id', eventoId).maybeSingle();
+  if (restante != null) {
+    // Nao conseguiu apagar pela RLS -- limpa com o bypass mesmo assim,
+    // pra nao deixar sujeira, e reporta a falha.
+    await _admin.from('eventos').delete().eq('id', eventoId);
+    throw Exception('eventos_delete não apagou o evento (ainda existe).');
+  }
+}
+
 Future<void> _testarDashboardMinisterio() async {
   // Mesma consulta base que dashboard_ministerio_screen.dart faz --
   // so chegar sem excecao ja confirma que a RLS de profile_ministerios
@@ -609,7 +667,39 @@ Future<void> _testarCriarEventoAdmin() async {
   await _admin.from('eventos').delete().eq('id', eventoId);
 }
 
-/// Testa outdoors_insert/delete (is_admin()) -- feature nova de hoje.
+/// Editar e apagar evento pelo cliente REAL do Admin (nao o bypass de
+/// limpeza) -- escopo 'igreja', que só admin gerencia (nenhum
+/// ministerioCorrespondente).
+Future<void> _testarEditarEApagarEventoAdmin() async {
+  final userId = _clienteAdmin.auth.currentUser!.id;
+  final eventoId = _gerarUuidV4();
+
+  await _clienteAdmin.from('eventos').insert({
+    'id': eventoId,
+    'titulo': '[Robô de teste] Pra editar/apagar',
+    'data_inicio': DateTime.now().add(const Duration(days: 30)).toIso8601String(),
+    'escopo': 'igreja',
+    'tipo': 'outro',
+    'recorrente': false,
+    'criado_por': userId,
+  });
+
+  try {
+    await _clienteAdmin.from('eventos').update({'titulo': '[Robô de teste] Editado'}).eq('id', eventoId);
+    final atual = await _admin.from('eventos').select('titulo').eq('id', eventoId).single();
+    if (atual['titulo'] != '[Robô de teste] Editado') throw Exception('eventos_update não persistiu a edição.');
+
+    await _clienteAdmin.from('eventos').delete().eq('id', eventoId);
+    final restante = await _admin.from('eventos').select('id').eq('id', eventoId).maybeSingle();
+    if (restante != null) throw Exception('eventos_delete não apagou o evento (ainda existe).');
+  } finally {
+    await _admin.from('eventos').delete().eq('id', eventoId);
+  }
+}
+
+/// Testa outdoors_insert (is_admin()) -- feature nova de hoje. O
+/// delete de verdade fica em _testarApagarOutdoor, testado pelo
+/// cliente real, nao esse bypass de limpeza.
 Future<void> _testarCriarOutdoor() async {
   final userId = _clienteAdmin.auth.currentUser!.id;
   final outdoorId = _gerarUuidV4();
@@ -622,6 +712,34 @@ Future<void> _testarCriarOutdoor() async {
     'criado_por': userId,
   });
   await _admin.from('outdoors').delete().eq('id', outdoorId);
+}
+
+/// Editar e apagar outdoor pelo cliente REAL do Admin (nao o bypass de
+/// limpeza) -- testa outdoors_update/outdoors_delete de verdade.
+Future<void> _testarEditarEApagarOutdoor() async {
+  final userId = _clienteAdmin.auth.currentUser!.id;
+  final outdoorId = _gerarUuidV4();
+
+  await _clienteAdmin.from('outdoors').insert({
+    'id': outdoorId,
+    'imagem_url': 'https://exemplo.invalido/robo-teste.jpg',
+    'tipo': 'sempre',
+    'ativo': true,
+    'criado_por': userId,
+  });
+
+  try {
+    await _clienteAdmin.from('outdoors').update({'ativo': false}).eq('id', outdoorId);
+    final atual = await _admin.from('outdoors').select('ativo').eq('id', outdoorId).single();
+    if (atual['ativo'] != false) throw Exception('outdoors_update não persistiu a edição.');
+
+    await _clienteAdmin.from('outdoors').delete().eq('id', outdoorId);
+    final restante = await _admin.from('outdoors').select('id').eq('id', outdoorId).maybeSingle();
+    if (restante != null) throw Exception('outdoors_delete não apagou o outdoor (ainda existe).');
+  } finally {
+    // So executa de verdade se o delete acima falhou e deixou sujeira.
+    await _admin.from('outdoors').delete().eq('id', outdoorId);
+  }
 }
 
 /// Testa contribuicoes_insert -- ate ontem so is_admin_financeiro()
@@ -858,6 +976,8 @@ Future<void> main() async {
     resultados.add(await _rodar('lider_catalogo_funcoes_todas_areas', _testarCatalogoFuncoesTodasAreas));
     resultados.add(await _rodar('lider_dashboard_ministerio', _testarDashboardMinisterio));
     resultados.add(await _rodar('lider_editar_ocorrencia_unica', _testarEditarOcorrenciaUnica));
+    resultados.add(await _rodar('lider_editar_evento_toda_serie', _testarEditarEventoTodaSerie));
+    resultados.add(await _rodar('lider_apagar_evento_toda_serie', _testarApagarEventoTodaSerie));
     if (resultadoLoginMembro.sucesso) {
       // Dependem do Membro tambem estar logado.
       resultados.add(await _rodar('lider_casal_diaconos', _testarCasalDiaconos));
@@ -878,7 +998,9 @@ Future<void> main() async {
   if (resultadoLoginAdmin.sucesso) {
     resultados.add(await _rodar('admin_ver_todos_usuarios', _testarVerTodosUsuarios));
     resultados.add(await _rodar('admin_criar_evento', _testarCriarEventoAdmin));
+    resultados.add(await _rodar('admin_editar_apagar_evento', _testarEditarEApagarEventoAdmin));
     resultados.add(await _rodar('admin_criar_outdoor', _testarCriarOutdoor));
+    resultados.add(await _rodar('admin_editar_apagar_outdoor', _testarEditarEApagarOutdoor));
     resultados.add(await _rodar('admin_caixa_de_entrada', _testarCaixaDeEntrada));
     resultados.add(await _rodar('admin_ver_visitantes_primeira_vez', _testarVerVisitantesPrimeiraVez));
     resultados.add(await _rodar('admin_crud_treinamento', _testarCrudTreinamento));
