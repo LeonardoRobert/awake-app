@@ -26,6 +26,10 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>O Shallom usa a câmera pra escanear o QR Code de check-in em eventos e escalas.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>O Shallom acessa suas fotos pra você escolher a imagem de perfil, de eventos ou de banners.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
