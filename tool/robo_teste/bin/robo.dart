@@ -1108,6 +1108,44 @@ Future<void> _testarAdminGerenciarQuestionario() async {
   }
 }
 
+/// Admin adiciona o Membro de teste a um ministério que ele ainda não
+/// tem vínculo e depois promove pra líder -- mesmo fluxo dos botões
+/// "+ Membro"/"+ Líder" e do chip clicável em gestao.html (Usuários).
+/// Testa profile_ministerios_insert e _update pra is_admin().
+Future<void> _testarAdminGerenciarMinisterioDeUsuario() async {
+  final membroId = _clienteMembro.auth.currentUser!.id;
+  const ministerio = 'coral';
+
+  try {
+    await _clienteAdmin.from('profile_ministerios').upsert(
+      {'profile_id': membroId, 'ministerio': ministerio, 'papel': 'membro'},
+      onConflict: 'profile_id,ministerio',
+    );
+    var atual = await _admin
+        .from('profile_ministerios')
+        .select('papel')
+        .eq('profile_id', membroId)
+        .eq('ministerio', ministerio)
+        .single();
+    if (atual['papel'] != 'membro') throw Exception('profile_ministerios_insert não adicionou o Membro.');
+
+    await _clienteAdmin
+        .from('profile_ministerios')
+        .update({'papel': 'lider'})
+        .eq('profile_id', membroId)
+        .eq('ministerio', ministerio);
+    atual = await _admin
+        .from('profile_ministerios')
+        .select('papel')
+        .eq('profile_id', membroId)
+        .eq('ministerio', ministerio)
+        .single();
+    if (atual['papel'] != 'lider') throw Exception('profile_ministerios_update não promoveu a líder.');
+  } finally {
+    await _admin.from('profile_ministerios').delete().eq('profile_id', membroId).eq('ministerio', ministerio);
+  }
+}
+
 /// Anexa um "PDF" (bytes fake, so testando o caminho de storage +
 /// tabela, nao o conteudo) a um video-id fake -- mesmo fluxo de "Meus
 /// Conteúdos" (meus_conteudos_screen.dart -> VideoMaterialService).
@@ -1337,6 +1375,7 @@ Future<void> main() async {
       resultados.add(await _rodar('admin_editar_perfil_de_outra_pessoa', _testarEditarPerfilDeOutraPessoa));
       resultados.add(await _rodar('admin_apagar_conta_de_usuario', _testarAdminApagarContaDeUsuario));
       resultados.add(await _rodar('admin_gerenciar_questionario_novo_servo', _testarAdminGerenciarQuestionario));
+      resultados.add(await _rodar('admin_gerenciar_ministerio_de_usuario', _testarAdminGerenciarMinisterioDeUsuario));
       final membroId = _clienteMembro.auth.currentUser!.id;
       resultados.add(await _rodar(
           'admin_marcar_lido_e_apagar_pedido_oracao',

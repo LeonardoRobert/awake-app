@@ -2556,11 +2556,31 @@
 
       const ehAdminAtual = pessoa.papel === 'admin' || pessoa.papel === 'admin_financeiro';
 
+      // So oferece no seletor os ministerios que a pessoa AINDA NAO tem
+      // vinculo -- os que ja tem aparecem como chip (clica pra alternar
+      // membro<->lider ali mesmo).
+      const ministeriosVinculados = new Set(vinculos.map(v => v.ministerio));
+      const opcoesNovoMinisterio = Object.entries(LABEL_MINISTERIO_AGREGADO)
+        .filter(([chave]) => !ministeriosVinculados.has(chave))
+        .map(([chave, label]) => `<option value="${chave}">${escaparHtml(label)}</option>`)
+        .join('');
+      const seletorNovoMinisterio = opcoesNovoMinisterio
+        ? `
+            <select class="select-novo-ministerio" id="select-ministerio-${pessoa.id}" style="flex:none; padding:5px; font-size:12px;">
+              <option value="">Adicionar a um ministério...</option>
+              ${opcoesNovoMinisterio}
+            </select>
+            <button type="button" class="botao-secundario" style="flex:none; padding:5px 10px; font-size:12px;"
+                    data-acao="adicionar-membro" data-profile-id="${pessoa.id}">+ Membro</button>
+            <button type="button" class="botao-secundario" style="flex:none; padding:5px 10px; font-size:12px;"
+                    data-acao="adicionar-lider" data-profile-id="${pessoa.id}">+ Líder</button>`
+        : '';
+
       return `
         <div class="linha-usuario">
           <span class="nome-usuario">${escaparHtml(pessoa.nome || '(sem nome)')}</span>${badgePapel}${badgeInativo}
           <div class="chips-ministerios">${chipsMinisterios}${chipCasal}</div>
-          <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
+          <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; align-items:center;">
             <button type="button" class="botao-secundario" style="flex:none; padding:5px 10px; font-size:12px;"
                     data-acao="editar" data-profile-id="${pessoa.id}">Editar perfil</button>
             <button type="button" class="botao-secundario" style="flex:none; padding:5px 10px; font-size:12px;"
@@ -2569,6 +2589,7 @@
             </button>
             <button type="button" class="botao-secundario botao-perigo" style="flex:none; padding:5px 10px; font-size:12px;"
                     data-acao="apagar" data-profile-id="${pessoa.id}">Apagar conta</button>
+            ${seletorNovoMinisterio}
           </div>
         </div>`;
     }).join('');
@@ -2584,6 +2605,12 @@
     });
     listaEl.querySelectorAll('[data-acao="apagar"]').forEach(btn => {
       btn.addEventListener('click', () => apagarUsuario(btn.dataset.profileId));
+    });
+    listaEl.querySelectorAll('[data-acao="adicionar-membro"]').forEach(btn => {
+      btn.addEventListener('click', () => adicionarAoMinisterio(btn.dataset.profileId, 'membro'));
+    });
+    listaEl.querySelectorAll('[data-acao="adicionar-lider"]').forEach(btn => {
+      btn.addEventListener('click', () => adicionarAoMinisterio(btn.dataset.profileId, 'lider'));
     });
   }
 
@@ -2738,6 +2765,35 @@
     const vinculo = todosVinculosMinisterio.find(v => v.profile_id === profileId && v.ministerio === ministerio);
     if (vinculo) vinculo.papel = novoPapel;
 
+    renderizarAgregados();
+    renderizarListaUsuarios();
+  }
+
+  // Adiciona a pessoa a um ministério que ela AINDA NAO tem vinculo --
+  // usado tanto pra "alguem entrou pro Coral" (papel='membro') quanto
+  // pra ja entrar direto como lider (papel='lider'), sem precisar do
+  // passo intermediario de virar membro e so depois clicar no chip.
+  async function adicionarAoMinisterio(profileId, papel) {
+    const selectEl = document.getElementById(`select-ministerio-${profileId}`);
+    const ministerio = selectEl?.value;
+    if (!ministerio) {
+      alert('Escolha um ministério na lista antes.');
+      return;
+    }
+
+    const nomePessoa = todosUsuarios.find(p => p.id === profileId)?.nome || 'essa pessoa';
+    const labelMinisterio = LABEL_MINISTERIO_AGREGADO[ministerio] || ministerio;
+    const mensagem = papel === 'lider'
+      ? `Adicionar ${nomePessoa} a ${labelMinisterio} já como líder?`
+      : `Adicionar ${nomePessoa} a ${labelMinisterio}?`;
+    if (!confirm(mensagem)) return;
+
+    const { error } = await supa
+      .from('profile_ministerios')
+      .upsert({ profile_id: profileId, ministerio, papel }, { onConflict: 'profile_id,ministerio' });
+    if (error) { alert('Erro ao adicionar: ' + error.message); return; }
+
+    todosVinculosMinisterio.push({ profile_id: profileId, ministerio, papel });
     renderizarAgregados();
     renderizarListaUsuarios();
   }
