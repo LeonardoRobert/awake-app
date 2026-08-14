@@ -1594,7 +1594,16 @@ Future<void> main() async {
     stdout.writeln('Login do Admin falhou -- pulando checagens que dependem dessa sessão.');
   }
 
-  await _salvarResultados(rodadaId, resultados);
+  try {
+    await _salvarResultados(rodadaId, resultados);
+  } catch (e) {
+    // Se ATE o salvamento falhar (ex: Supabase fora do ar no meio da
+    // rodada), nao deixa virar excecao nao tratada com stack trace --
+    // so' avisa e segue pro resumo/exit normal. As checagens em si ja
+    // rodaram e falharam do jeito certo (PostgrestException capturada
+    // em _rodar()), so' o registro na tabela que nao foi.
+    stderr.writeln('Não deu pra salvar os resultados em testes_automatizados_execucoes: $e');
+  }
 
   final falhas = resultados.where((r) => !r.sucesso).toList();
   stdout.writeln('=== ${resultados.length - falhas.length}/${resultados.length} passaram ===');
