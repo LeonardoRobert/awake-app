@@ -2479,15 +2479,24 @@
 
     const cartoesFaixaEtaria = GRUPO_FAIXA_ETARIA.map(cartaoMinisterioAgregado).join('');
 
-    // Discipulado = grupo de casais (coluna grupo_casais) + categoria
-    // do Awake (coluna categoria) -- as duas moram direto em profiles,
-    // sem vinculo em profile_ministerios, entao nao tem "lider" aqui.
+    // Discipulado Casais = coluna grupo_casais, direto em profiles.
     const cartoesCasais = Object.entries(LABEL_GRUPO_CASAIS).map(([valor, label]) => {
       const qtd = todosUsuarios.filter(p => p.grupo_casais === valor).length;
       return `<div class="cartao-agregado"><div class="nome-agregado">${label}</div><div class="contagem-agregado">${qtd}</div></div>`;
     }).join('');
+
+    // Discipulado Awake = coluna categoria -- MAS categoria e calculada
+    // pra QUALQUER perfil (a partir de estado civil/idade), nao so pra
+    // quem e do Awake -- um casado de Homens/Mulheres tambem recebe
+    // categoria='one' no banco, mesmo Genesis/Next/One so fazendo
+    // sentido dentro do Awake. Por isso filtra tambem por vinculo com
+    // 'awake' em profile_ministerios, senao "One" conta casal que nem
+    // e do Awake.
+    const idsDoAwake = new Set(
+      todosVinculosMinisterio.filter(v => v.ministerio === 'awake').map(v => v.profile_id),
+    );
     const cartoesCategoria = Object.entries(LABEL_CATEGORIA).map(([valor, label]) => {
-      const qtd = todosUsuarios.filter(p => p.categoria === valor).length;
+      const qtd = todosUsuarios.filter(p => p.categoria === valor && idsDoAwake.has(p.id)).length;
       return `<div class="cartao-agregado"><div class="nome-agregado">${label}</div><div class="contagem-agregado">${qtd}</div></div>`;
     }).join('');
 
@@ -2496,8 +2505,10 @@
     el.innerHTML = `
       <h4 style="margin:0 0 8px;">Ministério de faixas etárias</h4>
       <div class="grade-agregados" style="margin-bottom:24px;">${cartoesFaixaEtaria}</div>
-      <h4 style="margin:0 0 8px;">Ministério de discipulado</h4>
-      <div class="grade-agregados" style="margin-bottom:24px;">${cartoesCasais}${cartoesCategoria}</div>
+      <h4 style="margin:0 0 8px;">Discipulado Casais</h4>
+      <div class="grade-agregados" style="margin-bottom:24px;">${cartoesCasais}</div>
+      <h4 style="margin:0 0 8px;">Discipulado Awake</h4>
+      <div class="grade-agregados" style="margin-bottom:24px;">${cartoesCategoria}</div>
       <h4 style="margin:0 0 8px;">Ministérios de serviço</h4>
       <div class="grade-agregados">${cartoesServico}</div>
     `;
