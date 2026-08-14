@@ -768,7 +768,18 @@
       diaSelecionado = null;
       renderizarMes();
     });
-    document.getElementById('botao-novo-evento').addEventListener('click', () => abrirFormularioEvento(null));
+    document.getElementById('botao-novo-evento').addEventListener('click', () => {
+      // Se um dia do calendario estiver selecionado, pre-preenche a
+      // data do formulario com ELE (so a data -- a hora continua a
+      // atual, editavel normalmente) em vez de sempre cair em "agora".
+      let dataInicial = null;
+      if (diaSelecionado) {
+        dataInicial = new Date(diaSelecionado);
+        const agora = new Date();
+        dataInicial.setHours(agora.getHours(), agora.getMinutes());
+      }
+      abrirFormularioEvento(null, dataInicial);
+    });
 
     const { data, error } = await supa.from('eventos').select('*');
     todosEventos = data || [];
@@ -905,10 +916,10 @@
     if (e.target.id === 'fundo-modal') fecharModal();
   });
 
-  function abrirFormularioEvento(eventoExistente) {
+  function abrirFormularioEvento(eventoExistente, dataInicial) {
     const ev = eventoExistente || {
       titulo: '', escopo: 'igreja', tipo: 'outro', descricao: '', local: '',
-      data_inicio: new Date().toISOString(), recorrente: false,
+      data_inicio: (dataInicial || new Date()).toISOString(), recorrente: false,
       recorrencia_fim: null, semanas_do_mes: [],
     };
     const dataObj = new Date(ev.data_inicio);

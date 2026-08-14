@@ -28,8 +28,25 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   /// pra tela certa; lider de ministerio (nao-admin) so pode criar
   /// evento, entao vai direto, sem esse passo extra.
   Future<void> _onTapCriar(bool isAdmin) async {
+    // Se tem um dia selecionado no calendario, pre-preenche a data do
+    // formulario com ELE (so a data -- a hora continua a atual,
+    // editavel normalmente igual antes) em vez de sempre cair em
+    // "agora". EventFormScreen ja aceita isso via ?data= (dataInicial).
+    var rotaEvento = '/eventos/novo';
+    if (_diaSelecionado != null) {
+      final agora = DateTime.now();
+      final dataComHoraAtual = DateTime(
+        _diaSelecionado!.year,
+        _diaSelecionado!.month,
+        _diaSelecionado!.day,
+        agora.hour,
+        agora.minute,
+      );
+      rotaEvento = '/eventos/novo?data=${Uri.encodeComponent(dataComHoraAtual.toIso8601String())}';
+    }
+
     if (!isAdmin) {
-      context.push('/eventos/novo');
+      context.push(rotaEvento);
       return;
     }
 
@@ -57,7 +74,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
 
     if (!mounted) return;
     if (escolha == 'evento') {
-      context.push('/eventos/novo');
+      context.push(rotaEvento);
     } else if (escolha == 'outdoor') {
       Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => const OutdoorFormScreen()),
