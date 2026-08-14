@@ -466,6 +466,14 @@ Future<void> _testarPixDizimoEOferta() async {
   }
 }
 
+/// Recalcula a categoria (Genesis/Next/One) de todo mundo -- funcao
+/// nova que corrige o bug de categoria nunca atualizar sozinha no
+/// aniversario (2026_recalcular_categorias_diario.sql), tambem
+/// agendada 1x/dia via pg_cron. So confirma que a funcao roda sem erro.
+Future<void> _testarRecalcularCategorias() async {
+  await _admin.rpc('recalcular_categorias_diario');
+}
+
 // ---------- checagens (conta teste 2: Lider de Areas de Servico) ----------
 
 Future<void> _testarLoginLider() async {
@@ -1336,6 +1344,7 @@ Future<void> main() async {
   // Essas nao dependem do login da conta teste 1.
   resultados.add(await _rodar('cadastro_conta_nova', _testarCadastro));
   resultados.add(await _rodar('gerar_pix_dizimo_oferta', _testarPixDizimoEOferta));
+  resultados.add(await _rodar('recalcular_categorias', _testarRecalcularCategorias));
 
   // ---------- Fase 2: Lider de Areas de Servico ----------
   final resultadoLoginLider = await _rodar('lider_login', _testarLoginLider);
