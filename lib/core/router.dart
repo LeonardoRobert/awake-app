@@ -73,8 +73,15 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/eventos/novo',
         builder: (context, state) {
           final dataParam = state.uri.queryParameters['data'];
+          final extra = state.extra;
+          if (extra is EdicaoOcorrenciaUnica) {
+            return EventFormScreen(
+              eventoParaEditar: extra.evento,
+              ocorrenciaUnica: extra.dataOcorrencia,
+            );
+          }
           return EventFormScreen(
-            eventoParaEditar: state.extra as EventModel?,
+            eventoParaEditar: extra as EventModel?,
             dataInicial: dataParam != null ? DateTime.tryParse(dataParam) : null,
           );
         },

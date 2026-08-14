@@ -211,7 +211,7 @@ class EventDetailScreen extends ConsumerWidget {
                     children: [
                       Expanded(
                         child: OutlinedButton.icon(
-                          onPressed: () => context.push('/eventos/novo', extra: event),
+                          onPressed: () => _editarEvento(context, event, dataExibida),
                           icon: const Icon(Icons.edit),
                           label: const Text('Editar'),
                         ),
@@ -241,6 +241,28 @@ class EventDetailScreen extends ConsumerWidget {
         },
       ),
     );
+  }
+
+  /// Se o evento nao for recorrente, edita normal. Se for, pergunta se
+  /// e pra editar so essa data (vira um evento avulso novo, e a serie
+  /// original ganha uma excecao nessa data) ou a serie inteira.
+  Future<void> _editarEvento(BuildContext context, EventModel event, DateTime dataOcorrencia) async {
+    if (!event.recorrente) {
+      context.push('/eventos/novo', extra: event);
+      return;
+    }
+
+    final escopo = await _perguntarEscopo(context, 'evento', acao: 'editar', destrutivo: false);
+    if (escopo == null || !context.mounted) return;
+
+    if (escopo == 'uma') {
+      context.push(
+        '/eventos/novo',
+        extra: EdicaoOcorrenciaUnica(evento: event, dataOcorrencia: dataOcorrencia),
+      );
+    } else {
+      context.push('/eventos/novo', extra: event);
+    }
   }
 
   Future<void> _confirmarExclusao(
@@ -307,12 +329,17 @@ class EventDetailScreen extends ConsumerWidget {
     }
   }
 
-  Future<String?> _perguntarEscopo(BuildContext context, String tipoItem) {
+  Future<String?> _perguntarEscopo(
+    BuildContext context,
+    String tipoItem, {
+    String acao = 'excluir',
+    bool destrutivo = true,
+  }) {
     return showDialog<String>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text('Esse $tipoItem se repete toda semana'),
-        content: const Text('O que você quer excluir?'),
+        content: Text('O que você quer $acao?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(),
@@ -323,7 +350,7 @@ class EventDetailScreen extends ConsumerWidget {
             child: const Text('Só esta data'),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: destrutivo ? FilledButton.styleFrom(backgroundColor: Colors.red) : null,
             onPressed: () => Navigator.of(dialogContext).pop('todas'),
             child: const Text('Toda a série'),
           ),

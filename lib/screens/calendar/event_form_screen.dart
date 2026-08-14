@@ -18,7 +18,17 @@ import '../../widgets/awake_app_bar.dart';
 class EventFormScreen extends ConsumerStatefulWidget {
   final EventModel? eventoParaEditar;
   final DateTime? dataInicial;
-  const EventFormScreen({super.key, this.eventoParaEditar, this.dataInicial});
+  /// Se preenchido, essa tela nao esta editando a serie inteira de
+  /// [eventoParaEditar] -- esta criando um evento avulso novo so pra
+  /// essa data (a serie original ganha uma excecao nela). Ver
+  /// EdicaoOcorrenciaUnica.
+  final DateTime? ocorrenciaUnica;
+  const EventFormScreen({
+    super.key,
+    this.eventoParaEditar,
+    this.dataInicial,
+    this.ocorrenciaUnica,
+  });
 
   @override
   ConsumerState<EventFormScreen> createState() => _EventFormScreenState();
@@ -30,6 +40,7 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
   late final TextEditingController _descricaoController;
   late final TextEditingController _localController;
   DateTime? _dataInicio;
+  DateTime? _dataFim;
   bool _recorrente = false;
   DateTime? _recorrenciaFim;
   final Set<int> _semanasSelecionadas = {};
@@ -63,6 +74,7 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
   final Set<String> _metodosPagamentoSelecionados = {};
 
   bool get _isEdicao => widget.eventoParaEditar != null;
+  bool get _ehOcorrenciaUnica => widget.ocorrenciaUnica != null;
 
   @override
   void initState() {
@@ -74,6 +86,7 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
     // Se veio de um dia clicado no calendario (criando evento novo),
     // ja pre-preenche com aquele dia -- a pessoa ainda pode alterar.
     _dataInicio = evento?.dataInicio ?? widget.dataInicial;
+    _dataFim = evento?.dataFim;
     _recorrente = evento?.recorrente ?? false;
     _recorrenciaFim = evento?.recorrenciaFim;
     _semanasSelecionadas.addAll(evento?.semanasDoMes ?? const []);
@@ -106,6 +119,16 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
         evento?.valorTotal != null ? evento!.valorTotal!.toStringAsFixed(2) : '';
     _parcelasController.text = evento?.parcelasSugeridas?.toString() ?? '';
     _metodosPagamentoSelecionados.addAll(evento?.metodosPagamento ?? const []);
+
+    // Editando so UMA ocorrencia de uma serie: pre-preenche com os
+    // dados do evento original, mas essa vira um evento avulso novo
+    // (nao recorrente), travado nessa data especifica.
+    if (widget.ocorrenciaUnica != null) {
+      _dataInicio = widget.ocorrenciaUnica;
+      _recorrente = false;
+      _recorrenciaFim = null;
+      _semanasSelecionadas.clear();
+    }
   }
 
   /// Escopos que essa pessoa pode escolher, na ordem oficial.
@@ -148,6 +171,21 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
     setState(() {
       _dataInicio = DateTime(date.year, date.month, date.day, time.hour, time.minute);
     });
+  }
+
+  /// Data de termino do evento (opcional) -- pra eventos que duram
+  /// mais de um dia, tipo retiro/conferencia (sexta a domingo).
+  Future<void> _pickDataFim() async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: _dataFim ?? _dataInicio ?? DateTime.now(),
+      firstDate: _dataInicio ?? DateTime.now().subtract(const Duration(days: 365)),
+      lastDate: DateTime.now().add(const Duration(days: 1825)),
+    );
+    if (date == null) return;
+    // So a data importa aqui (nao a hora) -- mantem consistente com o
+    // fim de dia, entao "vai ate domingo" cobre o domingo inteiro.
+    setState(() => _dataFim = DateTime(date.year, date.month, date.day, 23, 59));
   }
 
   Future<void> _pickRecorrenciaFim() async {
@@ -206,6 +244,12 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
       }
       return;
     }
+    if (_dataFim != null && _dataFim!.isBefore(_dataInicio!)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('A data de término precisa ser depois da data de início.')),
+      );
+      return;
+    }
 
     final usaSubgrupos = _escopo == EventoEscopo.awake;
     final usaGenero = _escopo == EventoEscopo.awake || _escopo == EventoEscopo.coral;
@@ -246,7 +290,13 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
 
     try {
       final service = ref.read(eventServiceProvider);
-      final eventoId = widget.eventoParaEditar?.id ?? const Uuid().v4();
+      // Editando so uma ocorrencia: NAO reaproveita o id do evento
+      // original -- isso vira um evento avulso novo e independente,
+      // com id proprio (a serie original so ganha uma excecao nessa
+      // data, ela continua existindo do jeito que estava).
+      final eventoId = _ehOcorrenciaUnica
+          ? const Uuid().v4()
+          : (widget.eventoParaEditar?.id ?? const Uuid().v4());
 
       String? fotoUrl = _removerFoto ? null : _fotoUrlExistente;
       if (_novaFotoBytes != null && _novaFotoNome != null) {
@@ -268,6 +318,7 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
         titulo: _tituloController.text.trim(),
         descricao: _descricaoController.text.trim(),
         dataInicio: _dataInicio!,
+        dataFim: _dataFim,
         local: _localController.text.trim(),
         recorrente: _recorrente,
         recorrenciaFim: _recorrente ? _recorrenciaFim : null,
@@ -294,7 +345,13 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
         visivelSitePublico: _visivelSitePublico,
       );
 
-      if (_isEdicao) {
+      if (_ehOcorrenciaUnica) {
+        // Marca a data original como excecao na serie (ela para de
+        // gerar essa ocorrencia) e cria o evento avulso novo, editado,
+        // so pra esse dia.
+        await service.deleteOccurrence(widget.eventoParaEditar!.id, widget.ocorrenciaUnica!);
+        await service.create(novoEvento);
+      } else if (_isEdicao) {
         await service.update(widget.eventoParaEditar!.id, novoEvento);
       } else {
         await service.create(novoEvento);
@@ -328,7 +385,9 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
 
     return Scaffold(
       appBar: AwakeAppBar(
-        title: _isEdicao ? 'Editar evento' : 'Novo evento',
+        title: _ehOcorrenciaUnica
+            ? 'Editar esta data'
+            : (_isEdicao ? 'Editar evento' : 'Novo evento'),
         showQrButton: false,
       ),
       body: SingleChildScrollView(
@@ -433,19 +492,53 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                value: _recorrente,
-                onChanged: (v) => setState(() => _recorrente = v),
-                title: const Text('Evento recorrente'),
-                subtitle: Text(
-                  _dataInicio == null
-                      ? 'Repete toda semana, no mesmo dia e horario'
-                      : 'Repete toda ${DateFormat('EEEE', 'pt_BR').format(_dataInicio!)}'
-                          ' às ${DateFormat('HH:mm').format(_dataInicio!)}',
+              InkWell(
+                onTap: _pickDataFim,
+                child: InputDecorator(
+                  decoration: InputDecoration(
+                    labelText: 'Data de término (opcional)',
+                    helperText: 'Pra eventos que duram mais de um dia, tipo retiro (sexta a domingo)',
+                    suffixIcon: _dataFim == null
+                        ? null
+                        : IconButton(
+                            icon: const Icon(Icons.close, size: 18),
+                            onPressed: () => setState(() => _dataFim = null),
+                          ),
+                  ),
+                  child: Text(
+                    _dataFim == null ? 'Sem data de término' : DateFormat('dd/MM/yyyy').format(_dataFim!),
+                  ),
                 ),
               ),
-              if (_recorrente) ...[
+              const SizedBox(height: 16),
+              if (_ehOcorrenciaUnica) ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.secondary.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Text(
+                    'Editando só esta data. As outras ocorrências da série continuam '
+                    'do jeito que estavam.',
+                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                  ),
+                ),
+              ] else ...[
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: _recorrente,
+                  onChanged: (v) => setState(() => _recorrente = v),
+                  title: const Text('Evento recorrente'),
+                  subtitle: Text(
+                    _dataInicio == null
+                        ? 'Repete toda semana, no mesmo dia e horario'
+                        : 'Repete toda ${DateFormat('EEEE', 'pt_BR').format(_dataInicio!)}'
+                            ' às ${DateFormat('HH:mm').format(_dataInicio!)}',
+                  ),
+                ),
+              ],
+              if (_recorrente && !_ehOcorrenciaUnica) ...[
                 const SizedBox(height: 8),
                 InkWell(
                   onTap: _pickRecorrenciaFim,

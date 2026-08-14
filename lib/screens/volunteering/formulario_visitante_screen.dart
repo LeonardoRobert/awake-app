@@ -32,6 +32,7 @@ class FormularioVisitanteScreen extends StatefulWidget {
 
 class _FormularioVisitanteScreenState extends State<FormularioVisitanteScreen> {
   final _nomeController = TextEditingController();
+  final _telefoneController = TextEditingController();
   final _outroController = TextEditingController();
   DateTime? _dataNascimento;
   String? _sexo;
@@ -56,6 +57,11 @@ class _FormularioVisitanteScreenState extends State<FormularioVisitanteScreen> {
           .showSnackBar(const SnackBar(content: Text('Informe o nome completo.')));
       return;
     }
+    if (_telefoneController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Informe o celular/WhatsApp.')));
+      return;
+    }
     if (_sexo == null) {
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('Selecione o sexo.')));
@@ -78,6 +84,7 @@ class _FormularioVisitanteScreenState extends State<FormularioVisitanteScreen> {
     try {
       await VisitanteService().registrar({
         'Nome completo': _nomeController.text.trim(),
+        'Celular/WhatsApp': _telefoneController.text.trim(),
         'Data de nascimento':
             _dataNascimento != null ? DateFormat('yyyy-MM-dd').format(_dataNascimento!) : '',
         'Sexo': _sexo,
@@ -92,6 +99,7 @@ class _FormularioVisitanteScreenState extends State<FormularioVisitanteScreen> {
         );
         setState(() {
           _nomeController.clear();
+          _telefoneController.clear();
           _outroController.clear();
           _dataNascimento = null;
           _sexo = null;
@@ -157,6 +165,15 @@ class _FormularioVisitanteScreenState extends State<FormularioVisitanteScreen> {
               TextField(
                 controller: _nomeController,
                 decoration: const InputDecoration(hintText: 'Como podemos chamar você?'),
+              ),
+            ),
+
+            _pergunta(
+              'Celular / WhatsApp',
+              TextField(
+                controller: _telefoneController,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(hintText: '(21) 99999-9999'),
               ),
             ),
 
