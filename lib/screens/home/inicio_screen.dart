@@ -7,9 +7,9 @@ import '../../models/escala_servico_model.dart';
 import '../../models/event_model.dart';
 import '../../models/shift_model.dart';
 import '../../models/signup_model.dart';
+import '../../providers/contribuicao_provider.dart';
 import '../../providers/event_provider.dart';
 import '../../providers/outdoor_provider.dart';
-import '../../services/contribuicao_service.dart';
 import '../../services/escala_servico_service.dart';
 import '../../services/shift_service.dart';
 import '../../widgets/awake_app_bar.dart';
@@ -31,10 +31,18 @@ class InicioScreen extends ConsumerWidget {
     return Scaffold(
       appBar: const AwakeAppBar(title: 'Início'),
       body: RefreshIndicator(
-        onRefresh: () => Future.wait([
-          ref.refresh(upcomingEventsProvider.future),
-          ref.refresh(outdoorsAtivosProvider.future),
-        ]),
+        onRefresh: () {
+          // Invalida TODAS as instancias de totalPagoEventoProvider (nao
+          // sabemos ainda qual e o evento ingressado aqui em cima) --
+          // sem isso a tarja nunca refaz a busca sozinha, porque a tela
+          // de Inicio fica sempre viva dentro do IndexedStack e nunca
+          // desmonta pra "renascer" com o valor pago atualizado.
+          ref.invalidate(totalPagoEventoProvider);
+          return Future.wait([
+            ref.refresh(upcomingEventsProvider.future),
+            ref.refresh(outdoorsAtivosProvider.future),
+          ]);
+        },
         child: eventsAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (err, _) => Center(child: Text('Erro ao carregar: $err')),
@@ -147,80 +155,63 @@ class InicioScreen extends ConsumerWidget {
 /// Aparece pra todo mundo que ve o evento, mesmo com 0% pago ainda --
 /// a barra so anda quando o Admin Financeiro lanca um pagamento pra
 /// essa pessoa vinculado a esse evento.
-class _TarjaEventoIngressado extends StatefulWidget {
+class _TarjaEventoIngressado extends ConsumerWidget {
   final EventModel evento;
   const _TarjaEventoIngressado({required this.evento});
 
   @override
-  State<_TarjaEventoIngressado> createState() => _TarjaEventoIngressadoState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final valorTotal = evento.valorTotal ?? 0;
+    final totalPagoAsync = ref.watch(totalPagoEventoProvider(evento.id));
+    final totalPago = totalPagoAsync.value ?? 0;
+    final progresso = valorTotal > 0 ? (totalPago / valorTotal).clamp(0.0, 1.0) : 0.0;
+    final porcentagem = (progresso * 100).round();
 
-class _TarjaEventoIngressadoState extends State<_TarjaEventoIngressado> {
-  late Future<double> _futuroTotalPago;
-
-  @override
-  void initState() {
-    super.initState();
-    _futuroTotalPago = ContribuicaoService().totalPagoEvento(widget.evento.id);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final valorTotal = widget.evento.valorTotal ?? 0;
-
-    return FutureBuilder<double>(
-      future: _futuroTotalPago,
-      builder: (context, snapshot) {
-        final totalPago = snapshot.data ?? 0;
-        final progresso = valorTotal > 0 ? (totalPago / valorTotal).clamp(0.0, 1.0) : 0.0;
-        final porcentagem = (progresso * 100).round();
-
-        return InkWell(
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: () => context.push('/eventos/${evento.id}', extra: evento.dataInicio),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.secondary.withOpacity(0.12),
           borderRadius: BorderRadius.circular(14),
-          onTap: () => context.push('/eventos/${widget.evento.id}', extra: widget.evento.dataInicio),
-          child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.secondary.withOpacity(0.12),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: Theme.of(context).colorScheme.secondary.withOpacity(0.4)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.confirmation_num_outlined, size: 18),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      widget.evento.titulo,
-                      style: const TextStyle(fontWeight: FontWeight.w700),
-                    ),
+          border: Border.all(color: Theme.of(context).colorScheme.secondary.withOpacity(0.4)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.confirmation_num_outlined, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    evento.titulo,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(6),
-                child: LinearProgressIndicator(
-                  value: progresso,
-                  minHeight: 8,
-                  backgroundColor: Colors.black.withOpacity(0.08),
                 ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: LinearProgressIndicator(
+                value: progresso,
+                minHeight: 8,
+                backgroundColor: Colors.black.withOpacity(0.08),
               ),
-              const SizedBox(height: 6),
-              Text(
-                snapshot.connectionState == ConnectionState.waiting
-                    ? 'Carregando...'
-                    : '$porcentagem% pago — R\$ ${totalPago.toStringAsFixed(2)} de '
-                        'R\$ ${valorTotal.toStringAsFixed(2)}',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
-          ),
-        ));
-      },
+            ),
+            const SizedBox(height: 6),
+            Text(
+              totalPagoAsync.isLoading
+                  ? 'Carregando...'
+                  : '$porcentagem% pago — R\$ ${totalPago.toStringAsFixed(2)} de '
+                      'R\$ ${valorTotal.toStringAsFixed(2)}',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
