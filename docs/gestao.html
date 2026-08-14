@@ -529,6 +529,7 @@
     { id: 'calendario', label: 'Calendário' },
     { id: 'financeiro', label: 'Financeiro' },
     { id: 'usuarios', label: 'Usuários' },
+    { id: 'status', label: 'Status' },
   ];
   let secaoAtual = null;
   // Sub-aba de 2o nivel, so dentro da secao Financeiro.
@@ -622,6 +623,19 @@
         </div>
         <div id="lista-usuarios"></div>`;
       iniciarPainelUsuarios();
+    } else if (secaoAtual === 'status') {
+      secaoEl.innerHTML = `
+        <h2 style="margin-top:0;">Status do robô de teste</h2>
+        <p style="color:#888; font-size:13px; margin-top:-8px;">
+          Checagens automáticas contra o banco de verdade, rodando sozinhas a cada 8h
+          (e também quando disparadas manualmente no GitHub Actions).
+        </p>
+        <div id="status-resumo"></div>
+        <h3>Histórico de rodadas</h3>
+        <div id="status-historico"></div>
+        <h3 id="status-titulo-detalhe">Detalhe da rodada</h3>
+        <div id="status-detalhe"></div>`;
+      iniciarPainelStatus();
     }
   }
 
@@ -2285,6 +2299,115 @@
     marcelo_andreia: 'Grupo do Marcelo e Andréia',
   };
   const LABEL_CATEGORIA = { genesis: 'Genesis', next: 'Next', one: 'One' };
+
+  // ---------- Status do robô de teste ----------
+
+  let _statusRodadas = [];
+  let _statusRodadaSelecionada = null;
+
+  async function iniciarPainelStatus() {
+    const resumoEl = document.getElementById('status-resumo');
+    resumoEl.innerHTML = '<div class="vazio-lateral">Carregando...</div>';
+    document.getElementById('status-historico').innerHTML = '';
+    document.getElementById('status-detalhe').innerHTML = '';
+
+    // As ~58 checagens de uma rodada tem criado_em quase identico --
+    // busca as ultimas ~3000 linhas (~50 rodadas) e agrupa por
+    // rodada_id no proprio JS (nao da pra fazer GROUP BY pelo
+    // query builder do supabase-js).
+    const { data: linhas, error } = await supa
+      .from('testes_automatizados_execucoes')
+      .select('rodada_id, nome_teste, sucesso, erro, duracao_ms, criado_em')
+      .order('criado_em', { ascending: false })
+      .limit(3000);
+
+    if (error) {
+      resumoEl.innerHTML = `<div class="vazio-lateral">Erro ao carregar: ${escaparHtml(error.message)}</div>`;
+      return;
+    }
+    if (!linhas || linhas.length === 0) {
+      resumoEl.innerHTML = '<div class="vazio-lateral">O robô ainda não rodou nenhuma vez.</div>';
+      return;
+    }
+
+    const porId = {};
+    const rodadas = [];
+    linhas.forEach(l => {
+      let rodada = porId[l.rodada_id];
+      if (!rodada) {
+        rodada = { id: l.rodada_id, checagens: [], em: l.criado_em };
+        porId[l.rodada_id] = rodada;
+        rodadas.push(rodada);
+      }
+      rodada.checagens.push(l);
+      if (l.criado_em > rodada.em) rodada.em = l.criado_em;
+    });
+    rodadas.sort((a, b) => (a.em < b.em ? 1 : -1));
+
+    _statusRodadas = rodadas;
+    _statusRodadaSelecionada = rodadas[0].id;
+    renderizarStatusResumo();
+    renderizarStatusHistorico();
+  }
+
+  function _rodadaSelecionada() {
+    return _statusRodadas.find(r => r.id === _statusRodadaSelecionada) || _statusRodadas[0];
+  }
+
+  function renderizarStatusResumo() {
+    const atual = _rodadaSelecionada();
+    const total = atual.checagens.length;
+    const falharam = atual.checagens.filter(c => !c.sucesso).length;
+    const passaram = total - falharam;
+    const tudoOk = falharam === 0;
+    const cor = tudoOk ? '#1b8a3f' : '#c0392b';
+
+    document.getElementById('status-resumo').innerHTML = `
+      <div class="cartao-agregado" style="max-width:400px; border-left: 6px solid ${cor};">
+        <div class="nome-agregado">
+          ${tudoOk ? '✅ Tudo passando' : `⚠️ ${falharam} checagem(ns) falhando`} --
+          rodada de ${new Date(atual.em).toLocaleString('pt-BR')}
+        </div>
+        <div class="contagem-agregado" style="color:${cor};">${passaram}/${total}</div>
+      </div>`;
+
+    document.getElementById('status-titulo-detalhe').textContent =
+      `Detalhe da rodada de ${new Date(atual.em).toLocaleString('pt-BR')}`;
+
+    document.getElementById('status-detalhe').innerHTML = atual.checagens
+      .slice()
+      .sort((a, b) => (a.sucesso === b.sucesso ? 0 : a.sucesso ? 1 : -1))
+      .map(c => `
+        <div class="linha-usuario" style="border-left: 4px solid ${c.sucesso ? '#1b8a3f' : '#c0392b'};">
+          <span class="nome-usuario">${c.sucesso ? '✅' : '❌'} ${escaparHtml(c.nome_teste)}</span>
+          <span style="float:right; font-size:12px; color:#888;">${c.duracao_ms}ms</span>
+          ${c.erro ? `<div style="font-size:12px; color:#c0392b; margin-top:6px; clear:both;">${escaparHtml(c.erro)}</div>` : ''}
+        </div>`)
+      .join('');
+  }
+
+  function renderizarStatusHistorico() {
+    document.getElementById('status-historico').innerHTML = _statusRodadas.slice(0, 15).map(r => {
+      const falharam = r.checagens.filter(c => !c.sucesso).length;
+      const cor = falharam === 0 ? '#1b8a3f' : '#c0392b';
+      const ativa = r.id === _statusRodadaSelecionada;
+      return `
+        <button type="button" class="botao-secundario" data-rodada="${r.id}"
+                style="display:block; width:100%; max-width:400px; text-align:left; margin-bottom:6px;
+                       ${ativa ? 'border-color:#0C192E; border-width:2px;' : ''}">
+          <span style="color:${cor}; font-weight:700;">${r.checagens.length - falharam}/${r.checagens.length}</span>
+          &nbsp;&nbsp;${new Date(r.em).toLocaleString('pt-BR')}
+        </button>`;
+    }).join('');
+
+    document.querySelectorAll('#status-historico [data-rodada]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        _statusRodadaSelecionada = btn.dataset.rodada;
+        renderizarStatusResumo();
+        renderizarStatusHistorico();
+      });
+    });
+  }
 
   let todosUsuarios = [];
   let todosVinculosMinisterio = [];
