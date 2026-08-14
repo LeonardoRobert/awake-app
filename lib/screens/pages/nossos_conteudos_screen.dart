@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../models/video_youtube_model.dart';
+import '../../services/video_material_service.dart';
 import '../../services/youtube_service.dart';
 import '../../widgets/awake_app_bar.dart';
 
@@ -13,15 +14,27 @@ class NossosConteudosScreen extends StatefulWidget {
 }
 
 class _NossosConteudosScreenState extends State<NossosConteudosScreen> {
-  late Future<List<VideoYoutube>> _futuro;
+  late Future<(List<VideoYoutube>, Map<String, String>)> _futuro;
 
   @override
   void initState() {
     super.initState();
-    _futuro = YoutubeService().buscarVideosRecentes(limite: 6);
+    _futuro = _carregar();
+  }
+
+  /// Busca os videos e, em seguida, os materiais atrelados a eles --
+  /// junto num Future so, pra tela ter um unico estado de loading/erro.
+  Future<(List<VideoYoutube>, Map<String, String>)> _carregar() async {
+    final videos = await YoutubeService().buscarVideosRecentes(limite: 10);
+    final materiais = await VideoMaterialService().buscarPorVideoIds(videos.map((v) => v.id).toList());
+    return (videos, materiais);
   }
 
   Future<void> _abrirVideo(String url) async {
+    await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> _abrirMaterial(String url) async {
     await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
   }
 
@@ -38,16 +51,16 @@ class _NossosConteudosScreenState extends State<NossosConteudosScreen> {
       appBar: const AwakeAppBar(title: 'Nossos Conteúdos', showQrButton: false),
       body: RefreshIndicator(
         onRefresh: () async {
-          setState(() => _futuro = YoutubeService().buscarVideosRecentes(limite: 6));
+          setState(() => _futuro = _carregar());
           await _futuro;
         },
-        child: FutureBuilder<List<VideoYoutube>>(
+        child: FutureBuilder<(List<VideoYoutube>, Map<String, String>)>(
           future: _futuro,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
             }
-            if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
+            if (snapshot.hasError || !snapshot.hasData || snapshot.data!.$1.isEmpty) {
               return ListView(
                 padding: const EdgeInsets.all(24),
                 children: [
@@ -79,19 +92,21 @@ class _NossosConteudosScreenState extends State<NossosConteudosScreen> {
               );
             }
 
+            final (todosVideos, materiais) = snapshot.data!;
+
             // Ordena e tira duplicatas -- lives geram, as vezes, uma
             // segunda entrada (a "sala" que fica offline depois),
             // com o MESMO titulo do video de verdade mas ID diferente.
             // Por isso filtramos por titulo tambem, nao so por ID.
             final titulosVistos = <String>{};
-            final videosUnicos = snapshot.data!.where((v) {
+            final videosUnicos = todosVideos.where((v) {
               final jaVisto = titulosVistos.contains(v.titulo);
               titulosVistos.add(v.titulo);
               return !jaVisto;
             }).toList();
 
             final destaque = videosUnicos.first;
-            final outros = videosUnicos.skip(1).take(4).toList();
+            final outros = videosUnicos.skip(1).take(9).toList();
 
             return ListView(
               padding: const EdgeInsets.all(16),
@@ -126,33 +141,60 @@ class _NossosConteudosScreenState extends State<NossosConteudosScreen> {
                   DateFormat("dd/MM/yyyy", 'pt_BR').format(destaque.publicadoEm),
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
+                if (materiais[destaque.id] != null) ...[
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: OutlinedButton.icon(
+                      onPressed: () => _abrirMaterial(materiais[destaque.id]!),
+                      icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
+                      label: const Text('Visualizar material'),
+                    ),
+                  ),
+                ],
                 if (outros.isNotEmpty) ...[
                   const SizedBox(height: 28),
                   Text('Mais vídeos', style: Theme.of(context).textTheme.titleLarge),
                   const SizedBox(height: 12),
                   ...outros.map((video) => Card(
                         margin: const EdgeInsets.only(bottom: 8),
-                        child: ListTile(
-                          contentPadding: const EdgeInsets.all(8),
-                          leading: ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: SizedBox(
-                              width: 100,
-                              height: 60,
-                              child: Image.network(video.thumbnailUrl, fit: BoxFit.cover),
+                        child: Column(
+                          children: [
+                            ListTile(
+                              contentPadding: const EdgeInsets.all(8),
+                              leading: ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: SizedBox(
+                                  width: 100,
+                                  height: 60,
+                                  child: Image.network(video.thumbnailUrl, fit: BoxFit.cover),
+                                ),
+                              ),
+                              title: Text(
+                                video.titulo,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                              ),
+                              subtitle: Text(
+                                DateFormat("dd/MM/yyyy", 'pt_BR').format(video.publicadoEm),
+                                style: const TextStyle(fontSize: 11),
+                              ),
+                              onTap: () => _abrirVideo(video.url),
                             ),
-                          ),
-                          title: Text(
-                            video.titulo,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                          ),
-                          subtitle: Text(
-                            DateFormat("dd/MM/yyyy", 'pt_BR').format(video.publicadoEm),
-                            style: const TextStyle(fontSize: 11),
-                          ),
-                          onTap: () => _abrirVideo(video.url),
+                            if (materiais[video.id] != null)
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                                child: Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: TextButton.icon(
+                                    onPressed: () => _abrirMaterial(materiais[video.id]!),
+                                    icon: const Icon(Icons.picture_as_pdf_outlined, size: 16),
+                                    label: const Text('Visualizar material'),
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                       )),
                 ],

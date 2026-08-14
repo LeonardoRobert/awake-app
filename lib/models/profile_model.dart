@@ -1,11 +1,16 @@
-enum UserRole { membro, admin, adminFinanceiro }
+enum UserRole { membro, admin }
 
 UserRole userRoleFromString(String value) {
   switch (value) {
     case 'admin':
-      return UserRole.admin;
+    // 'admin_financeiro' deixou de ser um papel separado -- Admin e
+    // Admin Financeiro tinham as mesmas permissoes de banco, e a tela
+    // de Financeiro virou so pagamento de evento ingressado (qualquer
+    // admin ja acessa). O banco esta sendo migrado (ver
+    // supabase/sql/2026_merge_admin_financeiro.sql), mas o app trata
+    // esse valor antigo como admin tambem, por seguranca.
     case 'admin_financeiro':
-      return UserRole.adminFinanceiro;
+      return UserRole.admin;
     default:
       // Cobre 'membro' e tambem o antigo 'lider' (que nao existe mais
       // como papel global -- virou papel por ministerio).
@@ -132,6 +137,8 @@ extension MinisterioLabel on String {
         return 'Dança';
       case 'diaconos':
         return 'Diáconos';
+      case 'intercessao':
+        return 'Intercessão';
       case 'louvor':
         return 'Louvor';
       case 'midia':
@@ -185,11 +192,7 @@ class ProfileModel {
     this.ministerios = const [],
   });
 
-  /// admin "comum" e admin financeiro tem as mesmas permissoes gerais
-  /// -- o financeiro e um extra em cima disso, nao um papel separado
-  /// pros fins de "pode fazer tudo que admin faz".
-  bool get isAdmin => papel == UserRole.admin || papel == UserRole.adminFinanceiro;
-  bool get isAdminFinanceiro => papel == UserRole.adminFinanceiro;
+  bool get isAdmin => papel == UserRole.admin;
 
   bool get pertenceAwake => ministerios.any((m) => m.ministerio == 'awake');
   bool get pertenceHomens => ministerios.any((m) => m.ministerio == 'homens');

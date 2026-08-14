@@ -17,6 +17,7 @@ enum EventoEscopo {
   coral,
   danca,
   diaconos,
+  intercessao,
   louvor,
   midia,
   multimidia,
@@ -37,6 +38,7 @@ const ordemEscopos = [
   EventoEscopo.coral,
   EventoEscopo.danca,
   EventoEscopo.diaconos,
+  EventoEscopo.intercessao,
   EventoEscopo.louvor,
   EventoEscopo.midia,
   EventoEscopo.multimidia,
@@ -65,6 +67,8 @@ EventoEscopo eventoEscopoFromString(String? value) {
       return EventoEscopo.danca;
     case 'diaconos':
       return EventoEscopo.diaconos;
+    case 'intercessao':
+      return EventoEscopo.intercessao;
     case 'louvor':
       return EventoEscopo.louvor;
     case 'midia':
@@ -103,6 +107,8 @@ extension EventoEscopoDb on EventoEscopo {
         return 'danca';
       case EventoEscopo.diaconos:
         return 'diaconos';
+      case EventoEscopo.intercessao:
+        return 'intercessao';
       case EventoEscopo.louvor:
         return 'louvor';
       case EventoEscopo.midia:
@@ -132,6 +138,8 @@ extension EventoEscopoDb on EventoEscopo {
         return 'danca';
       case EventoEscopo.diaconos:
         return 'diaconos';
+      case EventoEscopo.intercessao:
+        return 'intercessao';
       case EventoEscopo.louvor:
         return 'louvor';
       case EventoEscopo.midia:
@@ -171,6 +179,8 @@ extension EventoEscopoLabel on EventoEscopo {
         return 'Dança';
       case EventoEscopo.diaconos:
         return 'Diáconos';
+      case EventoEscopo.intercessao:
+        return 'Intercessão';
       case EventoEscopo.louvor:
         return 'Louvor';
       case EventoEscopo.midia:
@@ -298,6 +308,7 @@ Color corDoEvento(EventTipo tipo, EventoEscopo escopo) {
     case EventoEscopo.coral:
     case EventoEscopo.danca:
     case EventoEscopo.diaconos:
+    case EventoEscopo.intercessao:
     case EventoEscopo.louvor:
     case EventoEscopo.midia:
     case EventoEscopo.multimidia:
@@ -458,10 +469,29 @@ class EventModel {
         excecoes.any((e) => e.year == d.year && e.month == d.month && e.day == d.day);
 
     if (!recorrente) {
-      if (!dataInicio.isBefore(rangeStart) && !dataInicio.isAfter(rangeEnd)) {
-        return ehExcecao(dataInicio) ? [] : [dataInicio];
+      // Sem data de termino (ou termino nao depois do inicio): evento
+      // de um dia so, como sempre funcionou.
+      if (dataFim == null || !dataFim!.isAfter(dataInicio)) {
+        if (!dataInicio.isBefore(rangeStart) && !dataInicio.isAfter(rangeEnd)) {
+          return ehExcecao(dataInicio) ? [] : [dataInicio];
+        }
+        return [];
       }
-      return [];
+
+      // Com data de termino: ocupa um dia por ocorrencia, sempre no
+      // horario de dataInicio, do dia de inicio ate o de termino
+      // (inclusive) -- ex: retiro de sexta a domingo aparece nos 3 dias.
+      final duracaoDias = DateTime(dataFim!.year, dataFim!.month, dataFim!.day)
+          .difference(DateTime(dataInicio.year, dataInicio.month, dataInicio.day))
+          .inDays;
+      final result = <DateTime>[];
+      for (var i = 0; i <= duracaoDias; i++) {
+        final dia = dataInicio.add(Duration(days: i));
+        if (!dia.isBefore(rangeStart) && !dia.isAfter(rangeEnd) && !ehExcecao(dia)) {
+          result.add(dia);
+        }
+      }
+      return result;
     }
 
     // Sem semanas especificas escolhidas: repete toda semana, como
@@ -521,4 +551,19 @@ class EventModel {
     result.sort();
     return result;
   }
+}
+
+/// Pedido de edicao de SO UMA ocorrencia de um evento recorrente --
+/// passado via `extra` do GoRouter pra /eventos/novo quando a pessoa
+/// escolhe "Só esta data" no dialogo de edicao
+/// (event_detail_screen.dart). O form (event_form_screen.dart) usa
+/// isso pra pre-preencher com os dados do evento original mas travado
+/// como avulso (nao recorrente) nessa data especifica -- ao salvar, a
+/// serie original ganha uma excecao nessa data (via
+/// EventService.deleteOccurrence) e um evento novo e avulso e criado
+/// só pra esse dia, com os dados editados.
+class EdicaoOcorrenciaUnica {
+  final EventModel evento;
+  final DateTime dataOcorrencia;
+  const EdicaoOcorrenciaUnica({required this.evento, required this.dataOcorrencia});
 }
