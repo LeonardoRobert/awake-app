@@ -9,6 +9,7 @@ import '../../providers/event_provider.dart';
 import '../../services/escala_servico_service.dart';
 import '../../widgets/awake_app_bar.dart';
 import '../../widgets/escala_fluxo.dart';
+import 'outdoor_form_screen.dart';
 
 class CalendarScreen extends ConsumerStatefulWidget {
   const CalendarScreen({super.key});
@@ -23,6 +24,47 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
 
   DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
 
+  /// Admin escolhe entre "Criar evento" e "Criar outdoor" antes de ir
+  /// pra tela certa; lider de ministerio (nao-admin) so pode criar
+  /// evento, entao vai direto, sem esse passo extra.
+  Future<void> _onTapCriar(bool isAdmin) async {
+    if (!isAdmin) {
+      context.push('/eventos/novo');
+      return;
+    }
+
+    final escolha = await showModalBottomSheet<String>(
+      context: context,
+      builder: (bottomSheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.event_outlined),
+              title: const Text('Criar evento'),
+              onTap: () => Navigator.of(bottomSheetContext).pop('evento'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.image_outlined),
+              title: const Text('Criar outdoor'),
+              subtitle: const Text('Banner no slideshow da tela de Início'),
+              onTap: () => Navigator.of(bottomSheetContext).pop('outdoor'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (!mounted) return;
+    if (escolha == 'evento') {
+      context.push('/eventos/novo');
+    } else if (escolha == 'outdoor') {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const OutdoorFormScreen()),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final eventsAsync = ref.watch(upcomingEventsProvider);
@@ -31,6 +73,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     // evento no calendario e permitido pra lider de QUALQUER ministerio
     // (ou admin) -- por isso usa esse getter, nao o "isLider" comum.
     final podeGerenciarEventos = profileAsync.value?.ehLiderDeAlgumMinisterio ?? false;
+    final isAdmin = profileAsync.value?.isAdmin ?? false;
     final ministeriosLideradosServico = (profileAsync.value?.ministerios ?? [])
         .where((m) => m.ehLider && ministeriosComEscalaServico.contains(m.ministerio))
         .toList();
@@ -75,7 +118,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
           if (podeGerenciarEventos)
             FloatingActionButton.small(
               heroTag: 'fab-calendario',
-              onPressed: () => context.push('/eventos/novo'),
+              onPressed: () => _onTapCriar(isAdmin),
               child: const Icon(Icons.add),
             ),
         ],

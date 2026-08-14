@@ -10,6 +10,8 @@ import '../../screens/messages/admin_mensagens_screen.dart';
 import '../../screens/messages/enviar_mensagem_screen.dart';
 import '../../screens/pages/nossas_paginas_screen.dart';
 import '../../models/profile_model.dart';
+import '../../screens/calendar/outdoors_admin_screen.dart';
+import '../../screens/pages/meus_conteudos_screen.dart';
 import '../../screens/pages/nossos_conteudos_screen.dart';
 import '../../screens/pages/quem_somos_screen.dart';
 import '../../screens/calendar/escala_grade_screen.dart';
@@ -250,6 +252,26 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => Navigator.of(context).push(MaterialPageRoute(
                     builder: (_) => const AdminVisitantesScreen(),
+                  )),
+                ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.attach_file),
+                  title: const Text('Meus Conteúdos'),
+                  subtitle: const Text('Anexar material aos vídeos'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => const MeusConteudosScreen(),
+                  )),
+                ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.image_outlined),
+                  title: const Text('Outdoors'),
+                  subtitle: const Text('Banners do slideshow da tela de Início'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => const OutdoorsAdminScreen(),
                   )),
                 ),
               ],
