@@ -453,6 +453,81 @@ Future<void> _testarCasamentoAjustaMinisterios() async {
   }
 }
 
+/// Ao "descasar" (estado_civil sai de casado/noivo pra outro valor), o
+/// grupo_casais (Discipulado de Casais) deve ser limpo sozinho --
+/// trg_limpar_grupo_casais_ao_sair_de_casado
+/// (2026_limpar_grupo_casais_ao_descasar.sql). Homens/Mulheres é o
+/// oposto (fica -- ninguém tira automaticamente, por decisão do Leo),
+/// por isso desfaz esse efeito colateral do trigger de casamento no
+/// finally, sem checar ele aqui (já testado em
+/// _testarCasamentoAjustaMinisterios).
+Future<void> _testarDescasarLimpaGrupoCasais() async {
+  final membroId = _clienteMembro.auth.currentUser!.id;
+  final original =
+      await _admin.from('profiles').select('estado_civil, grupo_casais, sexo').eq('id', membroId).single();
+  final estadoCivilOriginal = original['estado_civil'] as String?;
+  final grupoCasaisOriginal = original['grupo_casais'] as String?;
+  final sexo = original['sexo'] as String?;
+  final ministerioSecundario = sexo == 'masculino' ? 'homens' : (sexo == 'feminino' ? 'mulheres' : null);
+
+  final vinculoSecundarioOriginal = ministerioSecundario == null
+      ? null
+      : await _admin
+          .from('profile_ministerios')
+          .select('papel')
+          .eq('profile_id', membroId)
+          .eq('ministerio', ministerioSecundario)
+          .maybeSingle();
+  final vinculoAwakeOriginal = await _admin
+      .from('profile_ministerios')
+      .select('papel')
+      .eq('profile_id', membroId)
+      .eq('ministerio', 'awake')
+      .maybeSingle();
+
+  try {
+    await _clienteMembro.from('profiles').update({
+      'estado_civil': 'casado',
+      'grupo_casais': 'henrique_patricia',
+    }).eq('id', membroId);
+
+    final depoisDeCasar = await _admin.from('profiles').select('grupo_casais').eq('id', membroId).single();
+    if (depoisDeCasar['grupo_casais'] != 'henrique_patricia') {
+      throw Exception('grupo_casais não foi gravado ao casar (setup do teste falhou).');
+    }
+
+    await _clienteMembro.from('profiles').update({'estado_civil': 'solteiro'}).eq('id', membroId);
+
+    final depoisDeDescasar = await _admin.from('profiles').select('grupo_casais').eq('id', membroId).single();
+    if (depoisDeDescasar['grupo_casais'] != null) {
+      throw Exception('grupo_casais não foi limpo automaticamente ao "descasar".');
+    }
+  } finally {
+    await _admin.from('profiles').update({
+      'estado_civil': estadoCivilOriginal,
+      'grupo_casais': grupoCasaisOriginal,
+    }).eq('id', membroId);
+
+    // O "casar" temporario acima tambem disparou
+    // trg_ajustar_ministerios_ao_entrar_one -- desfaz esse efeito
+    // colateral (entrar em homens/mulheres, sair do awake) pra nao
+    // deixar sujeira.
+    if (ministerioSecundario != null && vinculoSecundarioOriginal == null) {
+      await _admin
+          .from('profile_ministerios')
+          .delete()
+          .eq('profile_id', membroId)
+          .eq('ministerio', ministerioSecundario);
+    }
+    if (vinculoAwakeOriginal != null) {
+      await _admin.from('profile_ministerios').upsert(
+        {'profile_id': membroId, 'ministerio': 'awake', 'papel': vinculoAwakeOriginal['papel']},
+        onConflict: 'profile_id,ministerio',
+      );
+    }
+  }
+}
+
 Future<void> _testarMinhasContribuicoes() async {
   await _clienteMembro.from('contribuicoes').select().eq('profile_id', _clienteMembro.auth.currentUser!.id);
 }
@@ -1391,6 +1466,7 @@ Future<void> main() async {
     resultados.add(await _rodar('membro_enviar_testemunho', _testarTestemunho));
     resultados.add(await _rodar('membro_enviar_questionario_novo_servo', _testarEnviarQuestionarioNovoServo));
     resultados.add(await _rodar('membro_casamento_ajusta_ministerios', _testarCasamentoAjustaMinisterios));
+    resultados.add(await _rodar('membro_descasar_limpa_grupo_casais', _testarDescasarLimpaGrupoCasais));
     resultados.add(await _rodar('membro_editar_perfil', _testarEditarPerfil));
     resultados.add(await _rodar('membro_cadastro_primeira_vez', _testarCadastroPrimeiraVez));
     resultados.add(await _rodar('membro_inscrever_e_cancelar_escala', _testarInscreverECancelarEscalaAwake));
