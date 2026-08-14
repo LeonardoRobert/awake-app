@@ -26,4 +26,8 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           TESTE_MEMBRO_EMAIL: ${{ secrets.TESTE_MEMBRO_EMAIL }}
           TESTE_MEMBRO_SENHA: ${{ secrets.TESTE_MEMBRO_SENHA }}
+          TESTE_LIDER_EMAIL: ${{ secrets.TESTE_LIDER_EMAIL }}
+          TESTE_LIDER_SENHA: ${{ secrets.TESTE_LIDER_SENHA }}
+          TESTE_ADMIN_EMAIL: ${{ secrets.TESTE_ADMIN_EMAIL }}
+          TESTE_ADMIN_SENHA: ${{ secrets.TESTE_ADMIN_SENHA }}
         run: dart run bin/robo.dart
