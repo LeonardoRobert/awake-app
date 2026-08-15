@@ -945,6 +945,16 @@ Future<void> _testarLiderVerInscritosEscala() async {
       if ((inscritos as List).isEmpty) {
         throw Exception('Líder não viu nenhum inscrito na ocorrência (deveria ver ao menos o Membro de teste).');
       }
+      // Nao basta a lista nao vir vazia -- profiles_select bloqueando
+      // o lider de ler o nome de outra pessoa faz o join voltar
+      // profiles=null em silencio (sem erro nenhum), e a tela caia no
+      // fallback "Membro" pra todo mundo. Foi exatamente esse bug que
+      // passou batido ate o Leo reportar, porque esse teste so
+      // conferia "lista nao vazia".
+      final nomeVeio = inscritos.any((i) => i['profiles'] != null);
+      if (!nomeVeio) {
+        throw Exception('Líder viu a inscrição mas profiles(nome) veio null -- RLS bloqueando o nome.');
+      }
     },
   );
 }
