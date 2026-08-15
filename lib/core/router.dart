@@ -44,8 +44,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isAuthRoute = state.matchedLocation == '/login' ||
           state.matchedLocation == '/cadastro' ||
           state.matchedLocation == '/redefinir-senha';
+      // /termos precisa ficar acessivel mesmo SEM login (a pessoa pode
+      // querer ler os termos durante o proprio cadastro, antes de ter
+      // sessao) -- mas nao faz parte de isAuthRoute pra nao disparar o
+      // redirect de "afasta gente logada dessas rotas" la embaixo (o
+      // link em profile_screen.dart usa /termos com a pessoa ja logada).
+      final isRotaPublica = isAuthRoute || state.matchedLocation == '/termos';
 
-      if (!isLoggedIn && !isAuthRoute) return '/login';
+      if (!isLoggedIn && !isRotaPublica) return '/login';
       if (isLoggedIn && isAuthRoute && state.matchedLocation != '/redefinir-senha') {
         return '/';
       }

@@ -150,6 +150,8 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   final _ruaController = TextEditingController();
   final _bairroController = TextEditingController();
   final _numeroController = TextEditingController();
+  final _complementoController = TextEditingController();
+  bool _semNumero = false;
   String _cidadeUf = '';
   bool _buscandoCep = false;
   String? _erroCep;
@@ -347,8 +349,13 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     final partes = <String>[];
     if (_ruaController.text.trim().isNotEmpty) {
       var linha = _ruaController.text.trim();
-      if (_numeroController.text.trim().isNotEmpty) {
+      if (_semNumero) {
+        linha += ', s/nº';
+      } else if (_numeroController.text.trim().isNotEmpty) {
         linha += ', nº ${_numeroController.text.trim()}';
+      }
+      if (_complementoController.text.trim().isNotEmpty) {
+        linha += ' (${_complementoController.text.trim()})';
       }
       partes.add(linha);
     }
@@ -832,12 +839,33 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
               Expanded(
                 child: TextFormField(
                   controller: _numeroController,
+                  enabled: !_semNumero,
                   decoration: const InputDecoration(labelText: 'Número'),
                   keyboardType: TextInputType.number,
                 ),
               ),
             ],
           ),
+          CheckboxListTile(
+            contentPadding: EdgeInsets.zero,
+            controlAffinity: ListTileControlAffinity.leading,
+            value: _semNumero,
+            onChanged: (v) => setState(() {
+              _semNumero = v ?? false;
+              if (_semNumero) _numeroController.clear();
+            }),
+            title: const Text('Sem número'),
+          ),
+          if (_semNumero) ...[
+            TextFormField(
+              controller: _complementoController,
+              decoration: const InputDecoration(
+                labelText: 'Complemento (opcional)',
+                hintText: 'Ex: Casa 2, Fundos, Próximo ao mercado...',
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
           if (_cidadeUf.isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(_cidadeUf, style: Theme.of(context).textTheme.bodySmall),

@@ -40,6 +40,8 @@ class _EditarPerfilScreenState extends ConsumerState<EditarPerfilScreen> {
   late final TextEditingController _ruaController;
   late final TextEditingController _bairroController;
   late final TextEditingController _numeroController;
+  late final TextEditingController _complementoController;
+  bool _semNumero = false;
   EstadoCivil? _estadoCivil;
   Sexo? _sexo;
   GrupoCasais? _grupoCasais;
@@ -61,6 +63,7 @@ class _EditarPerfilScreenState extends ConsumerState<EditarPerfilScreen> {
     _ruaController = TextEditingController();
     _bairroController = TextEditingController();
     _numeroController = TextEditingController();
+    _complementoController = TextEditingController();
     _cepController.addListener(() {
       final digitos = _cepController.text.replaceAll(RegExp(r'\D'), '');
       if (digitos.length == 8) _buscarEndereco(digitos);
@@ -92,8 +95,13 @@ class _EditarPerfilScreenState extends ConsumerState<EditarPerfilScreen> {
 
       if (_ruaController.text.trim().isNotEmpty) {
         var endereco = _ruaController.text.trim();
-        if (_numeroController.text.trim().isNotEmpty) {
+        if (_semNumero) {
+          endereco += ', s/nº';
+        } else if (_numeroController.text.trim().isNotEmpty) {
           endereco += ', nº ${_numeroController.text.trim()}';
+        }
+        if (_complementoController.text.trim().isNotEmpty) {
+          endereco += ' (${_complementoController.text.trim()})';
         }
         if (_bairroController.text.trim().isNotEmpty) {
           endereco += ' - Bairro ${_bairroController.text.trim()}';
@@ -111,6 +119,127 @@ class _EditarPerfilScreenState extends ConsumerState<EditarPerfilScreen> {
       }
     } finally {
       if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _abrirAlterarEmail() async {
+    final controller = TextEditingController();
+    final novoEmail = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Alterar e-mail'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Enviaremos um link de confirmação pro e-mail novo -- ele só passa a '
+              'valer depois que você clicar nesse link.',
+              style: Theme.of(dialogContext).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              keyboardType: TextInputType.emailAddress,
+              decoration: const InputDecoration(labelText: 'Novo e-mail'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('Cancelar')),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(controller.text.trim()),
+            child: const Text('Confirmar'),
+          ),
+        ],
+      ),
+    );
+
+    if (novoEmail == null || novoEmail.isEmpty || !mounted) return;
+    try {
+      await ref.read(authServiceProvider).updateEmail(novoEmail);
+      if (mounted) {
+        setState(() {});
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Link de confirmação enviado pro e-mail novo.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Erro ao alterar e-mail: ${mensagemDeErroAmigavel(e)}')));
+      }
+    }
+  }
+
+  Future<void> _abrirAlterarSenha() async {
+    final senhaController = TextEditingController();
+    final confirmarController = TextEditingController();
+    final erroEl = ValueNotifier<String?>(null);
+
+    final novaSenha = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Alterar senha'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: senhaController,
+              autofocus: true,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: 'Nova senha'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: confirmarController,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: 'Confirmar nova senha'),
+            ),
+            ValueListenableBuilder<String?>(
+              valueListenable: erroEl,
+              builder: (context, erro, _) => erro == null
+                  ? const SizedBox.shrink()
+                  : Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(erro, style: const TextStyle(color: Colors.red, fontSize: 12)),
+                    ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('Cancelar')),
+          FilledButton(
+            onPressed: () {
+              if (senhaController.text.length < 6) {
+                erroEl.value = 'Mínimo de 6 caracteres.';
+                return;
+              }
+              if (senhaController.text != confirmarController.text) {
+                erroEl.value = 'As senhas não coincidem.';
+                return;
+              }
+              Navigator.of(dialogContext).pop(senhaController.text);
+            },
+            child: const Text('Confirmar'),
+          ),
+        ],
+      ),
+    );
+
+    if (novaSenha == null || !mounted) return;
+    try {
+      await ref.read(authServiceProvider).updatePassword(novaSenha);
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Senha alterada com sucesso.')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Erro ao alterar senha: ${mensagemDeErroAmigavel(e)}')));
+      }
     }
   }
 
@@ -136,6 +265,22 @@ class _EditarPerfilScreenState extends ConsumerState<EditarPerfilScreen> {
               ),
             ),
             const SizedBox(height: 20),
+            Text('E-mail', style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    ref.read(authServiceProvider).currentUserEmail ?? '—',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ),
+                TextButton(onPressed: _abrirAlterarEmail, child: const Text('Alterar')),
+              ],
+            ),
+            const SizedBox(height: 4),
+            TextButton(onPressed: _abrirAlterarSenha, child: const Text('Alterar senha')),
+            const SizedBox(height: 16),
             TextFormField(
               controller: _telefoneController,
               decoration: const InputDecoration(labelText: 'Telefone (WhatsApp)'),
@@ -233,12 +378,31 @@ class _EditarPerfilScreenState extends ConsumerState<EditarPerfilScreen> {
                 Expanded(
                   child: TextFormField(
                     controller: _numeroController,
+                    enabled: !_semNumero,
                     decoration: const InputDecoration(labelText: 'Número'),
                     keyboardType: TextInputType.number,
                   ),
                 ),
               ],
             ),
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              controlAffinity: ListTileControlAffinity.leading,
+              value: _semNumero,
+              onChanged: (v) => setState(() {
+                _semNumero = v ?? false;
+                if (_semNumero) _numeroController.clear();
+              }),
+              title: const Text('Sem número'),
+            ),
+            if (_semNumero)
+              TextFormField(
+                controller: _complementoController,
+                decoration: const InputDecoration(
+                  labelText: 'Complemento (opcional)',
+                  hintText: 'Ex: Casa 2, Fundos, Próximo ao mercado...',
+                ),
+              ),
             const SizedBox(height: 24),
             FilledButton(
               onPressed: _saving ? null : _salvar,

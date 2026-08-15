@@ -117,9 +117,18 @@ class AuthService {
   }
 
   /// Usada na tela de "definir nova senha", depois que a pessoa clica no
-  /// link do e-mail de recuperacao.
+  /// link do e-mail de recuperacao. Tambem usada direto na tela de
+  /// Editar Perfil, pra trocar a senha sem precisar sair do app.
   Future<void> updatePassword(String novaSenha) {
     return _client.auth.updateUser(UserAttributes(password: novaSenha));
+  }
+
+  /// Troca o e-mail de login (usado na tela de Editar Perfil). O
+  /// Supabase manda um link de confirmacao pro endereco novo -- o
+  /// e-mail so' passa a valer de verdade depois que a pessoa clicar
+  /// nesse link (comportamento padrao do projeto no Supabase).
+  Future<void> updateEmail(String novoEmail) {
+    return _client.auth.updateUser(UserAttributes(email: novoEmail));
   }
 
   /// Atualiza campos do proprio perfil (usado na tela de Editar Perfil).
