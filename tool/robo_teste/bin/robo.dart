@@ -1133,6 +1133,58 @@ Future<void> _testarVerVisitantesPrimeiraVez() async {
   await _clienteAdmin.from('visitantes_primeira_vez').select('id, dados').limit(5);
 }
 
+/// Líder do Awake (não só admin) também vê Visitantes -- Primeira Vez
+/// e consegue marcar como lido -- mesma tela (AdminVisitantesScreen),
+/// agora tambem no menu de quem lidera o Awake (profile_screen.dart).
+/// A conta de teste "Líder" lidera só as 5 áreas de serviço, não o
+/// Awake -- concede papel de líder do Awake temporariamente só pra
+/// esse teste, e desfaz no finally.
+Future<void> _testarLiderAwakeVerEMarcarVisitante() async {
+  final liderId = _clienteLider.auth.currentUser!.id;
+  final membroId = _clienteMembro.auth.currentUser!.id;
+
+  final vinculoAwakeOriginal = await _admin
+      .from('profile_ministerios')
+      .select('papel')
+      .eq('profile_id', liderId)
+      .eq('ministerio', 'awake')
+      .maybeSingle();
+
+  await _admin.from('profile_ministerios').upsert(
+    {'profile_id': liderId, 'ministerio': 'awake', 'papel': 'lider'},
+    onConflict: 'profile_id,ministerio',
+  );
+
+  final criado = await _admin
+      .from('visitantes_primeira_vez')
+      .insert({
+        'registrado_por': membroId,
+        'dados': {'Nome completo': '[Robô de teste] Visitante alvo do líder'},
+      })
+      .select('id')
+      .single();
+  final id = criado['id'] as String;
+
+  try {
+    final visto = await _clienteLider.from('visitantes_primeira_vez').select('id').eq('id', id).maybeSingle();
+    if (visto == null) throw Exception('Líder do Awake não conseguiu ver o visitante (select bloqueado).');
+
+    await _clienteLider.from('visitantes_primeira_vez').update({'lido': true}).eq('id', id);
+    final atual = await _admin.from('visitantes_primeira_vez').select('lido').eq('id', id).single();
+    if (atual['lido'] != true) throw Exception('Líder do Awake não conseguiu marcar o visitante como lido.');
+  } finally {
+    await _admin.from('visitantes_primeira_vez').delete().eq('id', id);
+    if (vinculoAwakeOriginal == null) {
+      await _admin.from('profile_ministerios').delete().eq('profile_id', liderId).eq('ministerio', 'awake');
+    } else {
+      await _admin.from('profile_ministerios').upsert(
+        {'profile_id': liderId, 'ministerio': 'awake', 'papel': vinculoAwakeOriginal['papel']},
+        onConflict: 'profile_id,ministerio',
+      );
+    }
+  }
+}
+
 /// Cria, atualiza e apaga um treinamento (TreinamentoService) -- so
 /// admin gerencia (treinamentos_screen.dart: FAB só aparece isAdmin).
 Future<void> _testarCrudTreinamento() async {
@@ -1555,6 +1607,7 @@ Future<void> main() async {
       resultados.add(await _rodar('lider_casal_diaconos', _testarCasalDiaconos));
       resultados.add(await _rodar('lider_escalado_aparece_na_inicio', _testarEscaladoApareceNaInicio));
       resultados.add(await _rodar('lider_ver_inscritos_escala', _testarLiderVerInscritosEscala));
+      resultados.add(await _rodar('lider_awake_ver_e_marcar_visitante', _testarLiderAwakeVerEMarcarVisitante));
       // Lider (de qualquer ministerio, nao so Awake -- ver comentario
       // em _testarCheckInEscala) tambem pode fazer check-in.
       resultados.add(await _rodar('lider_check_in_escala', () => _testarCheckInEscala(_clienteLider)));

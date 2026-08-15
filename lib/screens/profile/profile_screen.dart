@@ -235,17 +235,23 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ref.read(themeModeProvider.notifier).definir(ativado);
                 },
               ),
-              if (profile.isAdmin) ...[
+              if (profile.isAdmin ||
+                  profile.ministerios.any((m) => m.ehLider && m.ministerio == 'awake')) ...[
                 const Divider(),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.mark_email_unread_outlined),
-                  title: const Text('Caixa de entrada'),
-                  subtitle: const Text('Pedidos de oração e testemunhos'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => Navigator.of(context)
-                      .push(MaterialPageRoute(builder: (_) => const AdminMensagensScreen())),
-                ),
+                if (profile.isAdmin)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.mark_email_unread_outlined),
+                    title: const Text('Caixa de entrada'),
+                    subtitle: const Text('Pedidos de oração e testemunhos'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.of(context)
+                        .push(MaterialPageRoute(builder: (_) => const AdminMensagensScreen())),
+                  ),
+                // Admin ve todo mundo; lider do Awake tambem, ja que
+                // Primeira Vez e uma area do proprio Awake (nao e' so'
+                // "quem eu mesmo escalei" -- por isso mora aqui, nao
+                // dentro do "if (profile.isAdmin)" sozinho).
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.person_add_alt_1_outlined),
@@ -255,6 +261,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     builder: (_) => const AdminVisitantesScreen(),
                   )),
                 ),
+              ],
+              if (profile.isAdmin) ...[
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.attach_file),
