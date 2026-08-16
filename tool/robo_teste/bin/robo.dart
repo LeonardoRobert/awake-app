@@ -979,11 +979,52 @@ Future<void> _testarLiderNaoPodeCriarEventoForaDoQueLidera() async {
   }
 }
 
+/// Mesma consulta base que dashboard_ministerio_screen.dart faz -- NAO
+/// basta so' nao lancar excecao (RLS bloqueando volta lista vazia/so
+/// a propria linha, em silencio, sem erro nenhum): esse teste
+/// adiciona o Membro de teste ao ministerio que o Lider lidera
+/// (louvor) e confirma que o Lider consegue ver AMBAS as linhas -- a
+/// dele e a do Membro -- nao so' a propria. Foi exatamente esse tipo
+/// de bug ("dashboard só mostra os dados do próprio líder") que
+/// passou batido antes, porque o teste antigo só conferia "não deu
+/// erro".
 Future<void> _testarDashboardMinisterio() async {
-  // Mesma consulta base que dashboard_ministerio_screen.dart faz --
-  // so chegar sem excecao ja confirma que a RLS de profile_ministerios
-  // libera o lider ver quem esta no proprio ministerio.
-  await _clienteLider.from('profile_ministerios').select('profile_id, criado_em').eq('ministerio', 'louvor');
+  final liderId = _clienteLider.auth.currentUser!.id;
+  final membroId = _clienteMembro.auth.currentUser!.id;
+
+  final vinculoOriginal = await _admin
+      .from('profile_ministerios')
+      .select('papel')
+      .eq('profile_id', membroId)
+      .eq('ministerio', 'louvor')
+      .maybeSingle();
+
+  await _admin.from('profile_ministerios').upsert(
+    {'profile_id': membroId, 'ministerio': 'louvor', 'papel': 'membro'},
+    onConflict: 'profile_id,ministerio',
+  );
+
+  try {
+    final vistoPeloLider = await _clienteLider
+        .from('profile_ministerios')
+        .select('profile_id')
+        .eq('ministerio', 'louvor');
+    final ids = (vistoPeloLider as List).map((v) => (v as Map<String, dynamic>)['profile_id']).toSet();
+
+    if (!ids.contains(liderId)) throw Exception('Líder não viu a própria linha em profile_ministerios.');
+    if (!ids.contains(membroId)) {
+      throw Exception('Líder não viu o Membro no time do ministério que lidera (dashboard mostraria só ele mesmo).');
+    }
+  } finally {
+    if (vinculoOriginal == null) {
+      await _admin.from('profile_ministerios').delete().eq('profile_id', membroId).eq('ministerio', 'louvor');
+    } else {
+      await _admin.from('profile_ministerios').upsert(
+        {'profile_id': membroId, 'ministerio': 'louvor', 'papel': vinculoOriginal['papel']},
+        onConflict: 'profile_id,ministerio',
+      );
+    }
+  }
 }
 
 // ---------- checagens (conta teste 3: Admin) ----------
@@ -1595,7 +1636,6 @@ Future<void> main() async {
   if (resultadoLoginLider.sucesso) {
     resultados.add(await _rodar('lider_criar_evento_e_escala_todas_areas', _testarCriarEventoEEscalaTodasAreas));
     resultados.add(await _rodar('lider_catalogo_funcoes_todas_areas', _testarCatalogoFuncoesTodasAreas));
-    resultados.add(await _rodar('lider_dashboard_ministerio', _testarDashboardMinisterio));
     resultados.add(await _rodar('lider_editar_ocorrencia_unica', _testarEditarOcorrenciaUnica));
     resultados.add(await _rodar('lider_editar_evento_toda_serie', _testarEditarEventoTodaSerie));
     resultados.add(await _rodar('lider_apagar_evento_toda_serie', _testarApagarEventoTodaSerie));
@@ -1608,6 +1648,7 @@ Future<void> main() async {
       resultados.add(await _rodar('lider_escalado_aparece_na_inicio', _testarEscaladoApareceNaInicio));
       resultados.add(await _rodar('lider_ver_inscritos_escala', _testarLiderVerInscritosEscala));
       resultados.add(await _rodar('lider_awake_ver_e_marcar_visitante', _testarLiderAwakeVerEMarcarVisitante));
+      resultados.add(await _rodar('lider_dashboard_ve_time_inteiro', _testarDashboardMinisterio));
       // Lider (de qualquer ministerio, nao so Awake -- ver comentario
       // em _testarCheckInEscala) tambem pode fazer check-in.
       resultados.add(await _rodar('lider_check_in_escala', () => _testarCheckInEscala(_clienteLider)));
