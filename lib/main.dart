@@ -54,7 +54,7 @@ class _AwakeAppState extends ConsumerState<AwakeApp> {
   @override
   Widget build(BuildContext context) {
     final router = ref.watch(routerProvider);
-    final themeMode = ref.watch(themeModeProvider);
+    final preferenciaTema = ref.watch(themeModeProvider);
 
     // Antes do login (perfil ainda nao carregado), usa o tema Shallom
     // como padrao -- e o app "guarda-chuva", o Awake e um dos
@@ -62,14 +62,23 @@ class _AwakeAppState extends ConsumerState<AwakeApp> {
     // Awake, o tema se ajusta sozinho pro amarelo/chama.
     final ehAwake = ref.watch(currentProfileProvider).value?.pertenceAwake ?? false;
 
+    // 3 opcoes (Claro/Escuro/Mais escuro), controladas manualmente pela
+    // pessoa (ver Perfil) -- nao segue o tema do sistema. Como o
+    // ThemeMode nativo do Flutter so tem claro/escuro/sistema, resolve
+    // o ThemeData na mao aqui e forca o MaterialApp a sempre usar
+    // "theme" (nunca "darkTheme" por conta propria).
+    final temaResolvido = switch (preferenciaTema) {
+      PreferenciaTema.claro => AppTheme.light(ehAwake: ehAwake),
+      PreferenciaTema.escuro => AppTheme.dark(ehAwake: ehAwake),
+      PreferenciaTema.maisEscuro => AppTheme.amoled(ehAwake: ehAwake),
+    };
+
     return MaterialApp.router(
       title: 'Shallom',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.light(ehAwake: ehAwake),
-      darkTheme: AppTheme.dark(ehAwake: ehAwake),
-      // Controlado manualmente pela pessoa (ver Perfil), nao segue mais
-      // o tema do sistema sozinho.
-      themeMode: themeMode,
+      theme: temaResolvido,
+      darkTheme: temaResolvido,
+      themeMode: ThemeMode.light,
       // Sem isso, os componentes prontos do proprio Flutter (calendario
       // do seletor de data, seletor de hora, etc) aparecem em ingles
       // por padrao, mesmo com o resto do app em portugues.

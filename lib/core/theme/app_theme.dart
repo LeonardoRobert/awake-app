@@ -13,6 +13,12 @@ class AwakeColors {
   // Tons extras usados so no tema escuro
   static const darkSurface = Color(0xFF16233A);
   static const darkBackground = Color(0xFF0A1220);
+
+  // Tons do tema "mais escuro" (preto de verdade, bom pra tela AMOLED
+  // economizar bateria) -- mesma estrutura do tema escuro normal, so
+  // troca o navy por preto.
+  static const amoledSurface = Color(0xFF0A0A0A);
+  static const amoledBackground = Color(0xFF000000);
 }
 
 /// Paleta da Shallom (usada nas telas de quem NAO e Awake -- Homens,
@@ -42,6 +48,8 @@ class AppTheme {
   static ThemeData? _lightShallom;
   static ThemeData? _darkAwake;
   static ThemeData? _darkShallom;
+  static ThemeData? _amoledAwake;
+  static ThemeData? _amoledShallom;
 
   /// `ehAwake` decide a cor de destaque do app inteiro (botoes, FAB,
   /// barra de navegacao): amarelo Awake ou azul Shallom. Nas telas de
@@ -55,6 +63,13 @@ class AppTheme {
   static ThemeData dark({bool ehAwake = true}) {
     if (ehAwake) return _darkAwake ??= _buildDark(true);
     return _darkShallom ??= _buildDark(false);
+  }
+
+  /// Variante "mais escura" -- mesmo tema escuro, so com fundo preto de
+  /// verdade (bom pra economizar bateria em tela AMOLED).
+  static ThemeData amoled({bool ehAwake = true}) {
+    if (ehAwake) return _amoledAwake ??= _buildDark(true, amoled: true);
+    return _amoledShallom ??= _buildDark(false, amoled: true);
   }
 
   static TextTheme _buildTextTheme(Color textColor) {
@@ -200,17 +215,24 @@ class AppTheme {
     );
   }
 
-  static ThemeData _buildDark(bool ehAwake) {
+  /// `amoled` troca o navy pelo preto de verdade (tema "mais escuro") --
+  /// mesma estrutura do tema escuro normal, so os tons de fundo mudam.
+  static ThemeData _buildDark(bool ehAwake, {bool amoled = false}) {
     final corDestaque = ehAwake ? AwakeColors.yellow : ShallomColors.azul;
+    final corSurface = amoled ? AwakeColors.amoledSurface : AwakeColors.darkSurface;
+    final corBackground = amoled ? AwakeColors.amoledBackground : AwakeColors.darkBackground;
+    final corBorda = amoled ? const Color(0xFF262626) : const Color(0xFF3A4A6B);
+    final corBordaCard = amoled ? const Color(0xFF1F1F1F) : const Color(0xFF2A3B5C);
+    final corSurfaceContainer = amoled ? const Color(0xFF1A1A1A) : const Color(0xFF223252);
 
-    final colorScheme = const ColorScheme.dark().copyWith(
+    final colorScheme = ColorScheme.dark(
       primary: AwakeColors.yellow,
       onPrimary: AwakeColors.navy,
       secondary: corDestaque,
       onSecondary: AwakeColors.navy,
-      surface: AwakeColors.darkSurface,
+      surface: corSurface,
       onSurface: AwakeColors.offWhite,
-      surfaceContainerHighest: const Color(0xFF223252),
+      surfaceContainerHighest: corSurfaceContainer,
       error: const Color(0xFFCF6679),
     );
 
@@ -218,10 +240,10 @@ class AppTheme {
       useMaterial3: true,
       brightness: Brightness.dark,
       colorScheme: colorScheme,
-      scaffoldBackgroundColor: AwakeColors.darkBackground,
+      scaffoldBackgroundColor: corBackground,
       textTheme: _buildTextTheme(AwakeColors.offWhite),
       appBarTheme: AppBarTheme(
-        backgroundColor: AwakeColors.darkSurface,
+        backgroundColor: corSurface,
         foregroundColor: AwakeColors.offWhite,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
@@ -271,7 +293,7 @@ class AppTheme {
         }),
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: AwakeColors.darkSurface,
+        backgroundColor: corSurface,
         indicatorColor: corDestaque,
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
@@ -291,10 +313,10 @@ class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: AwakeColors.darkSurface,
+        fillColor: corSurface,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFF3A4A6B)),
+          borderSide: BorderSide(color: corBorda),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -302,23 +324,23 @@ class AppTheme {
         ),
       ),
       cardTheme: CardThemeData(
-        color: AwakeColors.darkSurface,
+        color: corSurface,
         elevation: 0.5,
         shadowColor: Colors.black.withOpacity(0.3),
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(14),
-          side: const BorderSide(color: Color(0xFF2A3B5C)),
+          side: BorderSide(color: corBordaCard),
         ),
       ),
       dialogTheme: DialogThemeData(
         surfaceTintColor: Colors.transparent,
-        backgroundColor: AwakeColors.darkSurface,
+        backgroundColor: corSurface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
       popupMenuTheme: PopupMenuThemeData(
         surfaceTintColor: Colors.transparent,
-        color: AwakeColors.darkSurface,
+        color: corSurface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );

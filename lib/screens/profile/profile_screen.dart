@@ -60,6 +60,39 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     }
   }
 
+  IconData _iconeTema(PreferenciaTema tema) {
+    switch (tema) {
+      case PreferenciaTema.claro:
+        return Icons.light_mode_outlined;
+      case PreferenciaTema.escuro:
+        return Icons.dark_mode_outlined;
+      case PreferenciaTema.maisEscuro:
+        return Icons.nightlight_round;
+    }
+  }
+
+  Future<void> _abrirSeletorTema(PreferenciaTema atual) async {
+    final escolhido = await showDialog<PreferenciaTema>(
+      context: context,
+      builder: (dialogContext) => SimpleDialog(
+        title: const Text('Tema'),
+        children: PreferenciaTema.values.map((tema) {
+          return RadioListTile<PreferenciaTema>(
+            value: tema,
+            groupValue: atual,
+            title: Text(tema.label),
+            subtitle: Text(tema.descricao),
+            onChanged: (v) => Navigator.of(dialogContext).pop(v),
+          );
+        }).toList(),
+      ),
+    );
+
+    if (escolhido != null) {
+      ref.read(themeModeProvider.notifier).definir(escolhido);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final profileAsync = ref.watch(currentProfileProvider);
@@ -224,16 +257,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 )),
               ),
               const Divider(),
-              SwitchListTile(
+              ListTile(
                 contentPadding: EdgeInsets.zero,
-                secondary: Icon(
-                  themeMode == ThemeMode.dark ? Icons.dark_mode : Icons.light_mode_outlined,
-                ),
-                title: const Text('Modo escuro'),
-                value: themeMode == ThemeMode.dark,
-                onChanged: (ativado) {
-                  ref.read(themeModeProvider.notifier).definir(ativado);
-                },
+                leading: Icon(_iconeTema(themeMode)),
+                title: const Text('Tema'),
+                subtitle: Text(themeMode.label),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => _abrirSeletorTema(themeMode),
               ),
               if (profile.isAdmin ||
                   profile.ministerios.any((m) => m.ehLider && m.ministerio == 'awake')) ...[
