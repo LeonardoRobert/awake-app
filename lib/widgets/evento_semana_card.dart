@@ -33,6 +33,31 @@ int compararOcorrencias(Ocorrencia a, Ocorrencia b) {
   return prioridadeGrupo(a.event).compareTo(prioridadeGrupo(b.event));
 }
 
+/// Monta o texto padrao de compartilhamento (titulo, data/hora, local,
+/// descricao) -- usado tanto pelo card da Inicio quanto pelo botao
+/// "Compartilhar" da tela de detalhes do evento, pra ficarem iguais.
+String montarTextoCompartilharEvento(EventModel evento, DateTime data) {
+  final dataFormatada = DateFormat("EEEE, dd 'de' MMMM 'às' HH:mm", 'pt_BR').format(data);
+  final buffer = StringBuffer()
+    ..writeln('🔥 *${evento.titulo}*')
+    ..writeln()
+    ..writeln('🗓️ $dataFormatada');
+
+  if (evento.local != null && evento.local!.trim().isNotEmpty) {
+    buffer.writeln('📍 ${evento.local}');
+  }
+  if (evento.descricao != null && evento.descricao!.trim().isNotEmpty) {
+    buffer
+      ..writeln()
+      ..writeln(evento.descricao);
+  }
+  buffer
+    ..writeln()
+    ..writeln('Vem com a gente! 🙌');
+
+  return buffer.toString();
+}
+
 /// Card usado nas telas de Inicio (Awake e Shallom) pra mostrar um
 /// evento da semana, com a arte (se tiver) e os botoes de
 /// compartilhar no WhatsApp / Instagram.
@@ -51,32 +76,9 @@ class _EventoSemanaCardState extends State<EventoSemanaCard> {
   bool _compartilhando = false;
   bool _compartilhandoInstagram = false;
 
-  String _montarTexto(EventModel evento, DateTime data) {
-    final dataFormatada =
-        DateFormat("EEEE, dd 'de' MMMM 'às' HH:mm", 'pt_BR').format(data);
-    final buffer = StringBuffer()
-      ..writeln('🔥 *${evento.titulo}*')
-      ..writeln()
-      ..writeln('🗓️ $dataFormatada');
-
-    if (evento.local != null && evento.local!.trim().isNotEmpty) {
-      buffer.writeln('📍 ${evento.local}');
-    }
-    if (evento.descricao != null && evento.descricao!.trim().isNotEmpty) {
-      buffer
-        ..writeln()
-        ..writeln(evento.descricao);
-    }
-    buffer
-      ..writeln()
-      ..writeln('Vem com a gente! 🙌');
-
-    return buffer.toString();
-  }
-
   Future<void> _compartilharNoWhatsApp() async {
     final evento = widget.ocorrencia.event;
-    final texto = _montarTexto(evento, widget.ocorrencia.data);
+    final texto = montarTextoCompartilharEvento(evento, widget.ocorrencia.data);
 
     setState(() => _compartilhando = true);
     try {

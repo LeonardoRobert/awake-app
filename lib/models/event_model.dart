@@ -1,5 +1,30 @@
 import 'package:flutter/material.dart';
 
+/// O banco grava data_inicio (e afins) com os digitos LOCAIS de
+/// Brasilia pretendidos, mas com sufixo de fuso UTC (+00) sem nenhuma
+/// conversao de verdade acontecer -- mesma inconsistencia ja
+/// documentada e contornada em docs/site.html
+/// (parseDataHoraSemFuso/JS). Um DateTime.parse() comum trata o "+00"
+/// como instante UTC de verdade, jogando a hora 3h pra tras/frente
+/// toda vez que e comparada com DateTime.now() (ex: evento das 9h ja
+/// aparecendo como "passado" as 8h da manha). Le os digitos direto da
+/// string e monta um DateTime LOCAL com eles -- a EXIBICAO (DateFormat)
+/// ja funcionava certo porque so le os campos do DateTime sem
+/// converter; so a COMPARACAO de instante (isAfter/isBefore contra
+/// DateTime.now()) que quebrava.
+DateTime _parseDataHoraSemFuso(String isoStr) {
+  final m = RegExp(r'^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):?(\d{2})?').firstMatch(isoStr);
+  if (m == null) return DateTime.parse(isoStr); // formato inesperado -- melhor nao quebrar
+  return DateTime(
+    int.parse(m.group(1)!),
+    int.parse(m.group(2)!),
+    int.parse(m.group(3)!),
+    int.parse(m.group(4)!),
+    int.parse(m.group(5)!),
+    int.parse(m.group(6) ?? '0'),
+  );
+}
+
 // =========================================================
 // ESCOPO — define QUEM PODE VER o evento (e, em quase todos os casos,
 // tambem a cor da bolinha no calendario). Substitui o antigo booleano
@@ -407,15 +432,15 @@ class EventModel {
       id: map['id'] as String,
       titulo: map['titulo'] as String,
       descricao: map['descricao'] as String?,
-      dataInicio: DateTime.parse(map['data_inicio'] as String),
+      dataInicio: _parseDataHoraSemFuso(map['data_inicio'] as String),
       dataFim: map['data_fim'] != null
-          ? DateTime.parse(map['data_fim'] as String)
+          ? _parseDataHoraSemFuso(map['data_fim'] as String)
           : null,
       local: map['local'] as String?,
       criadoPor: map['criado_por'] as String?,
       recorrente: map['recorrente'] as bool? ?? false,
       recorrenciaFim: map['recorrencia_fim'] != null
-          ? DateTime.parse(map['recorrencia_fim'] as String)
+          ? _parseDataHoraSemFuso(map['recorrencia_fim'] as String)
           : null,
       semanasDoMes: (map['semanas_do_mes'] as List?)?.map((e) => e as int).toList(),
       tipo: eventTipoFromString(map['tipo'] as String?),
@@ -424,7 +449,7 @@ class EventModel {
       publicoGenero: (map['publico_genero'] as List?)?.map((e) => e.toString()).toList(),
       publicoCasais: (map['publico_casais'] as List?)?.map((e) => e.toString()).toList(),
       excecoes: (map['excecoes'] as List?)
-              ?.map((e) => DateTime.parse(e.toString()))
+              ?.map((e) => _parseDataHoraSemFuso(e.toString()))
               .toList() ??
           const [],
       fotoUrl: map['foto_url'] as String?,

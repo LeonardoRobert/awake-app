@@ -1,6 +1,8 @@
+import 'package:cross_file/cross_file.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -13,6 +15,7 @@ import '../../providers/event_provider.dart';
 import '../../services/contribuicao_service.dart';
 import '../../services/escala_servico_service.dart';
 import '../../widgets/awake_app_bar.dart';
+import '../../widgets/evento_semana_card.dart';
 import '../../widgets/quem_esta_escalado.dart';
 import 'escala_servico_screen.dart';
 
@@ -171,14 +174,7 @@ class EventDetailScreen extends ConsumerWidget {
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () => Share.share(
-                            event.fotoUrl!,
-                            subject: event.titulo,
-                          ),
-                          icon: const Icon(Icons.share_outlined),
-                          label: const Text('Compartilhar'),
-                        ),
+                        child: _BotaoCompartilharEvento(evento: event, data: dataExibida),
                       ),
                     ],
                   ),
@@ -357,6 +353,61 @@ class EventDetailScreen extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Botão "Compartilhar" da tela de detalhes -- antes so mandava o link
+/// cru da foto (Share.share(event.fotoUrl!)), sem legenda nenhuma.
+/// Agora busca a foto de verdade e manda junto com o texto (título,
+/// data/hora, local, descrição), mesmo padrão do card da Início
+/// (EventoSemanaCard/montarTextoCompartilharEvento).
+class _BotaoCompartilharEvento extends StatefulWidget {
+  final EventModel evento;
+  final DateTime data;
+  const _BotaoCompartilharEvento({required this.evento, required this.data});
+
+  @override
+  State<_BotaoCompartilharEvento> createState() => _BotaoCompartilharEventoState();
+}
+
+class _BotaoCompartilharEventoState extends State<_BotaoCompartilharEvento> {
+  bool _compartilhando = false;
+
+  Future<void> _compartilhar() async {
+    final texto = montarTextoCompartilharEvento(widget.evento, widget.data);
+
+    setState(() => _compartilhando = true);
+    try {
+      if (widget.evento.fotoUrl != null) {
+        final resposta = await http.get(Uri.parse(widget.evento.fotoUrl!));
+        final arquivo = XFile.fromData(
+          resposta.bodyBytes,
+          name: 'convite.jpg',
+          mimeType: 'image/jpeg',
+        );
+        await Share.shareXFiles([arquivo], text: texto);
+      } else {
+        await Share.share(texto);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Não foi possível compartilhar: ${mensagemDeErroAmigavel(e)}')));
+      }
+    } finally {
+      if (mounted) setState(() => _compartilhando = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      onPressed: _compartilhando ? null : _compartilhar,
+      icon: _compartilhando
+          ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
+          : const Icon(Icons.share_outlined),
+      label: Text(_compartilhando ? 'Preparando...' : 'Compartilhar'),
     );
   }
 }
