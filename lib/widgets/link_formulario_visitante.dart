@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import '../services/visitante_service.dart';
 import '../screens/volunteering/formulario_visitante_screen.dart';
 
-/// So aparece pra quem esta escalado na area "Primeira Vez" -- fica
-/// sempre visivel (nao some depois de usar uma vez), porque a pessoa
-/// vai usar isso toda vez que receber um visitante novo.
+/// So aparece pra quem esta escalado na area "Primeira Vez" NO
+/// PROPRIO DIA da escala (esta_na_escala_primeira_vez() no banco --
+/// ver 2026_primeira_vez_so_no_dia.sql) -- ou pra lider do Awake, que
+/// ve sempre, independente de estar escalado.
 class LinkFormularioVisitante extends StatelessWidget {
   const LinkFormularioVisitante({super.key});
 

@@ -231,6 +231,98 @@ Future<T> _comEscalaAwakeDeHoje<T>({
   }
 }
 
+/// esta_na_escala_primeira_vez() (formulario "Registrar visitante" no
+/// Perfil) so deve liberar no PROPRIO DIA da escala -- antes nao tinha
+/// filtro de data nenhum, ficava disponivel pra sempre depois de uma
+/// unica inscricao (2026_primeira_vez_so_no_dia.sql corrigiu). Testa
+/// os dois lados: escala de ONTEM nao libera mais, escala de HOJE
+/// continua liberando.
+Future<void> _testarPrimeiraVezSoNoDia() async {
+  final escalaOntemId = _gerarUuidV4();
+  final ontem = DateTime.now().subtract(const Duration(days: 1));
+  final dataOntemStr = ontem.toIso8601String().split('T').first;
+
+  await _admin.from('escalas').insert({
+    'id': escalaOntemId,
+    'nome': '[Robô de teste]',
+    'area_id': _areaPrimeiraVezId,
+    'data': dataOntemStr,
+    'horario_inicio': '00:00',
+    'horario_fim': '23:59',
+    'vagas': 1,
+    'recorrente': false,
+  });
+
+  try {
+    await _admin.from('inscricoes').insert({
+      'escala_id': escalaOntemId,
+      'data_ocorrencia': dataOntemStr,
+      'user_id': _clienteMembro.auth.currentUser!.id,
+      'status': 'inscrito',
+    });
+
+    try {
+      final liberadoOntem = await _clienteMembro.rpc('esta_na_escala_primeira_vez') as bool;
+      if (liberadoOntem) {
+        throw Exception(
+            'esta_na_escala_primeira_vez() liberou pra escala de ONTEM -- deveria só liberar no próprio dia.');
+      }
+    } finally {
+      await _admin.from('inscricoes').delete().eq('escala_id', escalaOntemId);
+    }
+  } finally {
+    await _admin.from('escalas').delete().eq('id', escalaOntemId);
+  }
+
+  // Confirma que HOJE continua liberando normalmente (nao regrediu).
+  await _comEscalaAwakeDeHoje(
+    areaId: _areaPrimeiraVezId,
+    dentroDoCenario: (escalaId, dataStr) async {
+      final liberadoHoje = await _clienteMembro.rpc('esta_na_escala_primeira_vez') as bool;
+      if (!liberadoHoje) {
+        throw Exception('esta_na_escala_primeira_vez() não liberou pra escala de HOJE.');
+      }
+    },
+  );
+}
+
+/// Líder do Awake sempre vê "Registrar visitante", mesmo sem nenhuma
+/// inscrição em Primeira Vez -- exceção deliberada em
+/// esta_na_escala_primeira_vez(). A conta de teste "Líder" não lidera
+/// o Awake por padrão (só as 5 áreas de serviço) -- concede
+/// temporariamente, mesmo padrão já usado em outros testes de líder
+/// do Awake.
+Future<void> _testarPrimeiraVezLiderAwakeSempre() async {
+  final liderId = _clienteLider.auth.currentUser!.id;
+  final vinculoAwakeOriginal = await _admin
+      .from('profile_ministerios')
+      .select('papel')
+      .eq('profile_id', liderId)
+      .eq('ministerio', 'awake')
+      .maybeSingle();
+
+  await _admin.from('profile_ministerios').upsert(
+    {'profile_id': liderId, 'ministerio': 'awake', 'papel': 'lider'},
+    onConflict: 'profile_id,ministerio',
+  );
+
+  try {
+    final liberado = await _clienteLider.rpc('esta_na_escala_primeira_vez') as bool;
+    if (!liberado) {
+      throw Exception('esta_na_escala_primeira_vez() não liberou pro líder do Awake (deveria liberar sempre).');
+    }
+  } finally {
+    if (vinculoAwakeOriginal == null) {
+      await _admin.from('profile_ministerios').delete().eq('profile_id', liderId).eq('ministerio', 'awake');
+    } else {
+      await _admin.from('profile_ministerios').upsert(
+        {'profile_id': liderId, 'ministerio': 'awake', 'papel': vinculoAwakeOriginal['papel']},
+        onConflict: 'profile_id,ministerio',
+      );
+    }
+  }
+}
+
 /// Cadastro de visitante feito por quem esta escalado em "Recepção/
 /// Primeira Vez" (LinkFormularioVisitante no Perfil) -- so aparece/
 /// funciona pra quem tem inscricao ativa nessa area especifica, por
@@ -1612,6 +1704,7 @@ Future<void> main() async {
     resultados.add(await _rodar('membro_descasar_limpa_grupo_casais', _testarDescasarLimpaGrupoCasais));
     resultados.add(await _rodar('membro_editar_perfil', _testarEditarPerfil));
     resultados.add(await _rodar('membro_cadastro_primeira_vez', _testarCadastroPrimeiraVez));
+    resultados.add(await _rodar('primeira_vez_so_no_dia', _testarPrimeiraVezSoNoDia));
     resultados.add(await _rodar('membro_inscrever_e_cancelar_escala', _testarInscreverECancelarEscalaAwake));
     resultados.add(await _rodar('membro_cadastrar_filho', _testarCadastrarFilho));
     resultados.add(await _rodar('membro_apagar_filho', _testarApagarFilho));
@@ -1640,6 +1733,7 @@ Future<void> main() async {
     resultados.add(await _rodar('lider_editar_evento_toda_serie', _testarEditarEventoTodaSerie));
     resultados.add(await _rodar('lider_apagar_evento_toda_serie', _testarApagarEventoTodaSerie));
     resultados.add(await _rodar('lider_modelo_escala_awake', _testarLiderCriarEditarApagarModeloEscalaAwake));
+    resultados.add(await _rodar('primeira_vez_lider_awake_sempre', _testarPrimeiraVezLiderAwakeSempre));
     resultados.add(await _rodarEsperandoFalha(
         'lider_nao_pode_criar_evento_fora_do_que_lidera', _testarLiderNaoPodeCriarEventoForaDoQueLidera));
     if (resultadoLoginMembro.sucesso) {

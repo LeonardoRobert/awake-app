@@ -295,10 +295,18 @@ class _AdminVisitantesScreenState extends State<AdminVisitantesScreen> {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(rotulo),
-          Text(valor, style: const TextStyle(fontWeight: FontWeight.w700)),
+          Expanded(child: Text(rotulo)),
+          const SizedBox(width: 12),
+          Flexible(
+            child: Text(
+              valor,
+              textAlign: TextAlign.end,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
         ],
       ),
     );
