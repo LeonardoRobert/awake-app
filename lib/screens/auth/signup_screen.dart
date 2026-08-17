@@ -418,6 +418,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
           _liderPorMinisterio.entries.where((e) => e.value).map((e) => e.key).toList();
 
       if (ministeriosOndeQuerSerLider.isNotEmpty) {
+        final falharam = <String>[];
         for (final ministerio in ministeriosOndeQuerSerLider) {
           try {
             await authService.solicitarPapelLider(
@@ -425,18 +426,34 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
               ministerio: ministerio,
             );
           } catch (_) {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    'Código de líder inválido para ${ministerio.labelMinisterio}. '
-                    'Sua conta foi criada como membro; peça o código certo e tente '
-                    'de novo depois.',
-                  ),
-                ),
-              );
-            }
+            falharam.add(ministerio.labelMinisterio);
           }
+        }
+
+        // Usa um dialogo (esperado com await) em vez de SnackBar --
+        // logo depois daqui o app navega pra outra tela (ou o proprio
+        // router redireciona sozinho pra fora do cadastro assim que a
+        // sessao existe), e isso apagava o SnackBar antes da pessoa
+        // conseguir ler.
+        if (falharam.isNotEmpty && mounted) {
+          await showDialog<void>(
+            context: context,
+            builder: (dialogContext) => AlertDialog(
+              title: const Text('Código de líder inválido'),
+              content: Text(
+                'Não deu pra confirmar liderança em: ${falharam.join(", ")}. '
+                'Sua conta foi criada normalmente como membro -- peça pra um '
+                'admin te promover a líder direto no gestão, ou peça o código '
+                'certo com a liderança.',
+              ),
+              actions: [
+                FilledButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: const Text('Entendi'),
+                ),
+              ],
+            ),
+          );
         }
       }
 

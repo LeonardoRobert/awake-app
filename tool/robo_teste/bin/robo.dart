@@ -131,6 +131,52 @@ Future<void> _testarLogin() async {
   if (resposta.session == null) throw Exception('Login não retornou sessão.');
 }
 
+/// Código de líder ERRADO deve ser rejeitado (exceção lançada) e NÃO
+/// deve criar vínculo nenhum em profile_ministerios -- achado hoje:
+/// existiam 2 versões ambíguas de solicitar_papel_lider() ao mesmo
+/// tempo (2026_remove_solicitar_papel_lider_antiga.sql apagou a
+/// antiga, que só mexia no profiles.papel legado e nunca promovia de
+/// verdade via profile_ministerios, além de deixar a chamada ambígua
+/// pro PostgREST). NÃO testa o código CERTO aqui de propósito -- o
+/// código real de líder não deve aparecer em nenhum arquivo
+/// versionado no repositório.
+Future<void> _testarCodigoLiderErrado() async {
+  const ministerioTeste = 'teatro'; // area que a conta Membro de teste nao lidera
+  final membroId = _clienteMembro.auth.currentUser!.id;
+
+  final vinculoAntes = await _admin
+      .from('profile_ministerios')
+      .select('papel')
+      .eq('profile_id', membroId)
+      .eq('ministerio', ministerioTeste)
+      .maybeSingle();
+
+  var lancouExcecao = false;
+  try {
+    await _clienteMembro.rpc('solicitar_papel_lider', params: {
+      'p_codigo': 'codigo-obviamente-errado-do-robo-de-teste',
+      'p_ministerio': ministerioTeste,
+    });
+  } catch (_) {
+    lancouExcecao = true;
+  }
+
+  if (!lancouExcecao) throw Exception('Código de líder errado não lançou exceção nenhuma.');
+
+  final vinculoDepois = await _admin
+      .from('profile_ministerios')
+      .select('papel')
+      .eq('profile_id', membroId)
+      .eq('ministerio', ministerioTeste)
+      .maybeSingle();
+
+  if (vinculoDepois != null && vinculoAntes == null) {
+    // Limpa a sujeira antes de reportar a falha.
+    await _admin.from('profile_ministerios').delete().eq('profile_id', membroId).eq('ministerio', ministerioTeste);
+    throw Exception('Código de líder errado mesmo assim criou vínculo em profile_ministerios.');
+  }
+}
+
 Future<void> _testarCadastro() async {
   final clienteTemp = SupabaseClient(_url, _anonKey, authOptions: _semPkce);
   final marca = DateTime.now().millisecondsSinceEpoch;
@@ -1703,6 +1749,7 @@ Future<void> main() async {
     resultados.add(await _rodar('membro_casamento_ajusta_ministerios', _testarCasamentoAjustaMinisterios));
     resultados.add(await _rodar('membro_descasar_limpa_grupo_casais', _testarDescasarLimpaGrupoCasais));
     resultados.add(await _rodar('membro_editar_perfil', _testarEditarPerfil));
+    resultados.add(await _rodar('codigo_lider_errado', _testarCodigoLiderErrado));
     resultados.add(await _rodar('membro_cadastro_primeira_vez', _testarCadastroPrimeiraVez));
     resultados.add(await _rodar('primeira_vez_so_no_dia', _testarPrimeiraVezSoNoDia));
     resultados.add(await _rodar('membro_inscrever_e_cancelar_escala', _testarInscreverECancelarEscalaAwake));

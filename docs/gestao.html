@@ -529,6 +529,7 @@
     { id: 'calendario', label: 'Calendário' },
     { id: 'financeiro', label: 'Financeiro' },
     { id: 'usuarios', label: 'Usuários' },
+    { id: 'visitantes', label: 'Visitantes' },
     { id: 'status', label: 'Status' },
   ];
   let secaoAtual = null;
@@ -623,6 +624,17 @@
         </div>
         <div id="lista-usuarios"></div>`;
       iniciarPainelUsuarios();
+    } else if (secaoAtual === 'visitantes') {
+      secaoEl.innerHTML = `
+        <h2 style="margin-top:0;">Visitantes — Primeira Vez</h2>
+        <div id="dashboard-visitantes"></div>
+        <h3>Lista completa</h3>
+        <div class="campo-form" style="max-width:320px;">
+          <label>Buscar visitante</label>
+          <input type="text" id="busca-visitante" placeholder="Nome...">
+        </div>
+        <div id="lista-visitantes"></div>`;
+      iniciarPainelVisitantes();
     } else if (secaoAtual === 'status') {
       secaoEl.innerHTML = `
         <h2 style="margin-top:0;">Status do robô de teste</h2>
@@ -2310,6 +2322,138 @@
     marcelo_andreia: 'Grupo do Marcelo e Andréia',
   };
   const LABEL_CATEGORIA = { genesis: 'Genesis', next: 'Next', one: 'One' };
+
+  // ---------- Visitantes -- Primeira Vez ----------
+
+  let todosVisitantes = [];
+  let todosUsuariosParaAcompanhamento = [];
+
+  async function iniciarPainelVisitantes() {
+    const dashEl = document.getElementById('dashboard-visitantes');
+    dashEl.innerHTML = '<div class="vazio-lateral">Carregando...</div>';
+
+    const [{ data: visitantes, error: erroVis }, { data: usuarios, error: erroUsu }] = await Promise.all([
+      supa.from('visitantes_primeira_vez')
+        .select('id, dados, lido, criado_em, acompanhado_por, primeiro_retorno, segundo_retorno, virou_membro')
+        .order('criado_em', { ascending: false }),
+      supa.from('profiles').select('id, nome').order('nome'),
+    ]);
+
+    if (erroVis || erroUsu) {
+      dashEl.innerHTML = `<div class="vazio-lateral">Erro ao carregar: ${escaparHtml((erroVis || erroUsu).message)}</div>`;
+      return;
+    }
+
+    todosVisitantes = visitantes || [];
+    todosUsuariosParaAcompanhamento = usuarios || [];
+
+    renderizarDashboardVisitantes();
+    renderizarListaVisitantes();
+    document.getElementById('busca-visitante').addEventListener('input', renderizarListaVisitantes);
+  }
+
+  function renderizarDashboardVisitantes() {
+    const total = todosVisitantes.length;
+    const retornaram1x = todosVisitantes.filter(v => v.primeiro_retorno).length;
+    const retornaram2x = todosVisitantes.filter(v => v.segundo_retorno).length;
+    const viraramMembro = todosVisitantes.filter(v => v.virou_membro).length;
+    const taxaConversao = total ? Math.round((viraramMembro / total) * 100) : 0;
+
+    document.getElementById('dashboard-visitantes').innerHTML = `
+      <div class="grade-agregados">
+        <div class="cartao-agregado"><div class="nome-agregado">Total de visitantes</div><div class="contagem-agregado">${total}</div></div>
+        <div class="cartao-agregado"><div class="nome-agregado">Retornaram (1ª vez)</div><div class="contagem-agregado">${retornaram1x}</div></div>
+        <div class="cartao-agregado"><div class="nome-agregado">Retornaram (2ª vez)</div><div class="contagem-agregado">${retornaram2x}</div></div>
+        <div class="cartao-agregado"><div class="nome-agregado">Viraram membro</div><div class="contagem-agregado">${viraramMembro} · ${taxaConversao}%</div></div>
+      </div>`;
+  }
+
+  function renderizarListaVisitantes() {
+    const busca = (document.getElementById('busca-visitante').value || '').trim().toLowerCase();
+    const filtrados = busca
+      ? todosVisitantes.filter(v => ((v.dados && v.dados['Nome completo']) || '').toLowerCase().includes(busca))
+      : todosVisitantes;
+
+    const listaEl = document.getElementById('lista-visitantes');
+    if (filtrados.length === 0) {
+      listaEl.innerHTML = '<div class="vazio-lateral">Nenhum visitante encontrado.</div>';
+      return;
+    }
+
+    const opcoesUsuarios = todosUsuariosParaAcompanhamento
+      .map(u => `<option value="${u.id}">${escaparHtml(u.nome)}</option>`)
+      .join('');
+
+    listaEl.innerHTML = filtrados.map(v => {
+      const dados = v.dados || {};
+      const nome = dados['Nome completo'] || '(sem nome)';
+      const contato = dados['Celular/WhatsApp'] || '';
+      const situacao = dados['Situação de fé'] || '';
+      const dataCadastro = new Date(v.criado_em).toLocaleDateString('pt-BR');
+      const detalhe = [contato, situacao].filter(Boolean).join(' · ');
+
+      return `
+        <div class="linha-usuario">
+          <span class="nome-usuario">${escaparHtml(nome)}</span>
+          <div style="font-size:12px; color:#888; margin-top:2px;">
+            ${detalhe ? escaparHtml(detalhe) + ' · ' : ''}cadastrado em ${dataCadastro}
+          </div>
+          <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:10px; align-items:flex-end;">
+            <div class="campo-form" style="max-width:220px; margin:0;">
+              <label>Acompanhado por</label>
+              <select data-visitante-id="${v.id}" data-campo="acompanhado_por" class="select-acompanhamento">
+                <option value="">Ninguém ainda</option>
+                ${opcoesUsuarios}
+              </select>
+            </div>
+            <div class="campo-form" style="max-width:160px; margin:0;">
+              <label>Primeiro retorno</label>
+              <input type="date" data-visitante-id="${v.id}" data-campo="primeiro_retorno"
+                     class="input-acompanhamento" value="${v.primeiro_retorno || ''}">
+            </div>
+            <div class="campo-form" style="max-width:160px; margin:0;">
+              <label>Segundo retorno</label>
+              <input type="date" data-visitante-id="${v.id}" data-campo="segundo_retorno"
+                     class="input-acompanhamento" value="${v.segundo_retorno || ''}">
+            </div>
+            <div class="campo-form check" style="margin:0;">
+              <input type="checkbox" data-visitante-id="${v.id}" data-campo="virou_membro"
+                     class="checkbox-acompanhamento" ${v.virou_membro ? 'checked' : ''}>
+              <label>Virou membro</label>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+
+    // Preenche o valor selecionado do <select> depois de montar o HTML
+    // (mais simples que montar "selected" dinamico dentro de cada <option>).
+    listaEl.querySelectorAll('.select-acompanhamento').forEach(sel => {
+      const visitante = todosVisitantes.find(v => v.id === sel.dataset.visitanteId);
+      sel.value = visitante?.acompanhado_por || '';
+      sel.addEventListener('change', () => salvarCampoAcompanhamento(sel, sel.value || null));
+    });
+    listaEl.querySelectorAll('.input-acompanhamento').forEach(input => {
+      input.addEventListener('change', () => salvarCampoAcompanhamento(input, input.value || null));
+    });
+    listaEl.querySelectorAll('.checkbox-acompanhamento').forEach(chk => {
+      chk.addEventListener('change', () => salvarCampoAcompanhamento(chk, chk.checked));
+    });
+  }
+
+  async function salvarCampoAcompanhamento(elemento, valor) {
+    const visitanteId = elemento.dataset.visitanteId;
+    const campo = elemento.dataset.campo;
+
+    const { error } = await supa.from('visitantes_primeira_vez').update({ [campo]: valor }).eq('id', visitanteId);
+    if (error) {
+      alert('Erro ao salvar: ' + error.message);
+      return;
+    }
+
+    const visitante = todosVisitantes.find(v => v.id === visitanteId);
+    if (visitante) visitante[campo] = valor;
+    renderizarDashboardVisitantes();
+  }
 
   // ---------- Status do robô de teste ----------
 
