@@ -2391,10 +2391,13 @@
       const situacao = dados['Situação de fé'] || '';
       const dataCadastro = new Date(v.criado_em).toLocaleDateString('pt-BR');
       const detalhe = [contato, situacao].filter(Boolean).join(' · ');
+      const badgeSemAcompanhamento = v.acompanhado_por
+        ? ''
+        : '<span class="badge badge-inativo">Sem acompanhamento</span>';
 
       return `
         <div class="linha-usuario">
-          <span class="nome-usuario">${escaparHtml(nome)}</span>
+          <span class="nome-usuario">${escaparHtml(nome)}</span>${badgeSemAcompanhamento}
           <div style="font-size:12px; color:#888; margin-top:2px;">
             ${detalhe ? escaparHtml(detalhe) + ' · ' : ''}cadastrado em ${dataCadastro}
           </div>
@@ -2453,6 +2456,10 @@
     const visitante = todosVisitantes.find(v => v.id === visitanteId);
     if (visitante) visitante[campo] = valor;
     renderizarDashboardVisitantes();
+    // So' o campo "acompanhado_por" muda a tarja "Sem acompanhamento" --
+    // reusa o mesmo re-render pros outros campos tambem, mais simples
+    // que reconstruir so' um pedacinho da linha.
+    renderizarListaVisitantes();
   }
 
   // ---------- Status do robô de teste ----------
