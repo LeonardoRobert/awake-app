@@ -117,24 +117,12 @@ class InicioScreen extends ConsumerWidget {
                       // parecido demais com a capa de um card de
                       // evento (que tem titulo/horario/local antes da
                       // foto, e o outdoor nao tinha nada disso).
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.campaign_outlined,
-                            size: 18,
-                            color: Theme.of(context).colorScheme.secondary,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Avisos',
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleMedium
-                                ?.copyWith(
+                      Text(
+                        'Avisos',
+                        style:
+                            Theme.of(context).textTheme.titleMedium?.copyWith(
                                   fontWeight: FontWeight.bold,
                                 ),
-                          ),
-                        ],
                       ),
                       const SizedBox(height: 8),
                       OutdoorSlideshow(outdoors: outdoorsAsync.value!),
