@@ -432,6 +432,73 @@ Future<void> _testarInscreverECancelarEscalaAwake() async {
   }
 }
 
+/// Confirma o comportamento E o texto exato da mensagem de horario
+/// sobreposto -- achado em producao (14/08): a mensagem tinha um "(a)"
+/// que quebrava o match com shifts_screen.dart._mensagemAmigavel(),
+/// que procura a substring literal 'ja esta inscrito em outra
+/// escala'. Sem esse teste, uma mudanca de texto no SQL pode
+/// dessincronizar da tela de novo sem ninguem perceber (a excecao
+/// ainda "funciona", so' a mensagem bonita que some).
+Future<void> _testarMensagemHorarioSobreposto() async {
+  final escalaAId = _gerarUuidV4();
+  final escalaBId = _gerarUuidV4();
+  final dataStr = DateTime.now().add(const Duration(days: 15)).toIso8601String().split('T').first;
+
+  await _admin.from('escalas').insert([
+    {
+      'id': escalaAId,
+      'nome': '[Robô de teste] A',
+      'area_id': null,
+      'data': dataStr,
+      'horario_inicio': '09:00',
+      'horario_fim': '10:00',
+      'vagas': 5,
+      'recorrente': false,
+    },
+    {
+      'id': escalaBId,
+      'nome': '[Robô de teste] B',
+      'area_id': null,
+      'data': dataStr,
+      'horario_inicio': '09:30',
+      'horario_fim': '10:30', // sobrepoe a escala A de proposito
+      'vagas': 5,
+      'recorrente': false,
+    },
+  ]);
+
+  try {
+    await _clienteMembro.rpc('inscrever_em_escala', params: {
+      'p_escala_id': escalaAId,
+      'p_data_ocorrencia': dataStr,
+    });
+
+    Object? erroCapturado;
+    try {
+      await _clienteMembro.rpc('inscrever_em_escala', params: {
+        'p_escala_id': escalaBId,
+        'p_data_ocorrencia': dataStr,
+      });
+    } catch (e) {
+      erroCapturado = e;
+    }
+
+    if (erroCapturado == null) {
+      throw Exception('Inscreveu em duas escalas com horário sobreposto -- deveria ter sido bloqueado.');
+    }
+    final texto = erroCapturado.toString();
+    if (!texto.contains('ja esta inscrito em outra escala') &&
+        !texto.contains('já está inscrito em outra escala')) {
+      throw Exception(
+          'Bloqueou a inscrição, mas a mensagem não bate com o que shifts_screen.dart espera '
+          '(_mensagemAmigavel ficaria genérica pro membro). Erro real: $texto');
+    }
+  } finally {
+    await _admin.from('inscricoes').delete().inFilter('escala_id', [escalaAId, escalaBId]);
+    await _admin.from('escalas').delete().inFilter('id', [escalaAId, escalaBId]);
+  }
+}
+
 Future<void> _testarCadastrarFilho() async {
   final userId = _clienteMembro.auth.currentUser!.id;
   await _clienteMembro.from('filhos').insert({
@@ -1753,6 +1820,7 @@ Future<void> main() async {
     resultados.add(await _rodar('membro_cadastro_primeira_vez', _testarCadastroPrimeiraVez));
     resultados.add(await _rodar('primeira_vez_so_no_dia', _testarPrimeiraVezSoNoDia));
     resultados.add(await _rodar('membro_inscrever_e_cancelar_escala', _testarInscreverECancelarEscalaAwake));
+    resultados.add(await _rodar('mensagem_horario_sobreposto', _testarMensagemHorarioSobreposto));
     resultados.add(await _rodar('membro_cadastrar_filho', _testarCadastrarFilho));
     resultados.add(await _rodar('membro_apagar_filho', _testarApagarFilho));
     resultados.add(await _rodar('membro_minhas_contribuicoes', _testarMinhasContribuicoes));

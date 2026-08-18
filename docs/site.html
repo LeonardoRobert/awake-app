@@ -50,7 +50,11 @@
     padding: 14px 24px;
   }
   .nav-logo { display: flex; align-items: center; gap: 10px; font-style: italic; font-weight: 800; font-size: 19px; }
-  .nav-logo img { width: 30px; height: 30px; }
+  /* A imagem em si e' quase branca com contorno dourado fino (pensada
+     pra fundo escuro, ex: docs/index.html) -- aqui o nav e' creme
+     claro, entao fica invisivel sem esse filtro. brightness(0) vira
+     silhueta preta, preservando a transparencia de fundo. */
+  .nav-logo img { width: 30px; height: 30px; filter: brightness(0); }
   .nav-links { display: flex; align-items: center; gap: 22px; font-size: 14px; font-weight: 600; }
   .nav-links a:not(.botao-whatsapp) { margin-right: 22px; }
   .nav-links a:last-child { margin-right: 0; }

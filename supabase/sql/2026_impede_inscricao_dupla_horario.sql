@@ -3,6 +3,17 @@
 -- escala com horario sobreposto no mesmo dia -- dava pra se inscrever
 -- em duas escalas ao mesmo tempo.
 --
+-- CORRECAO 14/08: shifts_screen.dart tem uma funcao
+-- _mensagemAmigavel() que traduz o texto da excecao lida do banco pra
+-- uma mensagem legivel -- ela procura pelas substrings exatas
+-- 'ja esta inscrito em outra escala' e 'limite_domingos'. A mensagem
+-- de horario sobreposto que escrevi (com "(a)" no meio) NAO batia com
+-- essa substring, e a mensagem de limite de domingos (que ja existia
+-- ANTES de eu mexer aqui) tambem nunca bateu -- os dois casos caiam
+-- na mensagem generica "Nao foi possivel se inscrever no momento.",
+-- escondendo o motivo real. Ajusta as duas mensagens pra conter as
+-- substrings exatas que o app ja espera (sem precisar de build novo).
+--
 -- Cole no Supabase Dashboard -> SQL Editor e rode manualmente.
 
 create or replace function public.inscrever_em_escala(p_escala_id uuid, p_data_ocorrencia date)
@@ -45,7 +56,7 @@ begin
       and i.escala_id <> p_escala_id
       and (e.horario_inicio, e.horario_fim) overlaps (v_horario_inicio, v_horario_fim)
   ) then
-    raise exception 'Voce ja esta inscrito(a) em outra escala nesse mesmo horario';
+    raise exception 'Voce ja esta inscrito em outra escala nesse mesmo horario';
   end if;
 
   if extract(dow from p_data_ocorrencia) = 0 then
@@ -57,7 +68,10 @@ begin
       and date_trunc('month', i.data_ocorrencia) = date_trunc('month', p_data_ocorrencia);
 
     if v_domingos_no_mes >= 2 then
-      raise exception 'Voce ja atingiu o limite de 2 domingos neste mes';
+      -- Precisa conter literalmente "limite_domingos" -- e' o que
+      -- shifts_screen.dart procura pra trocar por uma mensagem
+      -- amigavel (ver comentario no topo do arquivo).
+      raise exception 'Voce ja atingiu o limite_domingos deste mes (maximo de 2)';
     end if;
   end if;
 
