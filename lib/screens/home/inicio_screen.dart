@@ -118,7 +118,7 @@ class InicioScreen extends ConsumerWidget {
                       const SizedBox(height: 12),
                     ],
                     Text(
-                      'Próximos eventos:',
+                      'Próximos eventos',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
