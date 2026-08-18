@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/erro_amigavel.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/event_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../screens/financeiro/financeiro_screen.dart';
 import '../../screens/messages/admin_mensagens_screen.dart';
@@ -22,6 +23,7 @@ import '../../services/escala_servico_service.dart';
 import '../../services/notification_service.dart';
 import '../../widgets/awake_app_bar.dart';
 import '../../widgets/link_formulario_visitante.dart';
+import '../../widgets/tarja_evento_ingressado.dart';
 import 'meu_perfil_screen.dart';
 
 /// Essa tela virou um MENU (antes era a lista direta de dados do
@@ -52,8 +54,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       ref.invalidate(currentProfileProvider);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Erro ao enviar foto: ${mensagemDeErroAmigavel(e)}')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content:
+                Text('Erro ao enviar foto: ${mensagemDeErroAmigavel(e)}')));
       }
     } finally {
       if (mounted) setState(() => _enviandoFoto = false);
@@ -99,13 +102,25 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final email = ref.watch(authServiceProvider).currentUserEmail;
     final themeMode = ref.watch(themeModeProvider);
 
+    // Evento ingressado mais proximo (ainda nao aconteceu) -- mostrado
+    // numa tarja aqui no Menu, logo abaixo do formulario de visitante
+    // (antes ficava na tela de Inicio).
+    final eventosAsync = ref.watch(upcomingEventsProvider);
+    final eventosIngressados = (eventosAsync.value ?? [])
+        .where((e) => e.ingressado && e.dataInicio.isAfter(DateTime.now()))
+        .toList()
+      ..sort((a, b) => a.dataInicio.compareTo(b.dataInicio));
+    final eventoIngressado =
+        eventosIngressados.isEmpty ? null : eventosIngressados.first;
+
     return Scaffold(
       appBar: const AwakeAppBar(title: 'Menu'),
       body: profileAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (err, _) => Center(child: Text('Erro: $err')),
         data: (profile) {
-          if (profile == null) return const Center(child: Text('Perfil não encontrado.'));
+          if (profile == null)
+            return const Center(child: Text('Perfil não encontrado.'));
 
           return ListView(
             padding: const EdgeInsets.fromLTRB(24, 24, 24, 96),
@@ -118,11 +133,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       children: [
                         CircleAvatar(
                           radius: 36,
-                          backgroundImage:
-                              profile.fotoUrl != null ? NetworkImage(profile.fotoUrl!) : null,
+                          backgroundImage: profile.fotoUrl != null
+                              ? NetworkImage(profile.fotoUrl!)
+                              : null,
                           child: profile.fotoUrl == null
                               ? Text(
-                                  profile.nome.isNotEmpty ? profile.nome[0].toUpperCase() : '?',
+                                  profile.nome.isNotEmpty
+                                      ? profile.nome[0].toUpperCase()
+                                      : '?',
                                   style: const TextStyle(fontSize: 28),
                                 )
                               : null,
@@ -141,7 +159,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                 ? const SizedBox(
                                     height: 12,
                                     width: 12,
-                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2),
                                   )
                                 : const Icon(Icons.camera_alt, size: 14),
                           ),
@@ -154,7 +173,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(profile.nome, style: Theme.of(context).textTheme.titleLarge),
+                        Text(profile.nome,
+                            style: Theme.of(context).textTheme.titleLarge),
                         const SizedBox(height: 2),
                         Text(
                           email ?? '',
@@ -168,13 +188,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ),
               const SizedBox(height: 24),
               const LinkFormularioVisitante(),
+              if (eventoIngressado != null) ...[
+                const SizedBox(height: 16),
+                TarjaEventoIngressado(evento: eventoIngressado),
+              ],
+              const SizedBox(height: 8),
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.person_outline),
                 title: const Text('Ver meu perfil'),
                 trailing: const Icon(Icons.chevron_right),
-                onTap: () => Navigator.of(context)
-                    .push(MaterialPageRoute(builder: (_) => const MeuPerfilScreen())),
+                onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const MeuPerfilScreen())),
               ),
               const Divider(),
               ListTile(
@@ -182,8 +207,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 leading: const Icon(Icons.info_outline),
                 title: const Text('Quem somos nós'),
                 trailing: const Icon(Icons.chevron_right),
-                onTap: () => Navigator.of(context)
-                    .push(MaterialPageRoute(builder: (_) => const QuemSomosScreen())),
+                onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const QuemSomosScreen())),
               ),
               // So aparece aqui pra quem e Awake -- quem e Shallom ja
               // tem isso como aba propria (Início/Calendário/
@@ -194,8 +219,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   leading: const Icon(Icons.ondemand_video_outlined),
                   title: const Text('Nossos Conteúdos'),
                   trailing: const Icon(Icons.chevron_right),
-                  onTap: () => Navigator.of(context)
-                      .push(MaterialPageRoute(builder: (_) => const NossosConteudosScreen())),
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => const NossosConteudosScreen())),
                 ),
               ],
               ListTile(
@@ -203,8 +228,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 leading: const Icon(Icons.public_outlined),
                 title: const Text('Nossas páginas'),
                 trailing: const Icon(Icons.chevron_right),
-                onTap: () => Navigator.of(context)
-                    .push(MaterialPageRoute(builder: (_) => const NossasPaginasScreen())),
+                onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => const NossasPaginasScreen())),
               ),
               // So aparece aqui dentro do Menu pra quem e Awake -- os
               // demais ministerios ja tem "Contribua" como aba propria.
@@ -215,8 +240,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   leading: const Icon(Icons.attach_money),
                   title: const Text('Contribua'),
                   trailing: const Icon(Icons.chevron_right),
-                  onTap: () => Navigator.of(context)
-                      .push(MaterialPageRoute(builder: (_) => const FinanceiroScreen())),
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => const FinanceiroScreen())),
                 ),
               ],
               const Divider(),
@@ -252,7 +277,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     tabela: 'testemunhos',
                     titulo: 'Testemunho',
                     rotuloCampo: 'Seu testemunho',
-                    textoExplicativo: 'Compartilhe o que Deus tem feito na sua vida.',
+                    textoExplicativo:
+                        'Compartilhe o que Deus tem feito na sua vida.',
                   ),
                 )),
               ),
@@ -266,7 +292,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 onTap: () => _abrirSeletorTema(themeMode),
               ),
               if (profile.isAdmin ||
-                  profile.ministerios.any((m) => m.ehLider && m.ministerio == 'awake')) ...[
+                  profile.ministerios
+                      .any((m) => m.ehLider && m.ministerio == 'awake')) ...[
                 const Divider(),
                 if (profile.isAdmin)
                   ListTile(
@@ -275,8 +302,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     title: const Text('Caixa de entrada'),
                     subtitle: const Text('Pedidos de oração e testemunhos'),
                     trailing: const Icon(Icons.chevron_right),
-                    onTap: () => Navigator.of(context)
-                        .push(MaterialPageRoute(builder: (_) => const AdminMensagensScreen())),
+                    onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                        builder: (_) => const AdminMensagensScreen())),
                   ),
                 // Admin ve todo mundo; lider do Awake tambem, ja que
                 // Primeira Vez e uma area do proprio Awake (nao e' so'
@@ -307,35 +334,45 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.image_outlined),
                   title: const Text('Outdoors'),
-                  subtitle: const Text('Banners do slideshow da tela de Início'),
+                  subtitle:
+                      const Text('Banners do slideshow da tela de Início'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => Navigator.of(context).push(MaterialPageRoute(
                     builder: (_) => const OutdoorsAdminScreen(),
                   )),
                 ),
               ],
-              if (profile.ministerios
-                  .any((m) => m.ehLider && ministeriosComEscalaServico.contains(m.ministerio))) ...[
+              if (profile.ministerios.any((m) =>
+                  m.ehLider &&
+                  ministeriosComEscalaServico.contains(m.ministerio))) ...[
                 ...profile.ministerios
-                    .where((m) => m.ehLider && ministeriosComEscalaServico.contains(m.ministerio))
+                    .where((m) =>
+                        m.ehLider &&
+                        ministeriosComEscalaServico.contains(m.ministerio))
                     .map((m) => ListTile(
                           contentPadding: EdgeInsets.zero,
                           leading: const Icon(Icons.event_note_outlined),
-                          title: Text('Escala mensal — ${m.ministerio.labelMinisterio}'),
+                          title: Text(
+                              'Escala mensal — ${m.ministerio.labelMinisterio}'),
                           trailing: const Icon(Icons.chevron_right),
-                          onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                            builder: (_) => EscalaGradeScreen(ministerio: m.ministerio),
+                          onTap: () =>
+                              Navigator.of(context).push(MaterialPageRoute(
+                            builder: (_) =>
+                                EscalaGradeScreen(ministerio: m.ministerio),
                           )),
                         )),
               ],
               if (profile.ministerios.any((m) => m.ehLider)) ...[
-                ...profile.ministerios.where((m) => m.ehLider).map((m) => ListTile(
+                ...profile.ministerios.where((m) => m.ehLider).map((m) =>
+                    ListTile(
                       contentPadding: EdgeInsets.zero,
                       leading: const Icon(Icons.bar_chart_outlined),
-                      title: Text('Dashboard — ${m.ministerio.labelMinisterio}'),
+                      title:
+                          Text('Dashboard — ${m.ministerio.labelMinisterio}'),
                       trailing: const Icon(Icons.chevron_right),
                       onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                        builder: (_) => DashboardMinisterioScreen(ministerio: m.ministerio),
+                        builder: (_) =>
+                            DashboardMinisterioScreen(ministerio: m.ministerio),
                       )),
                     )),
               ],
