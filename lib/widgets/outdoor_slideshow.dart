@@ -69,52 +69,67 @@ class _OutdoorSlideshowState extends State<OutdoorSlideshow> {
   Widget build(BuildContext context) {
     if (widget.outdoors.isEmpty) return const SizedBox.shrink();
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(14),
-      child: AspectRatio(
-        aspectRatio: 2,
-        child: Stack(
-          children: [
-            PageView.builder(
-              controller: _controller,
-              itemCount: widget.outdoors.length,
-              onPageChanged: (i) => setState(() => _paginaAtual = i),
-              itemBuilder: (context, index) {
-                final outdoor = widget.outdoors[index];
-                final clicavel = outdoor.linkUrl != null && outdoor.linkUrl!.trim().isNotEmpty;
-                return GestureDetector(
-                  onTap: clicavel ? () => _abrirLink(outdoor.linkUrl!.trim()) : null,
-                  child: Image.network(
-                    outdoor.imagemUrl,
-                    fit: BoxFit.cover,
-                    width: double.infinity,
-                  ),
-                );
-              },
-            ),
-            if (widget.outdoors.length > 1)
-              Positioned(
-                bottom: 8,
-                left: 0,
-                right: 0,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(widget.outdoors.length, (i) {
-                    final ativo = i == _paginaAtual;
-                    return AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      margin: const EdgeInsets.symmetric(horizontal: 3),
-                      width: ativo ? 16 : 6,
-                      height: 6,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(ativo ? 0.9 : 0.5),
-                        borderRadius: BorderRadius.circular(3),
-                      ),
-                    );
-                  }),
-                ),
+    final corDestaque = Theme.of(context).colorScheme.secondary;
+
+    return Container(
+      // Moldura na cor de destaque -- mesmo esquema da tarja de evento
+      // ingressado (borda + fundo suave) -- pra deixar claro que isso
+      // aqui e um banner/aviso, e nao a foto de capa de um evento.
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: corDestaque, width: 2),
+      ),
+      padding: const EdgeInsets.all(3),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: AspectRatio(
+          aspectRatio: 2,
+          child: Stack(
+            children: [
+              PageView.builder(
+                controller: _controller,
+                itemCount: widget.outdoors.length,
+                onPageChanged: (i) => setState(() => _paginaAtual = i),
+                itemBuilder: (context, index) {
+                  final outdoor = widget.outdoors[index];
+                  final clicavel = outdoor.linkUrl != null &&
+                      outdoor.linkUrl!.trim().isNotEmpty;
+                  return GestureDetector(
+                    onTap: clicavel
+                        ? () => _abrirLink(outdoor.linkUrl!.trim())
+                        : null,
+                    child: Image.network(
+                      outdoor.imagemUrl,
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                    ),
+                  );
+                },
               ),
-          ],
+              if (widget.outdoors.length > 1)
+                Positioned(
+                  bottom: 8,
+                  left: 0,
+                  right: 0,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(widget.outdoors.length, (i) {
+                      final ativo = i == _paginaAtual;
+                      return AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        margin: const EdgeInsets.symmetric(horizontal: 3),
+                        width: ativo ? 16 : 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(ativo ? 0.9 : 0.5),
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                      );
+                    }),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );

@@ -66,9 +66,12 @@ class InicioScreen extends ConsumerWidget {
 
             // Evento ingressado mais proximo (ainda nao aconteceu) --
             // mostrado numa tarja, acima da lista de proximos eventos.
-            final eventosIngressados = events.where((e) => e.ingressado && e.dataInicio.isAfter(now)).toList()
+            final eventosIngressados = events
+                .where((e) => e.ingressado && e.dataInicio.isAfter(now))
+                .toList()
               ..sort((a, b) => a.dataInicio.compareTo(b.dataInicio));
-            final eventoIngressado = eventosIngressados.isEmpty ? null : eventosIngressados.first;
+            final eventoIngressado =
+                eventosIngressados.isEmpty ? null : eventosIngressados.first;
 
             return FutureBuilder<(List<MinhaEscalaResumo>, List<SignupModel>)>(
               future: (
@@ -96,17 +99,44 @@ class InicioScreen extends ConsumerWidget {
                 // EventoSemanaCard pra anexar a tarja, entao mostra
                 // como tarjas proprias, junto com o evento ingressado.
                 final escalasAwakeNaSemana = minhasInscricoesAwake.where((s) {
-                  final ativa = s.status == SignupStatus.inscrito || s.status == SignupStatus.checkInFeito;
-                  final dentroDaSemana =
-                      !s.dataOcorrencia.isBefore(hoje) && !s.dataOcorrencia.isAfter(fim);
+                  final ativa = s.status == SignupStatus.inscrito ||
+                      s.status == SignupStatus.checkInFeito;
+                  final dentroDaSemana = !s.dataOcorrencia.isBefore(hoje) &&
+                      !s.dataOcorrencia.isAfter(fim);
                   return ativa && dentroDaSemana;
                 }).toList()
-                  ..sort((a, b) => a.dataOcorrencia.compareTo(b.dataOcorrencia));
+                  ..sort(
+                      (a, b) => a.dataOcorrencia.compareTo(b.dataOcorrencia));
 
                 return ListView(
                   padding: const EdgeInsets.fromLTRB(16, 20, 16, 96),
                   children: [
                     if ((outdoorsAsync.value ?? []).isNotEmpty) ...[
+                      // Rotulo pequeno acima do slideshow -- sem isso,
+                      // o outdoor (so uma foto arredondada) ficava
+                      // parecido demais com a capa de um card de
+                      // evento (que tem titulo/horario/local antes da
+                      // foto, e o outdoor nao tinha nada disso).
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.campaign_outlined,
+                            size: 18,
+                            color: Theme.of(context).colorScheme.secondary,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Avisos',
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
                       OutdoorSlideshow(outdoors: outdoorsAsync.value!),
                       const SizedBox(height: 20),
                     ],
@@ -121,7 +151,8 @@ class InicioScreen extends ConsumerWidget {
                           )),
                       const SizedBox(height: 12),
                     ],
-                    Text('Próximos eventos:', style: Theme.of(context).textTheme.headlineSmall),
+                    Text('Próximos eventos:',
+                        style: Theme.of(context).textTheme.headlineSmall),
                     const SizedBox(height: 20),
                     if (ocorrencias.isEmpty)
                       Padding(
@@ -164,18 +195,21 @@ class _TarjaEventoIngressado extends ConsumerWidget {
     final valorTotal = evento.valorTotal ?? 0;
     final totalPagoAsync = ref.watch(totalPagoEventoProvider(evento.id));
     final totalPago = totalPagoAsync.value ?? 0;
-    final progresso = valorTotal > 0 ? (totalPago / valorTotal).clamp(0.0, 1.0) : 0.0;
+    final progresso =
+        valorTotal > 0 ? (totalPago / valorTotal).clamp(0.0, 1.0) : 0.0;
     final porcentagem = (progresso * 100).round();
 
     return InkWell(
       borderRadius: BorderRadius.circular(14),
-      onTap: () => context.push('/eventos/${evento.id}', extra: evento.dataInicio),
+      onTap: () =>
+          context.push('/eventos/${evento.id}', extra: evento.dataInicio),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.secondary.withOpacity(0.12),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Theme.of(context).colorScheme.secondary.withOpacity(0.4)),
+          border: Border.all(
+              color: Theme.of(context).colorScheme.secondary.withOpacity(0.4)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -227,7 +261,8 @@ class _TarjaEscalaAwake extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final escala = inscricao.escala != null ? ShiftModel.fromMap(inscricao.escala!) : null;
+    final escala =
+        inscricao.escala != null ? ShiftModel.fromMap(inscricao.escala!) : null;
     final nomeEscala = escala?.nome ?? 'Escala';
     final nomeArea = escala?.area?.nome;
 
