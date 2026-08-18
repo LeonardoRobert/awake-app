@@ -130,6 +130,26 @@ class EscalaServicoService {
     });
   }
 
+  /// Igual adicionarPosicao, mas devolve o id da linha criada -- usado
+  /// pelo "Colar lista de nomes" (só Dança), que precisa do id na hora
+  /// pra já vincular a pessoa em seguida, sem esperar um reload.
+  Future<String> adicionarPosicaoRetornandoId({
+    required String escalaId,
+    required String funcao,
+    int ordem = 99,
+  }) async {
+    final inserida = await _client
+        .from('escala_servico_posicoes')
+        .insert({
+          'escala_id': escalaId,
+          'funcao': funcao,
+          'ordem': ordem,
+        })
+        .select('id')
+        .single();
+    return inserida['id'] as String;
+  }
+
   Future<void> removerPosicao(String posicaoId) async {
     await _client.from('escala_servico_posicoes').delete().eq('id', posicaoId);
   }

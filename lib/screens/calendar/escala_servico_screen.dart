@@ -262,6 +262,116 @@ class _EscalaServicoScreenState extends State<EscalaServicoScreen> {
     await _recarregarOcorrencia(ocorrencia);
   }
 
+  /// So pra Danca: em vez de escolher pessoa por pessoa em cada
+  /// "Integrante N", cola uma lista (um nome por linha) e o app tenta
+  /// casar cada linha com uma pessoa de verdade do ministerio (precisa
+  /// ser perfil real -- e' o que faz check-in por QR, notificacao e a
+  /// tarja "Voce esta escalado(a)" funcionarem). Quem nao bater fica
+  /// de fora, listado no final, pra resolver na busca normal.
+  Future<void> _colarListaNomes(_OcorrenciaEscala ocorrencia) async {
+    final controller = TextEditingController();
+    final texto = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Colar lista de nomes'),
+        content: SizedBox(
+          width: 350,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Um nome por linha. Cada um precisa bater com o nome de uma '
+                'pessoa já cadastrada na Dança -- quem não bater fica de fora, '
+                'pra você resolver na busca normal.',
+                style: TextStyle(fontSize: 12),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: controller,
+                autofocus: true,
+                maxLines: 10,
+                minLines: 6,
+                decoration: const InputDecoration(
+                  hintText: 'Ana Souza\nBruno Lima\nCarla Mendes...',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(controller.text),
+            child: const Text('Escalar'),
+          ),
+        ],
+      ),
+    );
+
+    if (texto == null || ocorrencia.escalaId == null) return;
+    final nomes = texto.split('\n').map((n) => n.trim()).where((n) => n.isNotEmpty).toList();
+    if (nomes.isEmpty) return;
+
+    final posicoesVazias = ocorrencia.posicoes.where((p) => p.profileId == null).toList();
+    final naoEncontrados = <String>[];
+    var proximaOrdem = ocorrencia.posicoes.length + 1;
+    var indiceVazia = 0;
+
+    for (final nome in nomes) {
+      final resultados = await _service.buscarPessoasDoMinisterio(widget.ministerio, nome);
+      final exatos = resultados.where((p) => p.nome.toLowerCase() == nome.toLowerCase()).toList();
+      final pessoa = exatos.length == 1
+          ? exatos.first
+          : (resultados.length == 1 ? resultados.first : null);
+
+      if (pessoa == null) {
+        naoEncontrados.add(nome);
+        continue;
+      }
+
+      if (indiceVazia < posicoesVazias.length) {
+        await _service.definirPessoa(posicoesVazias[indiceVazia].id, pessoa.id);
+        indiceVazia++;
+      } else {
+        final novaPosicao = await _service.adicionarPosicaoRetornandoId(
+          escalaId: ocorrencia.escalaId!,
+          funcao: 'Integrante $proximaOrdem',
+          ordem: proximaOrdem,
+        );
+        proximaOrdem++;
+        await _service.definirPessoa(novaPosicao, pessoa.id);
+      }
+    }
+
+    await _recarregarOcorrencia(ocorrencia);
+
+    if (!mounted) return;
+    final escalados = nomes.length - naoEncontrados.length;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Resultado'),
+        content: Text(
+          naoEncontrados.isEmpty
+              ? '$escalados pessoa(s) escalada(s) com sucesso.'
+              : '$escalados escalada(s). Não encontrados na Dança (verifique o nome '
+                  'exato ou escale na busca normal):\n\n${naoEncontrados.join('\n')}',
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Entendi'),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// Monta um texto pronto pra colar num grupo do WhatsApp (usa
   /// *asterisco* pra negrito, que o WhatsApp já entende sozinho).
   String _gerarTextoWhatsApp() {
@@ -367,10 +477,22 @@ class _EscalaServicoScreenState extends State<EscalaServicoScreen> {
                               ),
                       )),
                   const SizedBox(height: 8),
-                  OutlinedButton.icon(
-                    onPressed: () => _adicionarFuncaoLivre(ocorrencia),
-                    icon: const Icon(Icons.add),
-                    label: const Text('Adicionar posição'),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: () => _adicionarFuncaoLivre(ocorrencia),
+                        icon: const Icon(Icons.add),
+                        label: const Text('Adicionar posição'),
+                      ),
+                      if (widget.ministerio == 'danca')
+                        OutlinedButton.icon(
+                          onPressed: () => _colarListaNomes(ocorrencia),
+                          icon: const Icon(Icons.playlist_add_outlined),
+                          label: const Text('Colar lista de nomes'),
+                        ),
+                    ],
                   ),
                   if (ocorrencia != _ocorrencias.last) ...[
                     const SizedBox(height: 24),
