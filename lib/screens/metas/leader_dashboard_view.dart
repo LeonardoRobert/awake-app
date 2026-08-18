@@ -32,8 +32,13 @@ class LeaderDashboardView extends ConsumerWidget {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
         children: [
-          Text('Participação por grupo (este mês)',
-              style: Theme.of(context).textTheme.titleLarge),
+          Text(
+            'Participação por grupo (este mês)',
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 12),
           porCategoriaAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
@@ -51,7 +56,8 @@ class LeaderDashboardView extends ConsumerWidget {
                             title: Text(_categoriaLabel(e.key)),
                             trailing: Text(
                               '${e.value}',
-                              style: const TextStyle(fontWeight: FontWeight.bold),
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.bold),
                             ),
                           ))
                       .toList(),
@@ -60,8 +66,13 @@ class LeaderDashboardView extends ConsumerWidget {
             },
           ),
           const SizedBox(height: 32),
-          Text('Ranking de participação (este mês)',
-              style: Theme.of(context).textTheme.titleLarge),
+          Text(
+            'Ranking de participação (este mês)',
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 4),
           Text(
             'Soma de check-ins em eventos + escalas de voluntariado',

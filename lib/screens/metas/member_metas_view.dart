@@ -21,11 +21,23 @@ class MemberMetasView extends ConsumerWidget {
         data: (resumo) => ListView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
           children: [
-            Text('Minha meta do mês', style: Theme.of(context).textTheme.titleLarge),
+            Text(
+              'Minha meta do mês',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 12),
             _ChecklistCard(meta: resumo.meta),
             const SizedBox(height: 32),
-            Text('Meus troféus', style: Theme.of(context).textTheme.titleLarge),
+            Text(
+              'Meus troféus',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 4),
             Text(
               'Um troféu novo a cada tanto de meses seguidos com a meta cumprida',
@@ -52,10 +64,17 @@ class _ChecklistCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _ItemMeta(label: 'EBD', atual: meta.ebd, meta: MetasConfig.ebd, ok: meta.cumpriuEbd),
+            _ItemMeta(
+                label: 'EBD',
+                atual: meta.ebd,
+                meta: MetasConfig.ebd,
+                ok: meta.cumpriuEbd),
             const Divider(),
             _ItemMeta(
-                label: 'GC', atual: meta.gc, meta: MetasConfig.gc, ok: meta.cumpriuGc),
+                label: 'GC',
+                atual: meta.gc,
+                meta: MetasConfig.gc,
+                ok: meta.cumpriuGc),
             const Divider(),
             _ItemMeta(
               label: 'Evento de Comunhão',
@@ -82,8 +101,12 @@ class _ChecklistCard extends StatelessWidget {
               child: Row(
                 children: [
                   Icon(
-                    meta.mesCumprido ? Icons.emoji_events : Icons.hourglass_bottom,
-                    color: meta.mesCumprido ? Colors.green.shade700 : AwakeColors.navy,
+                    meta.mesCumprido
+                        ? Icons.emoji_events
+                        : Icons.hourglass_bottom,
+                    color: meta.mesCumprido
+                        ? Colors.green.shade700
+                        : AwakeColors.navy,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -129,7 +152,9 @@ class _ItemMeta extends StatelessWidget {
         Expanded(child: Text(label)),
         Text(
           '$atual/$meta',
-          style: TextStyle(fontWeight: FontWeight.w600, color: ok ? Colors.green.shade700 : null),
+          style: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: ok ? Colors.green.shade700 : null),
         ),
       ],
     );
@@ -160,7 +185,8 @@ class _TrophyGallery extends StatelessWidget {
           children: [
             CircleAvatar(
               radius: 32,
-              backgroundColor: conquistado ? AwakeColors.yellow : Colors.grey.shade300,
+              backgroundColor:
+                  conquistado ? AwakeColors.yellow : Colors.grey.shade300,
               child: Icon(
                 Icons.emoji_events,
                 color: conquistado ? AwakeColors.navy : Colors.grey.shade500,

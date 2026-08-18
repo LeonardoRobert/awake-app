@@ -42,7 +42,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
         agora.hour,
         agora.minute,
       );
-      rotaEvento = '/eventos/novo?data=${Uri.encodeComponent(dataComHoraAtual.toIso8601String())}';
+      rotaEvento =
+          '/eventos/novo?data=${Uri.encodeComponent(dataComHoraAtual.toIso8601String())}';
     }
 
     if (!isAdmin) {
@@ -89,13 +90,16 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     // Diferente da Escala/Check-in (que sao coisas so do Awake), criar
     // evento no calendario e permitido pra lider de QUALQUER ministerio
     // (ou admin) -- por isso usa esse getter, nao o "isLider" comum.
-    final podeGerenciarEventos = profileAsync.value?.ehLiderDeAlgumMinisterio ?? false;
+    final podeGerenciarEventos =
+        profileAsync.value?.ehLiderDeAlgumMinisterio ?? false;
     final isAdmin = profileAsync.value?.isAdmin ?? false;
     final ministeriosLideradosServico = (profileAsync.value?.ministerios ?? [])
-        .where((m) => m.ehLider && ministeriosComEscalaServico.contains(m.ministerio))
+        .where((m) =>
+            m.ehLider && ministeriosComEscalaServico.contains(m.ministerio))
         .toList();
-    final eventosIgreja =
-        (eventsAsync.value ?? []).where((e) => e.escopo == EventoEscopo.igreja).toList();
+    final eventosIgreja = (eventsAsync.value ?? [])
+        .where((e) => e.escopo == EventoEscopo.igreja)
+        .toList();
 
     return Scaffold(
       appBar: AwakeAppBar(
@@ -144,14 +148,18 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
         onRefresh: () => ref.refresh(upcomingEventsProvider.future),
         child: eventsAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (err, _) => Center(child: Text('Erro ao carregar eventos: $err')),
+          error: (err, _) =>
+              Center(child: Text('Erro ao carregar eventos: $err')),
           data: (events) {
-            final rangeStart = DateTime(_focusedDay.year, _focusedDay.month - 1, 1);
-            final rangeEnd = DateTime(_focusedDay.year, _focusedDay.month + 2, 0);
+            final rangeStart =
+                DateTime(_focusedDay.year, _focusedDay.month - 1, 1);
+            final rangeEnd =
+                DateTime(_focusedDay.year, _focusedDay.month + 2, 0);
 
             final Map<DateTime, List<_Occurrence>> byDay = {};
             for (final event in events) {
-              for (final occ in event.occurrencesBetween(rangeStart, rangeEnd)) {
+              for (final occ
+                  in event.occurrencesBetween(rangeStart, rangeEnd)) {
                 final key = _dateOnly(occ);
                 byDay.putIfAbsent(key, () => []).add(_Occurrence(event, occ));
               }
@@ -178,7 +186,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
               tituloLista = 'Próximos 7 dias';
             } else {
               listaExibida = byDay[_dateOnly(_diaSelecionado!)] ?? [];
-              tituloLista = 'Eventos de ${DateFormat("dd/MM (EEEE)", 'pt_BR').format(_diaSelecionado!)}';
+              tituloLista =
+                  'Eventos de ${DateFormat("dd/MM (EEEE)", 'pt_BR').format(_diaSelecionado!)}';
             }
             listaExibida.sort(_compararOcorrencias);
 
@@ -191,7 +200,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                   focusedDay: _focusedDay,
                   startingDayOfWeek: StartingDayOfWeek.sunday,
                   selectedDayPredicate: (day) =>
-                      _diaSelecionado != null && isSameDay(_diaSelecionado, day),
+                      _diaSelecionado != null &&
+                      isSameDay(_diaSelecionado, day),
                   eventLoader: (day) => byDay[_dateOnly(day)] ?? [],
                   onDaySelected: (selected, focused) {
                     setState(() {
@@ -209,7 +219,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                     // mesma categoria mostra so 1 bolinha daquela cor.
                     markerBuilder: (context, day, eventsForDay) {
                       if (eventsForDay.isEmpty) return null;
-                      final cores = eventsForDay.map((e) => e.event.cor).toSet().toList();
+                      final cores =
+                          eventsForDay.map((e) => e.event.cor).toSet().toList();
 
                       return Positioned(
                         bottom: 4,
@@ -220,17 +231,24 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                               .map((cor) => Container(
                                     width: 6,
                                     height: 6,
-                                    margin: const EdgeInsets.symmetric(horizontal: 1.5),
-                                    decoration: BoxDecoration(color: cor, shape: BoxShape.circle),
+                                    margin: const EdgeInsets.symmetric(
+                                        horizontal: 1.5),
+                                    decoration: BoxDecoration(
+                                        color: cor, shape: BoxShape.circle),
                                   ))
                               .toList(),
                         ),
                       );
                     },
                   ),
-                  headerStyle: const HeaderStyle(
+                  headerStyle: HeaderStyle(
                     formatButtonVisible: false,
                     titleCentered: true,
+                    titleTextStyle: Theme.of(context)
+                            .textTheme
+                            .titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold) ??
+                        const TextStyle(),
                   ),
                 ),
                 const Divider(height: 1),
@@ -241,12 +259,16 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                       Expanded(
                         child: Text(
                           tituloLista,
-                          style: Theme.of(context).textTheme.titleMedium,
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(fontWeight: FontWeight.bold),
                         ),
                       ),
                       if (_diaSelecionado != null)
                         TextButton(
-                          onPressed: () => setState(() => _diaSelecionado = null),
+                          onPressed: () =>
+                              setState(() => _diaSelecionado = null),
                           child: const Text('Ver próximos 7 dias'),
                         ),
                     ],
@@ -254,7 +276,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                 ),
                 Expanded(
                   child: listaExibida.isEmpty
-                      ? const Center(child: Text('Nenhum evento neste período.'))
+                      ? const Center(
+                          child: Text('Nenhum evento neste período.'))
                       : ListView.builder(
                           padding: const EdgeInsets.only(bottom: 90),
                           itemCount: listaExibida.length,
@@ -272,8 +295,11 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                               title: Text(occ.event.titulo),
                               subtitle: Text(
                                 '${occ.event.labelCategoria} • ' +
-                                    DateFormat("dd/MM (EEEE) HH:mm", 'pt_BR').format(occ.data) +
-                                    (occ.event.local != null ? ' • ${occ.event.local}' : ''),
+                                    DateFormat("dd/MM (EEEE) HH:mm", 'pt_BR')
+                                        .format(occ.data) +
+                                    (occ.event.local != null
+                                        ? ' • ${occ.event.local}'
+                                        : ''),
                               ),
                               trailing: occ.event.recorrente
                                   ? const Icon(Icons.repeat, size: 18)
@@ -307,7 +333,8 @@ int _compararOcorrencias(_Occurrence a, _Occurrence b) {
   // Empate no dia/horario: primeiro pela ordem oficial das categorias
   // (Igreja, Lideranca, Casais, Homens, Mulheres, Awake, Embaixadores
   // e Mensageiras, Criancas)...
-  final porEscopo = a.event.escopo.prioridade.compareTo(b.event.escopo.prioridade);
+  final porEscopo =
+      a.event.escopo.prioridade.compareTo(b.event.escopo.prioridade);
   if (porEscopo != 0) return porEscopo;
   // ...e, se os dois forem do Awake, por subgrupo: Genesis, Next, One.
   if (a.event.escopo == EventoEscopo.awake) {

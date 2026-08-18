@@ -17,7 +17,8 @@ class AdminCalendarioScreen extends ConsumerStatefulWidget {
   const AdminCalendarioScreen({super.key});
 
   @override
-  ConsumerState<AdminCalendarioScreen> createState() => _AdminCalendarioScreenState();
+  ConsumerState<AdminCalendarioScreen> createState() =>
+      _AdminCalendarioScreenState();
 }
 
 class _AdminCalendarioScreenState extends ConsumerState<AdminCalendarioScreen> {
@@ -62,7 +63,8 @@ class _AdminCalendarioScreenState extends ConsumerState<AdminCalendarioScreen> {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (err, _) => Center(child: Text('Erro ao carregar: $err')),
         data: (events) {
-          final rangeStart = DateTime(_focusedDay.year, _focusedDay.month - 1, 1);
+          final rangeStart =
+              DateTime(_focusedDay.year, _focusedDay.month - 1, 1);
           final rangeEnd = DateTime(_focusedDay.year, _focusedDay.month + 2, 0);
 
           final Map<DateTime, List<_Ocorrencia>> byDay = {};
@@ -89,7 +91,8 @@ class _AdminCalendarioScreenState extends ConsumerState<AdminCalendarioScreen> {
                       lastDay: DateTime(2035, 12, 31),
                       focusedDay: _focusedDay,
                       startingDayOfWeek: StartingDayOfWeek.sunday,
-                      selectedDayPredicate: (day) => isSameDay(_diaSelecionado, day),
+                      selectedDayPredicate: (day) =>
+                          isSameDay(_diaSelecionado, day),
                       eventLoader: (day) => byDay[_dateOnly(day)] ?? [],
                       onDaySelected: (selected, focused) {
                         setState(() {
@@ -98,11 +101,15 @@ class _AdminCalendarioScreenState extends ConsumerState<AdminCalendarioScreen> {
                           _eventoSelecionado = null;
                         });
                       },
-                      onPageChanged: (focused) => setState(() => _focusedDay = focused),
+                      onPageChanged: (focused) =>
+                          setState(() => _focusedDay = focused),
                       calendarBuilders: CalendarBuilders<_Ocorrencia>(
                         markerBuilder: (context, day, eventsForDay) {
                           if (eventsForDay.isEmpty) return null;
-                          final cores = eventsForDay.map((e) => e.event.cor).toSet().toList();
+                          final cores = eventsForDay
+                              .map((e) => e.event.cor)
+                              .toSet()
+                              .toList();
                           return Positioned(
                             bottom: 4,
                             child: Row(
@@ -112,18 +119,24 @@ class _AdminCalendarioScreenState extends ConsumerState<AdminCalendarioScreen> {
                                   .map((cor) => Container(
                                         width: 6,
                                         height: 6,
-                                        margin: const EdgeInsets.symmetric(horizontal: 1.5),
-                                        decoration:
-                                            BoxDecoration(color: cor, shape: BoxShape.circle),
+                                        margin: const EdgeInsets.symmetric(
+                                            horizontal: 1.5),
+                                        decoration: BoxDecoration(
+                                            color: cor, shape: BoxShape.circle),
                                       ))
                                   .toList(),
                             ),
                           );
                         },
                       ),
-                      headerStyle: const HeaderStyle(
+                      headerStyle: HeaderStyle(
                         formatButtonVisible: false,
                         titleCentered: true,
+                        titleTextStyle: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(fontWeight: FontWeight.bold) ??
+                            const TextStyle(),
                       ),
                     ),
                     const Divider(height: 1),
@@ -132,31 +145,38 @@ class _AdminCalendarioScreenState extends ConsumerState<AdminCalendarioScreen> {
                       child: Align(
                         alignment: Alignment.centerLeft,
                         child: Text(
-                          DateFormat("EEEE, dd 'de' MMMM", 'pt_BR').format(_diaSelecionado),
+                          DateFormat("EEEE, dd 'de' MMMM", 'pt_BR')
+                              .format(_diaSelecionado),
                           style: Theme.of(context).textTheme.titleMedium,
                         ),
                       ),
                     ),
                     Expanded(
                       child: ocorrenciasDoDia.isEmpty
-                          ? const Center(child: Text('Nenhum evento nesse dia.'))
+                          ? const Center(
+                              child: Text('Nenhum evento nesse dia.'))
                           : ListView.builder(
                               itemCount: ocorrenciasDoDia.length,
                               itemBuilder: (context, index) {
                                 final oc = ocorrenciasDoDia[index];
-                                final selecionado = _eventoSelecionado?.event.id == oc.event.id &&
-                                    _eventoSelecionado?.data == oc.data;
+                                final selecionado =
+                                    _eventoSelecionado?.event.id ==
+                                            oc.event.id &&
+                                        _eventoSelecionado?.data == oc.data;
                                 return ListTile(
                                   selected: selecionado,
                                   leading: Container(
                                     width: 10,
                                     height: 10,
-                                    decoration:
-                                        BoxDecoration(color: oc.event.cor, shape: BoxShape.circle),
+                                    decoration: BoxDecoration(
+                                        color: oc.event.cor,
+                                        shape: BoxShape.circle),
                                   ),
                                   title: Text(oc.event.titulo),
-                                  subtitle: Text(DateFormat('HH:mm').format(oc.data)),
-                                  onTap: () => setState(() => _eventoSelecionado = oc),
+                                  subtitle:
+                                      Text(DateFormat('HH:mm').format(oc.data)),
+                                  onTap: () =>
+                                      setState(() => _eventoSelecionado = oc),
                                 );
                               },
                             ),
@@ -169,7 +189,8 @@ class _AdminCalendarioScreenState extends ConsumerState<AdminCalendarioScreen> {
               Expanded(
                 child: _eventoSelecionado == null
                     ? const Center(
-                        child: Text('Selecione um evento à esquerda para ver os detalhes.'),
+                        child: Text(
+                            'Selecione um evento à esquerda para ver os detalhes.'),
                       )
                     : _PainelDetalhes(
                         ocorrencia: _eventoSelecionado!,
@@ -280,8 +301,8 @@ class _PainelDetalhes extends ConsumerWidget {
       onAlterado();
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Erro ao excluir: ${mensagemDeErroAmigavel(e)}')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Erro ao excluir: ${mensagemDeErroAmigavel(e)}')));
       }
     }
   }
@@ -302,14 +323,17 @@ class _PainelDetalhes extends ConsumerWidget {
                 Container(
                   width: 14,
                   height: 14,
-                  decoration: BoxDecoration(color: evento.cor, shape: BoxShape.circle),
+                  decoration:
+                      BoxDecoration(color: evento.cor, shape: BoxShape.circle),
                 ),
                 const SizedBox(width: 8),
-                Text(evento.labelCategoria, style: Theme.of(context).textTheme.bodyMedium),
+                Text(evento.labelCategoria,
+                    style: Theme.of(context).textTheme.bodyMedium),
               ],
             ),
             const SizedBox(height: 8),
-            Text(evento.titulo, style: Theme.of(context).textTheme.headlineSmall),
+            Text(evento.titulo,
+                style: Theme.of(context).textTheme.headlineSmall),
             const SizedBox(height: 16),
 
             // Aqui esta a informacao que o admin pediu especificamente:
