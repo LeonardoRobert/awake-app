@@ -139,8 +139,12 @@ class InicioScreen extends ConsumerWidget {
                           )),
                       const SizedBox(height: 12),
                     ],
-                    Text('Próximos eventos:',
-                        style: Theme.of(context).textTheme.headlineSmall),
+                    Text(
+                      'Próximos eventos:',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
                     const SizedBox(height: 20),
                     if (ocorrencias.isEmpty)
                       Padding(
