@@ -387,6 +387,14 @@
     padding: 12px 14px;
     margin-bottom: 8px;
   }
+  .cabecalho-dia-visitantes {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--navy);
+    text-transform: capitalize;
+    margin: 18px 0 8px;
+  }
+  .cabecalho-dia-visitantes:first-child { margin-top: 0; }
   .linha-usuario .nome-usuario { font-weight: 700; font-size: 14px; }
   .badge { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 20px; margin-left: 6px; }
   .badge-admin { background: #FDE68A; color: #92400E; }
@@ -2384,18 +2392,32 @@
       .map(u => `<option value="${u.id}">${escaparHtml(u.nome)}</option>`)
       .join('');
 
+    // Aglutina por dia (data de cadastro) -- a lista ja vem ordenada por
+    // criado_em decrescente, entao so precisa detectar troca de dia
+    // enquanto percorre, sem precisar reordenar nada.
+    let ultimoDiaChave = null;
     listaEl.innerHTML = filtrados.map(v => {
       const dados = v.dados || {};
       const nome = dados['Nome completo'] || '(sem nome)';
       const contato = dados['Celular/WhatsApp'] || '';
       const situacao = dados['Situação de fé'] || '';
-      const dataCadastro = new Date(v.criado_em).toLocaleDateString('pt-BR');
+      const dataObj = new Date(v.criado_em);
+      const dataCadastro = dataObj.toLocaleDateString('pt-BR');
       const detalhe = [contato, situacao].filter(Boolean).join(' · ');
       const badgeSemAcompanhamento = v.acompanhado_por
         ? ''
         : '<span class="badge badge-inativo">Sem acompanhamento</span>';
 
+      const diaChave = dataCadastro; // dd/mm/aaaa ja basta como chave
+      let cabecalhoDia = '';
+      if (diaChave !== ultimoDiaChave) {
+        ultimoDiaChave = diaChave;
+        const rotuloDia = dataObj.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
+        cabecalhoDia = `<div class="cabecalho-dia-visitantes">${escaparHtml(rotuloDia)}</div>`;
+      }
+
       return `
+        ${cabecalhoDia}
         <div class="linha-usuario">
           <span class="nome-usuario">${escaparHtml(nome)}</span>${badgeSemAcompanhamento}
           <div style="font-size:12px; color:#888; margin-top:2px;">
