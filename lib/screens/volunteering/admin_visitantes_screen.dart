@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import '../../core/erro_amigavel.dart';
 import '../../models/visitante_model.dart';
 import '../../services/visitante_service.dart';
 import '../../widgets/awake_app_bar.dart';
@@ -90,6 +91,14 @@ class _AdminVisitantesScreenState extends State<AdminVisitantesScreen> {
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
+            }
+            // Erro de verdade (ex: RLS, conexão) NAO pode virar "lista
+            // vazia" silenciosamente -- ja escondeu um bug real assim
+            // antes (ver historico do erro do embed ambiguo).
+            if (snapshot.hasError) {
+              return Center(
+                child: Text('Erro ao carregar: ${mensagemDeErroAmigavel(snapshot.error!)}'),
+              );
             }
             final lista = snapshot.data ?? [];
             if (lista.isEmpty) {

@@ -19,9 +19,14 @@ class VisitanteService {
   }
 
   Future<List<VisitanteModel>> listarTodos() async {
+    // Precisa qualificar QUAL foreign key usar pro embed -- desde que
+    // "acompanhado_por" (outra FK pra profiles) foi adicionada, o
+    // PostgREST nao sabe mais escolher sozinho entre as duas e passou
+    // a rejeitar a consulta (erro que a tela escondia como "lista
+    // vazia" -- ver correcao em admin_visitantes_screen.dart tambem).
     final data = await _client
         .from('visitantes_primeira_vez')
-        .select('*, profiles(nome)')
+        .select('*, profiles!visitantes_primeira_vez_registrado_por_fkey(nome)')
         .order('criado_em', ascending: false);
     return (data as List)
         .map((e) => VisitanteModel.fromMap(e as Map<String, dynamic>))
