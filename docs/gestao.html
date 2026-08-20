@@ -395,6 +395,11 @@
     margin: 18px 0 8px;
   }
   .cabecalho-dia-visitantes:first-child { margin-top: 0; }
+  .link-acao {
+    background: none; border: none; padding: 0; cursor: pointer;
+    font-family: inherit; font-size: 12px; font-weight: 700; color: var(--navy);
+  }
+  .link-acao-perigo { color: var(--vermelho); }
   .linha-usuario .nome-usuario { font-weight: 700; font-size: 14px; }
   .badge { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 20px; margin-left: 6px; }
   .badge-admin { background: #FDE68A; color: #92400E; }
@@ -2447,8 +2452,19 @@
               <label>Virou membro</label>
             </div>
           </div>
+          <div style="margin-top:10px; display:flex; gap:14px;">
+            <button class="link-acao" data-visitante-id="${v.id}" data-acao-editar>Editar</button>
+            <button class="link-acao link-acao-perigo" data-visitante-id="${v.id}" data-acao-apagar>Apagar</button>
+          </div>
         </div>`;
     }).join('');
+
+    listaEl.querySelectorAll('[data-acao-editar]').forEach(btn => {
+      btn.addEventListener('click', () => abrirEdicaoVisitante(btn.dataset.visitanteId));
+    });
+    listaEl.querySelectorAll('[data-acao-apagar]').forEach(btn => {
+      btn.addEventListener('click', () => apagarVisitante(btn.dataset.visitanteId));
+    });
 
     // Preenche o valor selecionado do <select> depois de montar o HTML
     // (mais simples que montar "selected" dinamico dentro de cada <option>).
@@ -2481,6 +2497,91 @@
     // So' o campo "acompanhado_por" muda a tarja "Sem acompanhamento" --
     // reusa o mesmo re-render pros outros campos tambem, mais simples
     // que reconstruir so' um pedacinho da linha.
+    renderizarListaVisitantes();
+  }
+
+  // Campos de "dados" (respostas do formulario "Seja Bem-vindo!") que
+  // fazem sentido corrigir manualmente -- ver formulario_visitante_
+  // screen.dart no app pra ver os nomes exatos das chaves. Aqui vira
+  // texto livre mesmo pros campos que no app sao select (Sexo/Situacao
+  // de fe/Como conheceu) -- e' uma correcao administrativa, nao o
+  // formulario publico, entao nao precisa replicar a mesma validacao.
+  const CAMPOS_DADOS_VISITANTE = [
+    { chave: 'Nome completo', tipo: 'text' },
+    { chave: 'Celular/WhatsApp', tipo: 'text' },
+    { chave: 'Data de nascimento', tipo: 'date' },
+    { chave: 'Sexo', tipo: 'text' },
+    { chave: 'Situação de fé', tipo: 'text' },
+    { chave: 'Como conheceu', tipo: 'text' },
+  ];
+
+  function abrirEdicaoVisitante(visitanteId) {
+    const v = todosVisitantes.find(x => x.id === visitanteId);
+    if (!v) return;
+    const dados = v.dados || {};
+
+    document.getElementById('caixa-modal').innerHTML = `
+      <button class="fechar-modal" id="fechar-modal">✕</button>
+      <h2>Editar visitante</h2>
+      ${CAMPOS_DADOS_VISITANTE.map(c => `
+        <div class="campo-form">
+          <label>${escaparHtml(c.chave)}</label>
+          <input type="${c.tipo}" id="ev-${c.chave}" value="${escaparAtributo(dados[c.chave] || '')}">
+        </div>
+      `).join('')}
+      <div id="erro-form-visitante" style="color:var(--vermelho); font-size:12px; margin-bottom:8px;"></div>
+      <div class="acoes-modal">
+        <button class="botao-secundario" id="btn-cancelar-visitante">Cancelar</button>
+        <button class="botao-secundario" id="btn-salvar-visitante" style="background:var(--navy); color:#fff;">Salvar</button>
+      </div>
+    `;
+    document.getElementById('fundo-modal').classList.add('aberto');
+    document.getElementById('fechar-modal').addEventListener('click', fecharModal);
+    document.getElementById('btn-cancelar-visitante').addEventListener('click', fecharModal);
+    document.getElementById('btn-salvar-visitante').addEventListener('click', () => salvarEdicaoVisitante(visitanteId));
+  }
+
+  async function salvarEdicaoVisitante(visitanteId) {
+    const v = todosVisitantes.find(x => x.id === visitanteId);
+    if (!v) return;
+
+    const nome = document.getElementById('ev-Nome completo').value.trim();
+    if (!nome) {
+      document.getElementById('erro-form-visitante').textContent = 'Informe o nome completo.';
+      return;
+    }
+
+    // Mantem qualquer chave extra que ja existisse em "dados" e nao
+    // esteja no formulario acima -- so sobrescreve o que foi editado.
+    const novoDados = { ...(v.dados || {}) };
+    CAMPOS_DADOS_VISITANTE.forEach(c => {
+      novoDados[c.chave] = document.getElementById(`ev-${c.chave}`).value.trim();
+    });
+
+    const { error } = await supa.from('visitantes_primeira_vez').update({ dados: novoDados }).eq('id', visitanteId);
+    if (error) {
+      document.getElementById('erro-form-visitante').textContent = 'Erro ao salvar: ' + error.message;
+      return;
+    }
+
+    v.dados = novoDados;
+    fecharModal();
+    renderizarListaVisitantes();
+  }
+
+  async function apagarVisitante(visitanteId) {
+    const v = todosVisitantes.find(x => x.id === visitanteId);
+    const nome = (v && v.dados && v.dados['Nome completo']) || 'esse visitante';
+    if (!confirm(`Apagar o cadastro de "${nome}" permanentemente? Essa ação não pode ser desfeita.`)) return;
+
+    const { error } = await supa.from('visitantes_primeira_vez').delete().eq('id', visitanteId);
+    if (error) {
+      alert('Erro ao apagar: ' + error.message);
+      return;
+    }
+
+    todosVisitantes = todosVisitantes.filter(x => x.id !== visitanteId);
+    renderizarDashboardVisitantes();
     renderizarListaVisitantes();
   }
 
