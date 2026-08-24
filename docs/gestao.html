@@ -2714,7 +2714,7 @@
       return `
         ${cabecalhoSemana}
         <div class="linha-usuario">
-          <span class="nome-usuario">${escaparHtml(oc.evento.titulo)}</span><span class="badge badge-checkin">${presencasDoEvento.length} veio${presencasDoEvento.length === 1 ? '' : 'ram'}</span>
+          <span class="nome-usuario">${escaparHtml(oc.evento.titulo)}</span><span class="badge badge-checkin">${presencasDoEvento.length} ${presencasDoEvento.length === 1 ? 'veio' : 'vieram'}</span>
           <div style="font-size:12px; color:#888; margin-top:2px;">
             ${oc.data.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit', ...OPCOES_FUSO_UTC })}
           </div>
