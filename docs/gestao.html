@@ -540,6 +540,7 @@
   // navegacao por papel. Os dois veem as 3 abas, nessa ordem.
   const SECOES = [
     { id: 'calendario', label: 'Calendário' },
+    { id: 'awake', label: 'Awake' },
     { id: 'usuarios', label: 'Usuários' },
     { id: 'visitantes', label: 'Visitantes' },
     { id: 'financeiro', label: 'Financeiro' },
@@ -606,6 +607,16 @@
           </div>
         </div>`;
       iniciarCalendarioAdmin();
+    } else if (secaoAtual === 'awake') {
+      secaoEl.innerHTML = `
+        <h2 style="margin-top:0;">Awake</h2>
+        <p style="color:#888; font-size:13px; margin-top:-8px;">
+          Últimas 8 semanas de eventos do Awake, com check-ins e quem foi.
+        </p>
+        <div id="dashboard-awake"></div>
+        <h3>Últimos eventos</h3>
+        <div id="lista-awake"></div>`;
+      iniciarPainelAwake();
     } else if (secaoAtual === 'financeiro') {
       // A tesouraria decidiu nao adotar o lancamento/import geral de
       // dizimo/oferta (conversa com o Leo em 13/08/2026) -- as abas
@@ -2583,6 +2594,130 @@
     todosVisitantes = todosVisitantes.filter(x => x.id !== visitanteId);
     renderizarDashboardVisitantes();
     renderizarListaVisitantes();
+  }
+
+  // ---------- Awake: eventos + check-ins ----------
+
+  let ocorrenciasAwake = []; // [{ evento, data }], mais recente primeiro
+  let presencasAwake = [];
+
+  function inicioDaSemanaUtc(data) {
+    const d = new Date(data);
+    d.setUTCDate(d.getUTCDate() - d.getUTCDay());
+    return d;
+  }
+
+  async function iniciarPainelAwake() {
+    const dashEl = document.getElementById('dashboard-awake');
+    const listaEl = document.getElementById('lista-awake');
+    dashEl.innerHTML = '<div class="vazio-lateral">Carregando...</div>';
+    listaEl.innerHTML = '';
+
+    const hoje = hojeUtc();
+    const inicioJanela = new Date(hoje);
+    inicioJanela.setUTCDate(inicioJanela.getUTCDate() - 56); // ultimas 8 semanas
+
+    const { data: eventos, error: erroEv } = await supa
+      .from('eventos')
+      .select('id, titulo, data_inicio, recorrente, recorrencia_fim, semanas_do_mes')
+      .eq('escopo', 'awake')
+      .order('data_inicio', { ascending: false });
+
+    if (erroEv) {
+      dashEl.innerHTML = `<div class="vazio-lateral">Erro ao carregar eventos: ${escaparHtml(erroEv.message)}</div>`;
+      return;
+    }
+
+    // Reaproveita a mesma logica de recorrencia do Calendario -- monta
+    // cada ocorrencia (evento + data especifica) dentro da janela.
+    const ocorrencias = [];
+    (eventos || []).forEach(ev => {
+      ocorrenciasNoIntervalo(ev, inicioJanela, hoje).forEach(data => {
+        ocorrencias.push({ evento: ev, data });
+      });
+    });
+    ocorrencias.sort((a, b) => b.data - a.data);
+    ocorrenciasAwake = ocorrencias;
+
+    if (ocorrencias.length === 0) {
+      dashEl.innerHTML = '<div class="vazio-lateral">Nenhum evento Awake nas últimas 8 semanas.</div>';
+      return;
+    }
+
+    const eventoIds = [...new Set(ocorrencias.map(o => o.evento.id))];
+    const dataMaisAntiga = ocorrencias[ocorrencias.length - 1].data.toISOString().slice(0, 10);
+    // profiles!presencas_eventos_user_id_fkey -- precisa qualificar
+    // qual FK usar: a tabela tem DUAS ligacoes com profiles (user_id
+    // de quem fez check-in, e feito_por de quem confirmou), entao um
+    // embed sem qualificar ("profiles(nome)") fica ambiguo pro
+    // PostgREST e a consulta e' rejeitada (mesmo bug ja corrigido em
+    // visitante_service.dart no app, ver commit "Corrige lista de
+    // Visitantes vazia").
+    const { data: presencas, error: erroPres } = await supa
+      .from('presencas_eventos')
+      .select('evento_id, data_ocorrencia, profiles!presencas_eventos_user_id_fkey(nome)')
+      .in('evento_id', eventoIds)
+      .gte('data_ocorrencia', dataMaisAntiga);
+
+    if (erroPres) {
+      dashEl.innerHTML = `<div class="vazio-lateral">Erro ao carregar check-ins: ${escaparHtml(erroPres.message)}</div>`;
+      return;
+    }
+    presencasAwake = presencas || [];
+
+    renderizarDashboardAwake();
+    renderizarListaAwake();
+  }
+
+  function renderizarDashboardAwake() {
+    const totalOcorrencias = ocorrenciasAwake.length;
+    const totalCheckins = presencasAwake.length;
+    const media = totalOcorrencias ? totalCheckins / totalOcorrencias : 0;
+
+    document.getElementById('dashboard-awake').innerHTML = `
+      <div class="grade-agregados">
+        <div class="cartao-agregado"><div class="nome-agregado">Eventos (últimas 8 semanas)</div><div class="contagem-agregado">${totalOcorrencias}</div></div>
+        <div class="cartao-agregado"><div class="nome-agregado">Total de check-ins</div><div class="contagem-agregado">${totalCheckins}</div></div>
+        <div class="cartao-agregado"><div class="nome-agregado">Média de presença por evento</div><div class="contagem-agregado">${media.toFixed(1)}</div></div>
+      </div>`;
+  }
+
+  function renderizarListaAwake() {
+    const listaEl = document.getElementById('lista-awake');
+    let semanaAtualChave = null;
+
+    listaEl.innerHTML = ocorrenciasAwake.map(oc => {
+      const dataStr = oc.data.toISOString().slice(0, 10);
+      const presencasDoEvento = presencasAwake.filter(
+        p => p.evento_id === oc.evento.id && p.data_ocorrencia === dataStr
+      );
+      const nomes = presencasDoEvento
+        .map(p => (p.profiles && p.profiles.nome) || '(sem nome)')
+        .sort();
+
+      const inicioSemana = inicioDaSemanaUtc(oc.data);
+      const semanaChave = inicioSemana.toISOString().slice(0, 10);
+      let cabecalhoSemana = '';
+      if (semanaChave !== semanaAtualChave) {
+        semanaAtualChave = semanaChave;
+        const fimSemana = new Date(inicioSemana);
+        fimSemana.setUTCDate(fimSemana.getUTCDate() + 6);
+        cabecalhoSemana = `<div class="cabecalho-dia-visitantes">Semana de ${inicioSemana.toLocaleDateString('pt-BR', OPCOES_FUSO_UTC)} a ${fimSemana.toLocaleDateString('pt-BR', OPCOES_FUSO_UTC)}</div>`;
+      }
+
+      return `
+        ${cabecalhoSemana}
+        <div class="linha-usuario">
+          <span class="nome-usuario">${escaparHtml(oc.evento.titulo)}</span>
+          <div style="font-size:12px; color:#888; margin-top:2px;">
+            ${oc.data.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit', ...OPCOES_FUSO_UTC })}
+            · ${presencasDoEvento.length} check-in${presencasDoEvento.length === 1 ? '' : 's'}
+          </div>
+          ${nomes.length
+            ? `<div style="font-size:12px; color:var(--navy); margin-top:8px;">${nomes.map(escaparHtml).join(', ')}</div>`
+            : `<div style="font-size:12px; color:#aaa; margin-top:8px;">Ninguém fez check-in.</div>`}
+        </div>`;
+    }).join('');
   }
 
   // ---------- Status do robô de teste ----------
