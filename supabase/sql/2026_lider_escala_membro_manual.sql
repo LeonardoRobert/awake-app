@@ -8,7 +8,12 @@
 -- so muda QUEM esta sendo inscrito (p_user_id em vez de auth.uid()) e
 -- exige que quem chama seja lider do Awake ou admin.
 --
--- Cole no Supabase Dashboard -> SQL Editor e rode manualmente.
+-- Cole no Supabase Dashboard -> SQL Editor e rode manualmente. Usa
+-- $func$ em vez de $$ como delimitador de propósito -- o assistente
+-- automático do SQL Editor às vezes confunde variável declarada
+-- dentro da função (ex: v_vagas) com nome de tabela nova e cola um
+-- bloco "ALTER TABLE ... ENABLE ROW LEVEL SECURITY" sozinho, quebrando
+-- o fechamento de "$$". Já rodado com sucesso em produção (24/08).
 
 create or replace function public.inscrever_membro_como_lider(
   p_user_id uuid,
@@ -17,7 +22,7 @@ create or replace function public.inscrever_membro_como_lider(
 )
 returns uuid
 language plpgsql security definer set search_path = public
-as $$
+as $func$
 declare
   v_vagas int;
   v_horario_inicio time;
@@ -78,6 +83,6 @@ begin
 
   return v_nova_inscricao_id;
 end;
-$$;
+$func$;
 
 select 'inscrever_membro_como_lider() criada.' as status;
