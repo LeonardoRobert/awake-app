@@ -1,3 +1,4 @@
+import '../models/escala_servico_model.dart' show PessoaBusca;
 import '../models/service_area_model.dart';
 import '../models/shift_model.dart';
 import '../models/signup_model.dart';
@@ -84,6 +85,41 @@ class ShiftService {
       'p_escala_id': escalaId,
       'p_data_ocorrencia': dataOcorrencia.toIso8601String().split('T').first,
     });
+  }
+
+  /// So' lider do Awake ou admin -- escala outra pessoa numa ocorrencia,
+  /// mesmo que ela nao tenha se inscrito sozinha. Passa pelas mesmas
+  /// checagens de inscrever_em_escala (vaga lotada, horario sobreposto,
+  /// limite de domingos), so' que pra p_user_id em vez de quem chamou.
+  Future<void> inscreverComoLider({
+    required String userId,
+    required String escalaId,
+    required DateTime dataOcorrencia,
+  }) async {
+    await _client.rpc('inscrever_membro_como_lider', params: {
+      'p_user_id': userId,
+      'p_escala_id': escalaId,
+      'p_data_ocorrencia': dataOcorrencia.toIso8601String().split('T').first,
+    });
+  }
+
+  /// Busca por nome pra escalar manualmente -- qualquer pessoa cadastrada
+  /// pode ser escalada (inscrever_em_escala tambem nao exige que a
+  /// pessoa pertenca a nenhum ministerio especifico).
+  Future<List<PessoaBusca>> buscarMembroPorNome(String query) async {
+    if (query.trim().length < 2) return [];
+    final data = await _client
+        .from('profiles')
+        .select('id, nome')
+        .ilike('nome', '%${query.trim()}%')
+        .order('nome')
+        .limit(20);
+    return (data as List)
+        .map((e) => PessoaBusca(
+              id: (e as Map<String, dynamic>)['id'] as String,
+              nome: e['nome'] as String,
+            ))
+        .toList();
   }
 
   Future<void> cancelSignup(String inscricaoId) async {

@@ -1164,6 +1164,79 @@ Future<void> _testarLiderVerInscritosEscala() async {
   );
 }
 
+/// Lider consegue escalar OUTRA pessoa (o Membro de teste) numa
+/// ocorrencia que ela nao se inscreveu sozinha -- inscrever_membro_
+/// como_lider() precisa aceitar de quem e' lider/admin.
+Future<void> _testarLiderEscalarMembroManual() async {
+  final escalaId = _gerarUuidV4();
+  final dataStr = DateTime.now().toIso8601String().split('T').first;
+  final membroId = _clienteMembro.auth.currentUser!.id;
+
+  await _admin.from('escalas').insert({
+    'id': escalaId,
+    'nome': '[Robô de teste] escalar manual',
+    'area_id': null,
+    'data': dataStr,
+    'horario_inicio': '00:00',
+    'horario_fim': '23:59',
+    'vagas': 2,
+    'recorrente': false,
+  });
+
+  try {
+    await _clienteLider.rpc('inscrever_membro_como_lider', params: {
+      'p_user_id': membroId,
+      'p_escala_id': escalaId,
+      'p_data_ocorrencia': dataStr,
+    });
+
+    final inscricao = await _admin
+        .from('inscricoes')
+        .select('id, status')
+        .eq('escala_id', escalaId)
+        .eq('user_id', membroId)
+        .maybeSingle();
+    if (inscricao == null) {
+      throw Exception('Líder chamou a função mas não criou a inscrição do Membro.');
+    }
+  } finally {
+    await _admin.from('inscricoes').delete().eq('escala_id', escalaId);
+    await _admin.from('escalas').delete().eq('id', escalaId);
+  }
+}
+
+/// Negativo: Membro comum (nao lider, nao admin) tentando escalar
+/// OUTRA pessoa via inscrever_membro_como_lider() -- deve ser
+/// bloqueado pela checagem is_admin()/is_lider_ministerio('awake')
+/// dentro da funcao.
+Future<void> _testarMembroNaoPodeEscalarOutraPessoa() async {
+  final escalaId = _gerarUuidV4();
+  final dataStr = DateTime.now().toIso8601String().split('T').first;
+  final liderId = _clienteLider.auth.currentUser!.id;
+
+  await _admin.from('escalas').insert({
+    'id': escalaId,
+    'nome': '[Robô de teste] nao deveria escalar',
+    'area_id': null,
+    'data': dataStr,
+    'horario_inicio': '00:00',
+    'horario_fim': '23:59',
+    'vagas': 2,
+    'recorrente': false,
+  });
+
+  try {
+    await _clienteMembro.rpc('inscrever_membro_como_lider', params: {
+      'p_user_id': liderId,
+      'p_escala_id': escalaId,
+      'p_data_ocorrencia': dataStr,
+    });
+  } finally {
+    await _admin.from('inscricoes').delete().eq('escala_id', escalaId);
+    await _admin.from('escalas').delete().eq('id', escalaId);
+  }
+}
+
 /// Negativo: Lider de Areas de Servico tentando criar evento de escopo
 /// que ele NAO lidera (so lidera as 5 areas em _todasAreasServico) --
 /// is_lider_ministerio('homens') deve ser falso pra essa conta, RLS
@@ -1856,6 +1929,9 @@ Future<void> main() async {
       resultados.add(await _rodar('lider_casal_diaconos', _testarCasalDiaconos));
       resultados.add(await _rodar('lider_escalado_aparece_na_inicio', _testarEscaladoApareceNaInicio));
       resultados.add(await _rodar('lider_ver_inscritos_escala', _testarLiderVerInscritosEscala));
+      resultados.add(await _rodar('lider_escalar_membro_manual', _testarLiderEscalarMembroManual));
+      resultados.add(await _rodarEsperandoFalha(
+          'membro_nao_pode_escalar_outra_pessoa', _testarMembroNaoPodeEscalarOutraPessoa));
       resultados.add(await _rodar('lider_awake_ver_e_marcar_visitante', _testarLiderAwakeVerEMarcarVisitante));
       resultados.add(await _rodar('lider_dashboard_ve_time_inteiro', _testarDashboardMinisterio));
       // Lider (de qualquer ministerio, nao so Awake -- ver comentario
