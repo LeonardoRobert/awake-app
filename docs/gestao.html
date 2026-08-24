@@ -2617,10 +2617,14 @@
     const inicioJanela = new Date(hoje);
     inicioJanela.setUTCDate(inicioJanela.getUTCDate() - 56); // ultimas 8 semanas
 
+    // 'igreja' entra tambem -- EBD/Culto de Celebracao/Culto da
+    // Familia sao escopo=igreja (todo mundo, nao so' Awake), mas o
+    // Awake participa e faz check-in neles do mesmo jeito que em
+    // GC/Comunhao/Laje (escopo=awake).
     const { data: eventos, error: erroEv } = await supa
       .from('eventos')
       .select('id, titulo, data_inicio, recorrente, recorrencia_fim, semanas_do_mes')
-      .eq('escopo', 'awake')
+      .in('escopo', ['awake', 'igreja'])
       .order('data_inicio', { ascending: false });
 
     if (erroEv) {
