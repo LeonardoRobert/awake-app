@@ -230,6 +230,21 @@ Future<void> _testarTestemunho() async {
   await _admin.from('testemunhos').delete().eq('id', inserido['id'] as String);
 }
 
+/// "Agora" em horario de Brasilia (UTC-3 fixo -- o Brasil aboliu
+/// horario de verao em 2019, entao um offset fixo e' seguro). Varias
+/// funcoes do banco (ex: esta_na_escala_primeira_vez()) calculam
+/// "hoje" via `now() at time zone 'America/Sao_Paulo'`, nao em UTC --
+/// testes que comparam "hoje"/"ontem" contra esse conceito precisam
+/// calcular do mesmo jeito. Sem isso, ha uma janela de ~3h por dia
+/// (21h-00h de Brasilia) onde o UTC do servidor do robo (GitHub
+/// Actions, roda em UTC) ja virou o dia seguinte mas Brasilia ainda
+/// nao -- nessa janela, "ontem" calculado em UTC bate com "hoje" em
+/// Brasilia, dando falso positivo/negativo dependendo de quando o
+/// robo roda (foi exatamente isso que aconteceu com
+/// primeira_vez_so_no_dia numa rodada real).
+DateTime _agoraBrasilia() => DateTime.now().toUtc().subtract(const Duration(hours: 3));
+String _hojeBrasiliaStr() => _agoraBrasilia().toIso8601String().split('T').first;
+
 /// area_id fixo de "Recepção/Primeira Vez" (ver
 /// RECUPERACAO_parte3b_fix_id_primeira_vez.sql) -- e o mesmo id que
 /// esta_na_escala_primeira_vez() espera pra liberar o insert em
@@ -241,13 +256,20 @@ const _areaPrimeiraVezId = '7678a09a-1141-4fcb-833d-0736c91038f0';
 /// servico especifica pra HOJE, chama [dentroDoCenario] com o id da
 /// escala/inscricao criadas, e desfaz tudo no finally. Reaproveitado
 /// pelo teste de "Primeira Vez" e pelo de check-in.
+///
+/// "Hoje" aqui e' calculado em horario de Brasilia (ver
+/// _hojeBrasiliaStr()) -- funcoes do banco como
+/// esta_na_escala_primeira_vez() tambem calculam "hoje" assim, entao
+/// precisa bater, senao ha uma janela de ~3h por dia (21h-00h de
+/// Brasilia) onde o UTC do servidor do robo ja virou o dia seguinte
+/// mas Brasilia ainda nao.
 Future<T> _comEscalaAwakeDeHoje<T>({
   required String? areaId,
   required Future<T> Function(String escalaId, String dataStr) dentroDoCenario,
 }) async {
   final membroId = _clienteMembro.auth.currentUser!.id;
   final escalaId = _gerarUuidV4();
-  final dataStr = DateTime.now().toIso8601String().split('T').first;
+  final dataStr = _hojeBrasiliaStr();
 
   await _admin.from('escalas').insert({
     'id': escalaId,
@@ -285,8 +307,11 @@ Future<T> _comEscalaAwakeDeHoje<T>({
 /// continua liberando.
 Future<void> _testarPrimeiraVezSoNoDia() async {
   final escalaOntemId = _gerarUuidV4();
-  final ontem = DateTime.now().subtract(const Duration(days: 1));
-  final dataOntemStr = ontem.toIso8601String().split('T').first;
+  final dataOntemStr = _agoraBrasilia()
+      .subtract(const Duration(days: 1))
+      .toIso8601String()
+      .split('T')
+      .first;
 
   await _admin.from('escalas').insert({
     'id': escalaOntemId,
