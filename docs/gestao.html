@@ -761,6 +761,20 @@
   const OPCOES_FUSO_UTC = { timeZone: 'UTC' };
 
   function ocorrenciasNoIntervalo(evento, inicio, fim) {
+    // "excecoes": datas em que essa ocorrencia recorrente foi editada
+    // individualmente -- vira um evento novo e separado pra aquele dia
+    // (ver EdicaoOcorrenciaUnica no app), e a ocorrencia original
+    // precisa ser PULADA aqui, senao os dois aparecem juntos pra
+    // mesma data (mesmo evento 2x). Mesma logica de
+    // EventModel.occurrencesBetween() (ehExcecao) no app Flutter.
+    const excecoes = evento.excecoes || [];
+    const ehExcecao = (data) => excecoes.some(e => {
+      const d = new Date(e);
+      return d.getUTCFullYear() === data.getUTCFullYear()
+        && d.getUTCMonth() === data.getUTCMonth()
+        && d.getUTCDate() === data.getUTCDate();
+    });
+
     const ocorrencias = [];
     const dataBase = parseDataHoraUtc(evento.data_inicio);
     if (!evento.recorrente) {
@@ -771,7 +785,7 @@
     let cursor = new Date(dataBase);
     while (cursor < inicio) cursor.setUTCDate(cursor.getUTCDate() + 7);
     while (cursor <= fim) {
-      if (!fimRecorrencia || cursor <= fimRecorrencia) {
+      if ((!fimRecorrencia || cursor <= fimRecorrencia) && !ehExcecao(cursor)) {
         const semanasDoMes = evento.semanas_do_mes;
         if (!semanasDoMes || semanasDoMes.length === 0) {
           ocorrencias.push(new Date(cursor));
@@ -2625,7 +2639,7 @@
     // "Lançamento do Aplicativo") -- pedido explicito do Leo.
     const { data: eventos, error: erroEv } = await supa
       .from('eventos')
-      .select('id, titulo, data_inicio, recorrente, recorrencia_fim, semanas_do_mes, tipo')
+      .select('id, titulo, data_inicio, recorrente, recorrencia_fim, semanas_do_mes, tipo, excecoes')
       .in('tipo', ['ebd', 'gc', 'comunhao', 'laje'])
       .order('data_inicio', { ascending: false });
 
