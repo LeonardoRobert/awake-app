@@ -1,12 +1,12 @@
--- Permite que lider do Awake (ou admin) escale outra pessoa numa
--- ocorrencia de escala Awake, mesmo que ela nao tenha se inscrito
--- sozinha (ex: lider sabe que fulano vai servir, mas fulano esqueceu
--- de se inscrever pelo app).
+-- Permite que um lider (de qualquer ministerio -- mesma regra de quem
+-- ja pode LER a lista de inscritos, ver inscricoes_select) ou admin
+-- escale outra pessoa numa ocorrencia de escala Awake, mesmo que ela
+-- nao tenha se inscrito sozinha (ex: lider sabe que fulano vai
+-- servir, mas fulano esqueceu de se inscrever pelo app).
 --
 -- Espelha exatamente as mesmas checagens de inscrever_em_escala()
 -- (vaga lotada, horario sobreposto, limite de 2 domingos no mes) --
--- so muda QUEM esta sendo inscrito (p_user_id em vez de auth.uid()) e
--- exige que quem chama seja lider do Awake ou admin.
+-- so muda QUEM esta sendo inscrito (p_user_id em vez de auth.uid()).
 --
 -- Cole no Supabase Dashboard -> SQL Editor e rode manualmente. Usa
 -- $func$ em vez de $$ como delimitador de propósito -- o assistente
@@ -31,8 +31,12 @@ declare
   v_domingos_no_mes int;
   v_nova_inscricao_id uuid;
 begin
-  if not (is_admin() or is_lider_ministerio('awake')) then
-    raise exception 'Só líder do Awake ou admin pode escalar outra pessoa.';
+  -- Mesma condicao ja usada pela policy inscricoes_select (ver
+  -- RECUPERACAO_parte2_escala_metas.sql) pra quem pode LER inscritos
+  -- de uma escala -- lider de QUALQUER ministerio, nao so' do Awake
+  -- (a tela de "Inscritos" ja e' acessivel a qualquer lider hoje).
+  if not (is_admin() or is_lider_de_algum_ministerio()) then
+    raise exception 'Só líder ou admin pode escalar outra pessoa.';
   end if;
 
   select vagas, horario_inicio, horario_fim

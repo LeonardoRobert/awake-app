@@ -1232,7 +1232,7 @@ Future<void> _testarLiderEscalarMembroManual() async {
 
 /// Negativo: Membro comum (nao lider, nao admin) tentando escalar
 /// OUTRA pessoa via inscrever_membro_como_lider() -- deve ser
-/// bloqueado pela checagem is_admin()/is_lider_ministerio('awake')
+/// bloqueado pela checagem is_admin()/is_lider_de_algum_ministerio()
 /// dentro da funcao.
 Future<void> _testarMembroNaoPodeEscalarOutraPessoa() async {
   final escalaId = _gerarUuidV4();

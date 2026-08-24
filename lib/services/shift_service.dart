@@ -87,10 +87,12 @@ class ShiftService {
     });
   }
 
-  /// So' lider do Awake ou admin -- escala outra pessoa numa ocorrencia,
-  /// mesmo que ela nao tenha se inscrito sozinha. Passa pelas mesmas
-  /// checagens de inscrever_em_escala (vaga lotada, horario sobreposto,
-  /// limite de domingos), so' que pra p_user_id em vez de quem chamou.
+  /// So' lider (de qualquer ministerio -- mesma regra de quem ja pode
+  /// ver a lista de inscritos) ou admin -- escala outra pessoa numa
+  /// ocorrencia, mesmo que ela nao tenha se inscrito sozinha. Passa
+  /// pelas mesmas checagens de inscrever_em_escala (vaga lotada,
+  /// horario sobreposto, limite de domingos), so' que pra p_user_id em
+  /// vez de quem chamou.
   Future<void> inscreverComoLider({
     required String userId,
     required String escalaId,
