@@ -405,6 +405,7 @@
   .badge-admin { background: #FDE68A; color: #92400E; }
   .badge-financeiro { background: #BFDBFE; color: #1E3A8A; }
   .badge-inativo { background: #FEE2E2; color: #991B1B; }
+  .badge-checkin { background: #D1FAE5; color: #065F46; }
   .chips-ministerios { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
   .chip-ministerio {
     font-size: 12px; font-weight: 600; padding: 5px 10px; border-radius: 20px;
@@ -2617,14 +2618,15 @@
     const inicioJanela = new Date(hoje);
     inicioJanela.setUTCDate(inicioJanela.getUTCDate() - 56); // ultimas 8 semanas
 
-    // 'igreja' entra tambem -- EBD/Culto de Celebracao/Culto da
-    // Familia sao escopo=igreja (todo mundo, nao so' Awake), mas o
-    // Awake participa e faz check-in neles do mesmo jeito que em
-    // GC/Comunhao/Laje (escopo=awake).
+    // Filtra por TIPO, nao por escopo -- so os encontros "oficiais"
+    // (EBD vem de escopo=igreja; GC/Comunhao/Laje vem de escopo=awake).
+    // Fica de fora Culto de Celebracao/Culto da Familia (escopo=igreja)
+    // e qualquer evento tipo=outro dentro do Awake (ex: "Entre Elas",
+    // "Lançamento do Aplicativo") -- pedido explicito do Leo.
     const { data: eventos, error: erroEv } = await supa
       .from('eventos')
-      .select('id, titulo, data_inicio, recorrente, recorrencia_fim, semanas_do_mes')
-      .in('escopo', ['awake', 'igreja'])
+      .select('id, titulo, data_inicio, recorrente, recorrencia_fim, semanas_do_mes, tipo')
+      .in('tipo', ['ebd', 'gc', 'comunhao', 'laje'])
       .order('data_inicio', { ascending: false });
 
     if (erroEv) {
@@ -2712,10 +2714,9 @@
       return `
         ${cabecalhoSemana}
         <div class="linha-usuario">
-          <span class="nome-usuario">${escaparHtml(oc.evento.titulo)}</span>
+          <span class="nome-usuario">${escaparHtml(oc.evento.titulo)}</span><span class="badge badge-checkin">${presencasDoEvento.length} veio${presencasDoEvento.length === 1 ? '' : 'ram'}</span>
           <div style="font-size:12px; color:#888; margin-top:2px;">
             ${oc.data.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit', ...OPCOES_FUSO_UTC })}
-            · ${presencasDoEvento.length} check-in${presencasDoEvento.length === 1 ? '' : 's'}
           </div>
           ${nomes.length
             ? `<div style="font-size:12px; color:var(--navy); margin-top:8px;">${nomes.map(escaparHtml).join(', ')}</div>`
