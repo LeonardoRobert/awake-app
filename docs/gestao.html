@@ -2626,8 +2626,23 @@
 
   // ---------- Shallom: eventos gerais + contagem manual ----------
 
+  /// EBD aparece nas duas abas (Awake e Shallom) -- "nao contabilizado"
+  /// precisa ser independente por aba, senao marcar numa mexe na outra
+  /// sem querer. Devolve um Set de chaves "eventoId_data" pra lookup
+  /// rapido na hora de renderizar.
+  async function buscarNaoContabilizadas(aba, eventoIds) {
+    const { data, error } = await supa
+      .from('ocorrencias_nao_contabilizadas')
+      .select('evento_id, data_ocorrencia')
+      .eq('aba', aba)
+      .in('evento_id', eventoIds);
+    if (error) throw error;
+    return new Set((data || []).map(l => `${l.evento_id}_${l.data_ocorrencia}`));
+  }
+
   let ocorrenciasShallom = [];
   let contagensShallom = [];
+  let naoContabilizadasShallom = new Set();
 
   async function iniciarPainelShallom() {
     const dashEl = document.getElementById('dashboard-shallom');
@@ -2667,7 +2682,7 @@
     const eventoIds = [...new Set(ocorrencias.map(o => o.evento.id))];
     const { data: contagens, error: erroCont } = await supa
       .from('contagem_manual_eventos')
-      .select('evento_id, data_ocorrencia, contagem, nao_contabilizado')
+      .select('evento_id, data_ocorrencia, contagem')
       .in('evento_id', eventoIds);
 
     if (erroCont) {
@@ -2675,6 +2690,13 @@
       return;
     }
     contagensShallom = contagens || [];
+
+    try {
+      naoContabilizadasShallom = await buscarNaoContabilizadas('shallom', eventoIds);
+    } catch (e) {
+      dashEl.innerHTML = `<div class="vazio-lateral">Erro ao carregar: ${escaparHtml(e.message)}</div>`;
+      return;
+    }
 
     renderizarDashboardShallom();
     renderizarListaShallom();
@@ -2688,8 +2710,7 @@
 
   function _naoContabilizadoShallom(oc) {
     const dataStr = oc.data.toISOString().slice(0, 10);
-    const linha = contagensShallom.find(c => c.evento_id === oc.evento.id && c.data_ocorrencia === dataStr);
-    return linha ? !!linha.nao_contabilizado : false;
+    return naoContabilizadasShallom.has(`${oc.evento.id}_${dataStr}`);
   }
 
   function renderizarDashboardShallom() {
@@ -2751,7 +2772,7 @@
     });
     listaEl.querySelectorAll('[data-acao-nao-contabilizado-shallom]').forEach(btn => {
       btn.addEventListener('click', () => alternarNaoContabilizado(
-        btn.dataset.eventoId, btn.dataset.data, btn.dataset.naoContabilizado !== 'true', iniciarPainelShallom
+        btn.dataset.eventoId, btn.dataset.data, 'shallom', btn.dataset.naoContabilizado !== 'true', iniciarPainelShallom
       ));
     });
   }
@@ -2797,7 +2818,7 @@
 
   let ocorrenciasAwake = []; // [{ evento, data }], mais recente primeiro
   let presencasAwake = [];
-  let metadadosAwake = []; // so' guarda nao_contabilizado (Awake nao usa contagem manual)
+  let naoContabilizadasAwake = new Set();
 
   function inicioDaSemanaUtc(data) {
     const d = new Date(data);
@@ -2868,16 +2889,12 @@
     }
     presencasAwake = presencas || [];
 
-    const { data: metadados, error: erroMeta } = await supa
-      .from('contagem_manual_eventos')
-      .select('evento_id, data_ocorrencia, nao_contabilizado')
-      .in('evento_id', eventoIds);
-
-    if (erroMeta) {
-      dashEl.innerHTML = `<div class="vazio-lateral">Erro ao carregar: ${escaparHtml(erroMeta.message)}</div>`;
+    try {
+      naoContabilizadasAwake = await buscarNaoContabilizadas('awake', eventoIds);
+    } catch (e) {
+      dashEl.innerHTML = `<div class="vazio-lateral">Erro ao carregar: ${escaparHtml(e.message)}</div>`;
       return;
     }
-    metadadosAwake = metadados || [];
 
     renderizarDashboardAwake();
     renderizarListaAwake();
@@ -2885,8 +2902,7 @@
 
   function _naoContabilizadoAwake(oc) {
     const dataStr = oc.data.toISOString().slice(0, 10);
-    const linha = metadadosAwake.find(m => m.evento_id === oc.evento.id && m.data_ocorrencia === dataStr);
-    return linha ? !!linha.nao_contabilizado : false;
+    return naoContabilizadasAwake.has(`${oc.evento.id}_${dataStr}`);
   }
 
   function renderizarDashboardAwake() {
@@ -2957,19 +2973,22 @@
     });
     listaEl.querySelectorAll('[data-acao-nao-contabilizado-awake]').forEach(btn => {
       btn.addEventListener('click', () => alternarNaoContabilizado(
-        btn.dataset.eventoId, btn.dataset.data, btn.dataset.naoContabilizado !== 'true', iniciarPainelAwake
+        btn.dataset.eventoId, btn.dataset.data, 'awake', btn.dataset.naoContabilizado !== 'true', iniciarPainelAwake
       ));
     });
   }
 
-  /// Marca (ou desmarca) uma ocorrencia como "nao contabilizada" -- o
-  /// evento continua na lista, so' sai da contagem/media do dashboard.
-  /// Compartilhada entre a aba Awake e a aba Shallom -- [aoTerminar]
-  /// recarrega a lista certa depois.
-  async function alternarNaoContabilizado(eventoId, dataStr, novoValor, aoTerminar) {
+  /// Marca (ou desmarca) uma ocorrencia como "nao contabilizada" --
+  /// SEMPRE so' pra [aba] (evento tipo EBD aparece nas duas abas, e a
+  /// marcacao precisa ser independente entre elas -- ver
+  /// ocorrencias_nao_contabilizadas). O evento continua na lista, so'
+  /// sai da contagem/media do dashboard DAQUELA aba. Compartilhada
+  /// entre Awake e Shallom -- [aoTerminar] recarrega a lista certa.
+  async function alternarNaoContabilizado(eventoId, dataStr, aba, novoValor, aoTerminar) {
     const { error } = await supa.rpc('definir_nao_contabilizado_evento', {
       p_evento_id: eventoId,
       p_data_ocorrencia: dataStr,
+      p_aba: aba,
       p_nao_contabilizado: novoValor,
     });
     if (error) {
