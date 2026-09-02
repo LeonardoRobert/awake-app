@@ -12,6 +12,7 @@ import '../../screens/messages/admin_mensagens_screen.dart';
 import '../../screens/messages/enviar_mensagem_screen.dart';
 import '../../screens/pages/nossas_paginas_screen.dart';
 import '../../models/profile_model.dart';
+import '../../screens/calendar/contador_evento_screen.dart';
 import '../../screens/calendar/outdoors_admin_screen.dart';
 import '../../screens/pages/meus_conteudos_screen.dart';
 import '../../screens/pages/nossos_conteudos_screen.dart';
@@ -187,6 +188,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ],
               ),
               const SizedBox(height: 24),
+              if (profile.isAdmin) ...[
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.pin_outlined),
+                  title: const Text('Contador de evento'),
+                  subtitle: const Text('EBD, Culto de Celebração e Culto da Família'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => const ContadorEventoScreen(),
+                  )),
+                ),
+                const SizedBox(height: 8),
+              ],
               const LinkFormularioVisitante(),
               if (eventoIngressado != null) ...[
                 const SizedBox(height: 16),

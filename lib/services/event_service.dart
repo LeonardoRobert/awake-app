@@ -17,6 +17,38 @@ class EventService {
         .toList();
   }
 
+  /// Contagem manual de presença (admin aperta +/-) pra eventos "gerais"
+  /// (EBD, Culto de Celebração, Culto da Família) onde não dá pra
+  /// escanear QR Code de todo mundo. Uma linha por (evento, data) --
+  /// ver contagem_manual_eventos no banco.
+  Future<int> buscarContagemEvento({
+    required String eventoId,
+    required DateTime dataOcorrencia,
+  }) async {
+    final data = await _client
+        .from('contagem_manual_eventos')
+        .select('contagem')
+        .eq('evento_id', eventoId)
+        .eq('data_ocorrencia', dataOcorrencia.toIso8601String().split('T').first)
+        .maybeSingle();
+    return (data?['contagem'] as int?) ?? 0;
+  }
+
+  /// [delta] positivo soma, negativo subtrai -- nunca deixa ficar
+  /// negativo (o banco trava em 0). Devolve o valor novo já atualizado.
+  Future<int> ajustarContagemEvento({
+    required String eventoId,
+    required DateTime dataOcorrencia,
+    required int delta,
+  }) async {
+    final resultado = await _client.rpc('ajustar_contagem_evento', params: {
+      'p_evento_id': eventoId,
+      'p_data_ocorrencia': dataOcorrencia.toIso8601String().split('T').first,
+      'p_delta': delta,
+    });
+    return resultado as int;
+  }
+
   Future<void> create(EventModel event) async {
     await _client.from('eventos').insert(event.toInsertMap());
   }
