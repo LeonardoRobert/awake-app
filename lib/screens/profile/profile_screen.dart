@@ -189,15 +189,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ),
               const SizedBox(height: 24),
               if (profile.isAdmin) ...[
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.pin_outlined),
-                  title: const Text('Contador de evento'),
-                  subtitle: const Text('EBD, Culto de Celebração e Culto da Família'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                    builder: (_) => const ContadorEventoScreen(),
-                  )),
+                Card(
+                  color: Colors.amber.withOpacity(0.15),
+                  child: ListTile(
+                    leading: const Icon(Icons.pin_outlined),
+                    title: const Text('Contador de evento'),
+                    subtitle: const Text('EBD, Culto de Celebração e Culto da Família'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => const ContadorEventoScreen(),
+                    )),
+                  ),
                 ),
                 const SizedBox(height: 8),
               ],

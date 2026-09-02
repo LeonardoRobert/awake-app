@@ -7,8 +7,10 @@ import '../../widgets/awake_app_bar.dart';
 
 /// Contador manual de presença -- pra eventos "gerais" (EBD, Culto de
 /// Celebração, Culto da Família) onde não dá pra escanear QR Code de
-/// todo mundo. O admin escolhe o evento de HOJE e vai apertando +/-.
-/// Esse dado alimenta a aba Shallom do painel de gestão.
+/// todo mundo. O admin escolhe o evento de HOJE, vai apertando +/-
+/// (só na tela, não grava nada ainda) e manda pro banco de uma vez só
+/// no botão "Enviar", quando terminar de contar. Esse dado alimenta a
+/// aba Shallom do painel de gestão.
 class ContadorEventoScreen extends StatefulWidget {
   const ContadorEventoScreen({super.key});
 
@@ -25,9 +27,9 @@ class _ContadorEventoScreenState extends State<ContadorEventoScreen> {
   late Future<List<({EventModel evento, DateTime data})>> _futuroEventosDeHoje;
 
   ({EventModel evento, DateTime data})? _selecionado;
-  int? _contagem;
+  int _contagem = 0;
   bool _carregandoContagem = false;
-  bool _ajustando = false;
+  bool _enviando = false;
 
   @override
   void initState() {
@@ -58,6 +60,8 @@ class _ContadorEventoScreenState extends State<ContadorEventoScreen> {
       _carregandoContagem = true;
     });
     try {
+      // Comeca do que ja tiver sido enviado antes (ex: alguem ja
+      // contou uma parte e mandou, e agora vai continuar contando).
       final contagem = await _service.buscarContagemEvento(
         eventoId: item.evento.id,
         dataOcorrencia: item.data,
@@ -74,18 +78,31 @@ class _ContadorEventoScreenState extends State<ContadorEventoScreen> {
     }
   }
 
-  Future<void> _ajustar(int delta) async {
-    final selecionado = _selecionado;
-    if (selecionado == null || _ajustando) return;
+  /// So' mexe no numero da tela -- nao grava nada no banco ainda.
+  void _ajustar(int delta) {
+    setState(() => _contagem = (_contagem + delta).clamp(0, 999999));
+  }
 
-    setState(() => _ajustando = true);
+  Future<void> _enviar() async {
+    final selecionado = _selecionado;
+    if (selecionado == null || _enviando) return;
+
+    setState(() => _enviando = true);
     try {
-      final novoValor = await _service.ajustarContagemEvento(
+      await _service.definirContagemEvento(
         eventoId: selecionado.evento.id,
         dataOcorrencia: selecionado.data,
-        delta: delta,
+        valor: _contagem,
       );
-      if (mounted) setState(() => _contagem = novoValor);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Contagem enviada!')),
+        );
+        setState(() {
+          _selecionado = null;
+          _contagem = 0;
+        });
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -93,7 +110,7 @@ class _ContadorEventoScreenState extends State<ContadorEventoScreen> {
         );
       }
     } finally {
-      if (mounted) setState(() => _ajustando = false);
+      if (mounted) setState(() => _enviando = false);
     }
   }
 
@@ -167,7 +184,7 @@ class _ContadorEventoScreenState extends State<ContadorEventoScreen> {
             _carregandoContagem
                 ? const CircularProgressIndicator()
                 : Text(
-                    '${_contagem ?? 0}',
+                    '$_contagem',
                     style: const TextStyle(fontSize: 64, fontWeight: FontWeight.bold),
                   ),
             const SizedBox(height: 32),
@@ -176,20 +193,34 @@ class _ContadorEventoScreenState extends State<ContadorEventoScreen> {
               children: [
                 _BotaoContador(
                   icon: Icons.remove,
-                  onPressed: _ajustando || _carregandoContagem ? null : () => _ajustar(-1),
+                  onPressed: _carregandoContagem ? null : () => _ajustar(-1),
                 ),
                 const SizedBox(width: 24),
                 _BotaoContador(
                   icon: Icons.add,
-                  onPressed: _ajustando || _carregandoContagem ? null : () => _ajustar(1),
+                  onPressed: _carregandoContagem ? null : () => _ajustar(1),
                 ),
               ],
             ),
             const SizedBox(height: 32),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: _carregandoContagem || _enviando ? null : _enviar,
+                child: _enviando
+                    ? const SizedBox(
+                        height: 18,
+                        width: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Enviar'),
+              ),
+            ),
+            const SizedBox(height: 12),
             TextButton(
               onPressed: () => setState(() {
                 _selecionado = null;
-                _contagem = null;
+                _contagem = 0;
               }),
               child: const Text('Escolher outro evento'),
             ),

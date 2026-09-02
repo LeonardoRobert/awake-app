@@ -34,19 +34,20 @@ class EventService {
     return (data?['contagem'] as int?) ?? 0;
   }
 
-  /// [delta] positivo soma, negativo subtrai -- nunca deixa ficar
-  /// negativo (o banco trava em 0). Devolve o valor novo já atualizado.
-  Future<int> ajustarContagemEvento({
+  /// Define o valor final direto (usado pelo botão "Enviar" da tela de
+  /// Contador de evento -- o +/- só mexe num número local na tela, essa
+  /// chamada é a única que grava no banco, quando a pessoa termina de
+  /// contar).
+  Future<void> definirContagemEvento({
     required String eventoId,
     required DateTime dataOcorrencia,
-    required int delta,
+    required int valor,
   }) async {
-    final resultado = await _client.rpc('ajustar_contagem_evento', params: {
+    await _client.rpc('definir_contagem_evento', params: {
       'p_evento_id': eventoId,
       'p_data_ocorrencia': dataOcorrencia.toIso8601String().split('T').first,
-      'p_delta': delta,
+      'p_valor': valor,
     });
-    return resultado as int;
   }
 
   Future<void> create(EventModel event) async {

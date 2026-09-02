@@ -1848,6 +1848,180 @@ Future<void> _testarCheckInEvento(SupabaseClient quemFazCheckin) async {
   }
 }
 
+/// Admin marca check-in retroativo (aba Awake do gestao.html, botao
+/// "Editar") pra alguem que nao escaneou o QR Code na hora. Confirma
+/// que a linha foi criada, e que chamar de novo pra mesma pessoa/
+/// evento/data nao duplica (a funcao checa "exists" antes de inserir).
+Future<void> _testarAdminCheckinRetroativo() async {
+  final eventoId = _gerarUuidV4();
+  final membroId = _clienteMembro.auth.currentUser!.id;
+  final dataStr = DateTime.now().toIso8601String().split('T').first;
+
+  await _admin.from('eventos').insert({
+    'id': eventoId,
+    'titulo': '[Robô de teste] Verificação automática',
+    'data_inicio': DateTime.now().toIso8601String(),
+    'escopo': 'igreja',
+    'tipo': 'outro',
+    'recorrente': false,
+    'criado_por': _clienteAdmin.auth.currentUser!.id,
+  });
+
+  try {
+    await _clienteAdmin.rpc('admin_adicionar_checkin_evento', params: {
+      'p_user_id': membroId,
+      'p_evento_id': eventoId,
+      'p_data_ocorrencia': dataStr,
+    });
+    // Chama de novo de proposito -- nao pode duplicar a linha.
+    await _clienteAdmin.rpc('admin_adicionar_checkin_evento', params: {
+      'p_user_id': membroId,
+      'p_evento_id': eventoId,
+      'p_data_ocorrencia': dataStr,
+    });
+
+    final presencas = await _admin
+        .from('presencas_eventos')
+        .select('id')
+        .eq('evento_id', eventoId)
+        .eq('user_id', membroId);
+    if ((presencas as List).length != 1) {
+      throw Exception(
+          'admin_adicionar_checkin_evento() deveria ter exatamente 1 linha (achou ${presencas.length}) -- ou não criou, ou duplicou.');
+    }
+  } finally {
+    await _admin.from('presencas_eventos').delete().eq('evento_id', eventoId);
+    await _admin.from('eventos').delete().eq('id', eventoId);
+  }
+}
+
+/// Negativo: Lider (nao admin) tentando marcar check-in retroativo de
+/// outra pessoa -- admin_adicionar_checkin_evento() so' aceita admin.
+Future<void> _testarNaoAdminNaoPodeCheckinRetroativo() async {
+  final eventoId = _gerarUuidV4();
+  final membroId = _clienteMembro.auth.currentUser!.id;
+
+  await _admin.from('eventos').insert({
+    'id': eventoId,
+    'titulo': '[Robô de teste] não deveria conseguir',
+    'data_inicio': DateTime.now().toIso8601String(),
+    'escopo': 'igreja',
+    'tipo': 'outro',
+    'recorrente': false,
+    'criado_por': _clienteAdmin.auth.currentUser!.id,
+  });
+
+  try {
+    await _clienteLider.rpc('admin_adicionar_checkin_evento', params: {
+      'p_user_id': membroId,
+      'p_evento_id': eventoId,
+      'p_data_ocorrencia': DateTime.now().toIso8601String().split('T').first,
+    });
+  } finally {
+    await _admin.from('presencas_eventos').delete().eq('evento_id', eventoId);
+    await _admin.from('eventos').delete().eq('id', eventoId);
+  }
+}
+
+/// Contador manual de presenca (aba Shallom do gestao.html + tela
+/// "Contador de evento" no app) -- testa os dois lados: ajuste relativo
+/// (+/-, nunca fica negativo) e ajuste absoluto (definir_contagem_evento,
+/// usado só pelo "Editar" do gestao, rejeita valor negativo).
+Future<void> _testarAdminContagemManual() async {
+  final eventoId = _gerarUuidV4();
+  final dataStr = DateTime.now().toIso8601String().split('T').first;
+
+  await _admin.from('eventos').insert({
+    'id': eventoId,
+    'titulo': '[Robô de teste] Verificação automática',
+    'data_inicio': DateTime.now().toIso8601String(),
+    'escopo': 'igreja',
+    'tipo': 'ebd',
+    'recorrente': false,
+    'criado_por': _clienteAdmin.auth.currentUser!.id,
+  });
+
+  try {
+    final depoisDoisMais = await _clienteAdmin.rpc('ajustar_contagem_evento', params: {
+      'p_evento_id': eventoId,
+      'p_data_ocorrencia': dataStr,
+      'p_delta': 1,
+    }) as int;
+    final depoisMaisUm = await _clienteAdmin.rpc('ajustar_contagem_evento', params: {
+      'p_evento_id': eventoId,
+      'p_data_ocorrencia': dataStr,
+      'p_delta': 1,
+    }) as int;
+    if (depoisDoisMais != 1 || depoisMaisUm != 2) {
+      throw Exception('ajustar_contagem_evento(+1) duas vezes deveria dar 1 e depois 2 -- deu $depoisDoisMais e $depoisMaisUm.');
+    }
+
+    // Desce bem mais do que tem -- nao pode ficar negativo.
+    final depoisDeZerar = await _clienteAdmin.rpc('ajustar_contagem_evento', params: {
+      'p_evento_id': eventoId,
+      'p_data_ocorrencia': dataStr,
+      'p_delta': -10,
+    }) as int;
+    if (depoisDeZerar != 0) {
+      throw Exception('ajustar_contagem_evento(-10) numa contagem de 2 deveria travar em 0, deu $depoisDeZerar.');
+    }
+
+    // Ajuste absoluto (Editar no gestao) -- define um valor direto.
+    final aposDefinir = await _clienteAdmin.rpc('definir_contagem_evento', params: {
+      'p_evento_id': eventoId,
+      'p_data_ocorrencia': dataStr,
+      'p_valor': 42,
+    }) as int;
+    if (aposDefinir != 42) {
+      throw Exception('definir_contagem_evento(42) deveria devolver 42, deu $aposDefinir.');
+    }
+
+    Object? erroValorNegativo;
+    try {
+      await _clienteAdmin.rpc('definir_contagem_evento', params: {
+        'p_evento_id': eventoId,
+        'p_data_ocorrencia': dataStr,
+        'p_valor': -1,
+      });
+    } catch (e) {
+      erroValorNegativo = e;
+    }
+    if (erroValorNegativo == null) {
+      throw Exception('definir_contagem_evento(-1) deveria ter sido rejeitado.');
+    }
+  } finally {
+    await _admin.from('contagem_manual_eventos').delete().eq('evento_id', eventoId);
+    await _admin.from('eventos').delete().eq('id', eventoId);
+  }
+}
+
+/// Negativo: Lider (nao admin) tentando ajustar a contagem manual --
+/// ajustar_contagem_evento() so' aceita admin.
+Future<void> _testarNaoAdminNaoPodeAjustarContagem() async {
+  final eventoId = _gerarUuidV4();
+
+  await _admin.from('eventos').insert({
+    'id': eventoId,
+    'titulo': '[Robô de teste] não deveria conseguir',
+    'data_inicio': DateTime.now().toIso8601String(),
+    'escopo': 'igreja',
+    'tipo': 'ebd',
+    'recorrente': false,
+    'criado_por': _clienteAdmin.auth.currentUser!.id,
+  });
+
+  try {
+    await _clienteLider.rpc('ajustar_contagem_evento', params: {
+      'p_evento_id': eventoId,
+      'p_data_ocorrencia': DateTime.now().toIso8601String().split('T').first,
+      'p_delta': 1,
+    });
+  } finally {
+    await _admin.from('contagem_manual_eventos').delete().eq('evento_id', eventoId);
+    await _admin.from('eventos').delete().eq('id', eventoId);
+  }
+}
+
 /// Le o catalogo de funcoes (escala_servico_funcoes_catalogo) das 5
 /// areas -- e o que alimenta tanto as colunas da Escala Mensal
 /// (escala_grade_screen.dart) quanto o formulario da Escala Semanal
@@ -1990,6 +2164,12 @@ Future<void> main() async {
       resultados.add(await _rodar('admin_lancar_contribuicao', _testarLancarContribuicao));
       resultados.add(await _rodar('admin_check_in_escala', () => _testarCheckInEscala(_clienteAdmin)));
       resultados.add(await _rodar('admin_check_in_evento', () => _testarCheckInEvento(_clienteAdmin)));
+      resultados.add(await _rodar('admin_checkin_retroativo', _testarAdminCheckinRetroativo));
+      resultados.add(await _rodarEsperandoFalha(
+          'nao_admin_nao_pode_checkin_retroativo', _testarNaoAdminNaoPodeCheckinRetroativo));
+      resultados.add(await _rodar('admin_contagem_manual', _testarAdminContagemManual));
+      resultados.add(await _rodarEsperandoFalha(
+          'nao_admin_nao_pode_ajustar_contagem', _testarNaoAdminNaoPodeAjustarContagem));
       resultados.add(await _rodar('admin_promover_e_remover_admin', _testarPromoverERemoverAdmin));
       resultados.add(await _rodar('admin_editar_perfil_de_outra_pessoa', _testarEditarPerfilDeOutraPessoa));
       resultados.add(await _rodar('admin_apagar_conta_de_usuario', _testarAdminApagarContaDeUsuario));
