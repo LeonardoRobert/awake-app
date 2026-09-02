@@ -541,6 +541,7 @@
   // navegacao por papel. Os dois veem as 3 abas, nessa ordem.
   const SECOES = [
     { id: 'calendario', label: 'Calendário' },
+    { id: 'shallom', label: 'Shallom' },
     { id: 'awake', label: 'Awake' },
     { id: 'usuarios', label: 'Usuários' },
     { id: 'visitantes', label: 'Visitantes' },
@@ -608,6 +609,17 @@
           </div>
         </div>`;
       iniciarCalendarioAdmin();
+    } else if (secaoAtual === 'shallom') {
+      secaoEl.innerHTML = `
+        <h2 style="margin-top:0;">Shallom</h2>
+        <p style="color:#888; font-size:13px; margin-top:-8px;">
+          Últimas 8 semanas de EBD, Culto de Celebração e Culto da Família --
+          contagem manual (feita pelo admin no app), sem check-in individual.
+        </p>
+        <div id="dashboard-shallom"></div>
+        <h3>Últimos eventos</h3>
+        <div id="lista-shallom"></div>`;
+      iniciarPainelShallom();
     } else if (secaoAtual === 'awake') {
       secaoEl.innerHTML = `
         <h2 style="margin-top:0;">Awake</h2>
@@ -2611,6 +2623,158 @@
     renderizarListaVisitantes();
   }
 
+  // ---------- Shallom: eventos gerais + contagem manual ----------
+
+  let ocorrenciasShallom = [];
+  let contagensShallom = [];
+
+  async function iniciarPainelShallom() {
+    const dashEl = document.getElementById('dashboard-shallom');
+    const listaEl = document.getElementById('lista-shallom');
+    dashEl.innerHTML = '<div class="vazio-lateral">Carregando...</div>';
+    listaEl.innerHTML = '';
+
+    const hoje = hojeUtc();
+    const inicioJanela = new Date(hoje);
+    inicioJanela.setUTCDate(inicioJanela.getUTCDate() - 56); // ultimas 8 semanas
+
+    const { data: eventos, error: erroEv } = await supa
+      .from('eventos')
+      .select('id, titulo, data_inicio, recorrente, recorrencia_fim, semanas_do_mes, tipo, excecoes')
+      .in('tipo', ['ebd', 'culto_celebracao', 'culto_familia'])
+      .order('data_inicio', { ascending: false });
+
+    if (erroEv) {
+      dashEl.innerHTML = `<div class="vazio-lateral">Erro ao carregar eventos: ${escaparHtml(erroEv.message)}</div>`;
+      return;
+    }
+
+    const ocorrencias = [];
+    (eventos || []).forEach(ev => {
+      ocorrenciasNoIntervalo(ev, inicioJanela, hoje).forEach(data => {
+        ocorrencias.push({ evento: ev, data });
+      });
+    });
+    ocorrencias.sort((a, b) => b.data - a.data);
+    ocorrenciasShallom = ocorrencias;
+
+    if (ocorrencias.length === 0) {
+      dashEl.innerHTML = '<div class="vazio-lateral">Nenhum evento nas últimas 8 semanas.</div>';
+      return;
+    }
+
+    const eventoIds = [...new Set(ocorrencias.map(o => o.evento.id))];
+    const { data: contagens, error: erroCont } = await supa
+      .from('contagem_manual_eventos')
+      .select('evento_id, data_ocorrencia, contagem')
+      .in('evento_id', eventoIds);
+
+    if (erroCont) {
+      dashEl.innerHTML = `<div class="vazio-lateral">Erro ao carregar contagem: ${escaparHtml(erroCont.message)}</div>`;
+      return;
+    }
+    contagensShallom = contagens || [];
+
+    renderizarDashboardShallom();
+    renderizarListaShallom();
+  }
+
+  function _contagemDaOcorrencia(oc) {
+    const dataStr = oc.data.toISOString().slice(0, 10);
+    const linha = contagensShallom.find(c => c.evento_id === oc.evento.id && c.data_ocorrencia === dataStr);
+    return linha ? linha.contagem : 0;
+  }
+
+  function renderizarDashboardShallom() {
+    const totalOcorrencias = ocorrenciasShallom.length;
+    const totalPresencas = ocorrenciasShallom.reduce((soma, oc) => soma + _contagemDaOcorrencia(oc), 0);
+    const media = totalOcorrencias ? totalPresencas / totalOcorrencias : 0;
+
+    document.getElementById('dashboard-shallom').innerHTML = `
+      <div class="grade-agregados">
+        <div class="cartao-agregado"><div class="nome-agregado">Eventos (últimas 8 semanas)</div><div class="contagem-agregado">${totalOcorrencias}</div></div>
+        <div class="cartao-agregado"><div class="nome-agregado">Total de presenças</div><div class="contagem-agregado">${totalPresencas}</div></div>
+        <div class="cartao-agregado"><div class="nome-agregado">Média de presença por evento</div><div class="contagem-agregado">${media.toFixed(1)}</div></div>
+      </div>`;
+  }
+
+  function renderizarListaShallom() {
+    const listaEl = document.getElementById('lista-shallom');
+    let semanaAtualChave = null;
+
+    listaEl.innerHTML = ocorrenciasShallom.map(oc => {
+      const dataStr = oc.data.toISOString().slice(0, 10);
+      const contagem = _contagemDaOcorrencia(oc);
+
+      const inicioSemana = inicioDaSemanaUtc(oc.data);
+      const semanaChave = inicioSemana.toISOString().slice(0, 10);
+      let cabecalhoSemana = '';
+      if (semanaChave !== semanaAtualChave) {
+        semanaAtualChave = semanaChave;
+        const fimSemana = new Date(inicioSemana);
+        fimSemana.setUTCDate(fimSemana.getUTCDate() + 6);
+        cabecalhoSemana = `<div class="cabecalho-dia-visitantes">Semana de ${inicioSemana.toLocaleDateString('pt-BR', OPCOES_FUSO_UTC)} a ${fimSemana.toLocaleDateString('pt-BR', OPCOES_FUSO_UTC)}</div>`;
+      }
+
+      return `
+        ${cabecalhoSemana}
+        <div class="linha-usuario">
+          <span class="nome-usuario">${escaparHtml(oc.evento.titulo)}</span><span class="badge badge-checkin">${contagem} ${contagem === 1 ? 'veio' : 'vieram'}</span>
+          <div style="font-size:12px; color:#888; margin-top:2px;">
+            ${oc.data.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit', ...OPCOES_FUSO_UTC })}
+          </div>
+          <div style="margin-top:10px; display:flex; gap:14px;">
+            <button class="link-acao" data-evento-id="${oc.evento.id}" data-data="${dataStr}" data-titulo="${escaparAtributo(oc.evento.titulo)}" data-contagem="${contagem}" data-acao-editar-shallom>Editar</button>
+            <button class="link-acao link-acao-perigo" data-evento-id="${oc.evento.id}" data-data="${dataStr}" data-titulo="${escaparAtributo(oc.evento.titulo)}" data-acao-apagar-shallom>Apagar</button>
+          </div>
+        </div>`;
+    }).join('');
+
+    listaEl.querySelectorAll('[data-acao-editar-shallom]').forEach(btn => {
+      btn.addEventListener('click', () => abrirEdicaoContagemShallom(btn.dataset.eventoId, btn.dataset.data, btn.dataset.titulo, Number(btn.dataset.contagem)));
+    });
+    listaEl.querySelectorAll('[data-acao-apagar-shallom]').forEach(btn => {
+      btn.addEventListener('click', () => apagarOcorrenciaEvento(btn.dataset.eventoId, btn.dataset.data, btn.dataset.titulo, iniciarPainelShallom));
+    });
+  }
+
+  async function abrirEdicaoContagemShallom(eventoId, dataStr, titulo, contagemAtual) {
+    document.getElementById('caixa-modal').innerHTML = `
+      <button class="fechar-modal" id="fechar-modal">✕</button>
+      <h2>Editar contagem — ${escaparHtml(titulo)}</h2>
+      <div class="campo-form">
+        <label>Quantas pessoas vieram</label>
+        <input type="number" id="ec-contagem" min="0" value="${contagemAtual}">
+      </div>
+      <div id="erro-form-contagem" style="color:var(--vermelho); font-size:12px; margin-bottom:8px;"></div>
+      <div class="acoes-modal">
+        <button class="botao-secundario" id="btn-cancelar-contagem">Cancelar</button>
+        <button class="botao-secundario" id="btn-salvar-contagem" style="background:var(--navy); color:#fff;">Salvar</button>
+      </div>
+    `;
+    document.getElementById('fundo-modal').classList.add('aberto');
+    document.getElementById('fechar-modal').addEventListener('click', fecharModal);
+    document.getElementById('btn-cancelar-contagem').addEventListener('click', fecharModal);
+    document.getElementById('btn-salvar-contagem').addEventListener('click', async () => {
+      const valor = Number(document.getElementById('ec-contagem').value);
+      if (!Number.isInteger(valor) || valor < 0) {
+        document.getElementById('erro-form-contagem').textContent = 'Informe um número inteiro, 0 ou mais.';
+        return;
+      }
+      const { error } = await supa.rpc('definir_contagem_evento', {
+        p_evento_id: eventoId,
+        p_data_ocorrencia: dataStr,
+        p_valor: valor,
+      });
+      if (error) {
+        document.getElementById('erro-form-contagem').textContent = 'Erro ao salvar: ' + error.message;
+        return;
+      }
+      fecharModal();
+      await iniciarPainelShallom();
+    });
+  }
+
   // ---------- Awake: eventos + check-ins ----------
 
   let ocorrenciasAwake = []; // [{ evento, data }], mais recente primeiro
@@ -2735,8 +2899,96 @@
           ${nomes.length
             ? `<div style="font-size:12px; color:var(--navy); margin-top:8px;">${nomes.map(escaparHtml).join(', ')}</div>`
             : `<div style="font-size:12px; color:#aaa; margin-top:8px;">Ninguém fez check-in.</div>`}
+          <div style="margin-top:10px; display:flex; gap:14px;">
+            <button class="link-acao" data-evento-id="${oc.evento.id}" data-data="${dataStr}" data-titulo="${escaparAtributo(oc.evento.titulo)}" data-acao-editar-awake>Editar</button>
+            <button class="link-acao link-acao-perigo" data-evento-id="${oc.evento.id}" data-data="${dataStr}" data-titulo="${escaparAtributo(oc.evento.titulo)}" data-acao-apagar-awake>Apagar</button>
+          </div>
         </div>`;
     }).join('');
+
+    listaEl.querySelectorAll('[data-acao-editar-awake]').forEach(btn => {
+      btn.addEventListener('click', () => abrirEdicaoCheckinAwake(btn.dataset.eventoId, btn.dataset.data, btn.dataset.titulo));
+    });
+    listaEl.querySelectorAll('[data-acao-apagar-awake]').forEach(btn => {
+      btn.addEventListener('click', () => apagarOcorrenciaEvento(btn.dataset.eventoId, btn.dataset.data, btn.dataset.titulo, iniciarPainelAwake));
+    });
+  }
+
+  /// Apaga so' UMA ocorrencia (data) de um evento, recorrente ou nao --
+  /// mesma RPC que o app usa (excluir_ocorrencia_evento). Compartilhada
+  /// entre a aba Awake e a aba Shallom -- [aoTerminar] recarrega a
+  /// lista certa depois.
+  async function apagarOcorrenciaEvento(eventoId, dataStr, titulo, aoTerminar) {
+    if (!confirm(`Apagar "${titulo}" do dia ${new Date(dataStr + 'T12:00:00Z').toLocaleDateString('pt-BR', OPCOES_FUSO_UTC)}? Só essa data -- as outras semanas da série continuam. Essa ação não pode ser desfeita.`)) return;
+
+    const { error } = await supa.rpc('excluir_ocorrencia_evento', { p_evento_id: eventoId, p_data: dataStr });
+    if (error) {
+      alert('Erro ao apagar: ' + error.message);
+      return;
+    }
+    await aoTerminar();
+  }
+
+  async function abrirEdicaoCheckinAwake(eventoId, dataStr, titulo) {
+    document.getElementById('caixa-modal').innerHTML = `
+      <button class="fechar-modal" id="fechar-modal">✕</button>
+      <h2>Adicionar check-in — ${escaparHtml(titulo)}</h2>
+      <p style="color:#888; font-size:13px; margin-top:-8px;">
+        Marca que alguém foi, mesmo sem ter escaneado o QR Code na hora.
+      </p>
+      <div class="campo-form">
+        <label>Nome da pessoa</label>
+        <input type="text" id="busca-checkin-retroativo" placeholder="Digite pra buscar...">
+      </div>
+      <div id="resultado-busca-checkin"></div>
+    `;
+    document.getElementById('fundo-modal').classList.add('aberto');
+    document.getElementById('fechar-modal').addEventListener('click', fecharModal);
+
+    const inputEl = document.getElementById('busca-checkin-retroativo');
+    inputEl.addEventListener('input', async () => {
+      const termo = inputEl.value.trim();
+      const resultadoEl = document.getElementById('resultado-busca-checkin');
+      if (termo.length < 2) { resultadoEl.innerHTML = ''; return; }
+
+      const { data: pessoas, error } = await supa
+        .from('profiles')
+        .select('id, nome')
+        .ilike('nome', `%${termo}%`)
+        .order('nome')
+        .limit(15);
+
+      if (error) {
+        resultadoEl.innerHTML = `<div class="vazio-lateral">Erro: ${escaparHtml(error.message)}</div>`;
+        return;
+      }
+      if ((pessoas || []).length === 0) {
+        resultadoEl.innerHTML = '<div class="vazio-lateral">Ninguém encontrado.</div>';
+        return;
+      }
+
+      resultadoEl.innerHTML = pessoas.map(p =>
+        `<div class="linha-usuario" style="cursor:pointer;" data-pessoa-id="${p.id}" data-pessoa-nome="${escaparAtributo(p.nome)}">
+          <span class="nome-usuario">${escaparHtml(p.nome)}</span>
+        </div>`
+      ).join('');
+
+      resultadoEl.querySelectorAll('[data-pessoa-id]').forEach(linha => {
+        linha.addEventListener('click', async () => {
+          const { error: erroCheckin } = await supa.rpc('admin_adicionar_checkin_evento', {
+            p_user_id: linha.dataset.pessoaId,
+            p_evento_id: eventoId,
+            p_data_ocorrencia: dataStr,
+          });
+          if (erroCheckin) {
+            alert('Erro ao adicionar check-in: ' + erroCheckin.message);
+            return;
+          }
+          fecharModal();
+          await iniciarPainelAwake();
+        });
+      });
+    });
   }
 
   // ---------- Status do robô de teste ----------
