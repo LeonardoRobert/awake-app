@@ -406,6 +406,7 @@
   .badge-financeiro { background: #BFDBFE; color: #1E3A8A; }
   .badge-inativo { background: #FEE2E2; color: #991B1B; }
   .badge-checkin { background: #D1FAE5; color: #065F46; }
+  .badge-neutro { background: #E5E7EB; color: #4B5563; }
   .chips-ministerios { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
   .chip-ministerio {
     font-size: 12px; font-weight: 600; padding: 5px 10px; border-radius: 20px;
@@ -2666,7 +2667,7 @@
     const eventoIds = [...new Set(ocorrencias.map(o => o.evento.id))];
     const { data: contagens, error: erroCont } = await supa
       .from('contagem_manual_eventos')
-      .select('evento_id, data_ocorrencia, contagem')
+      .select('evento_id, data_ocorrencia, contagem, nao_contabilizado')
       .in('evento_id', eventoIds);
 
     if (erroCont) {
@@ -2685,9 +2686,19 @@
     return linha ? linha.contagem : 0;
   }
 
+  function _naoContabilizadoShallom(oc) {
+    const dataStr = oc.data.toISOString().slice(0, 10);
+    const linha = contagensShallom.find(c => c.evento_id === oc.evento.id && c.data_ocorrencia === dataStr);
+    return linha ? !!linha.nao_contabilizado : false;
+  }
+
   function renderizarDashboardShallom() {
-    const totalOcorrencias = ocorrenciasShallom.length;
-    const totalPresencas = ocorrenciasShallom.reduce((soma, oc) => soma + _contagemDaOcorrencia(oc), 0);
+    // Evento marcado "nao contabilizado" continua na lista, mas sai
+    // inteiro da conta (nem entra no total de eventos, nem no total de
+    // presencas, nem na media).
+    const ocorrenciasContadas = ocorrenciasShallom.filter(oc => !_naoContabilizadoShallom(oc));
+    const totalOcorrencias = ocorrenciasContadas.length;
+    const totalPresencas = ocorrenciasContadas.reduce((soma, oc) => soma + _contagemDaOcorrencia(oc), 0);
     const media = totalOcorrencias ? totalPresencas / totalOcorrencias : 0;
 
     document.getElementById('dashboard-shallom').innerHTML = `
@@ -2705,6 +2716,7 @@
     listaEl.innerHTML = ocorrenciasShallom.map(oc => {
       const dataStr = oc.data.toISOString().slice(0, 10);
       const contagem = _contagemDaOcorrencia(oc);
+      const naoContabilizado = _naoContabilizadoShallom(oc);
 
       const inicioSemana = inicioDaSemanaUtc(oc.data);
       const semanaChave = inicioSemana.toISOString().slice(0, 10);
@@ -2716,16 +2728,20 @@
         cabecalhoSemana = `<div class="cabecalho-dia-visitantes">Semana de ${inicioSemana.toLocaleDateString('pt-BR', OPCOES_FUSO_UTC)} a ${fimSemana.toLocaleDateString('pt-BR', OPCOES_FUSO_UTC)}</div>`;
       }
 
+      const badge = naoContabilizado
+        ? `<span class="badge badge-neutro">Não contabilizado</span>`
+        : `<span class="badge badge-checkin">${contagem} ${contagem === 1 ? 'veio' : 'vieram'}</span>`;
+
       return `
         ${cabecalhoSemana}
-        <div class="linha-usuario">
-          <span class="nome-usuario">${escaparHtml(oc.evento.titulo)}</span><span class="badge badge-checkin">${contagem} ${contagem === 1 ? 'veio' : 'vieram'}</span>
+        <div class="linha-usuario" ${naoContabilizado ? 'style="opacity:0.6;"' : ''}>
+          <span class="nome-usuario">${escaparHtml(oc.evento.titulo)}</span>${badge}
           <div style="font-size:12px; color:#888; margin-top:2px;">
             ${oc.data.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit', ...OPCOES_FUSO_UTC })}
           </div>
           <div style="margin-top:10px; display:flex; gap:14px;">
             <button class="link-acao" data-evento-id="${oc.evento.id}" data-data="${dataStr}" data-titulo="${escaparAtributo(oc.evento.titulo)}" data-contagem="${contagem}" data-acao-editar-shallom>Editar</button>
-            <button class="link-acao link-acao-perigo" data-evento-id="${oc.evento.id}" data-data="${dataStr}" data-titulo="${escaparAtributo(oc.evento.titulo)}" data-acao-apagar-shallom>Apagar</button>
+            <button class="link-acao ${naoContabilizado ? '' : 'link-acao-perigo'}" data-evento-id="${oc.evento.id}" data-data="${dataStr}" data-nao-contabilizado="${naoContabilizado}" data-acao-nao-contabilizado-shallom>${naoContabilizado ? 'Contabilizar de novo' : 'Não contabilizado'}</button>
           </div>
         </div>`;
     }).join('');
@@ -2733,8 +2749,10 @@
     listaEl.querySelectorAll('[data-acao-editar-shallom]').forEach(btn => {
       btn.addEventListener('click', () => abrirEdicaoContagemShallom(btn.dataset.eventoId, btn.dataset.data, btn.dataset.titulo, Number(btn.dataset.contagem)));
     });
-    listaEl.querySelectorAll('[data-acao-apagar-shallom]').forEach(btn => {
-      btn.addEventListener('click', () => apagarOcorrenciaEvento(btn.dataset.eventoId, btn.dataset.data, btn.dataset.titulo, iniciarPainelShallom));
+    listaEl.querySelectorAll('[data-acao-nao-contabilizado-shallom]').forEach(btn => {
+      btn.addEventListener('click', () => alternarNaoContabilizado(
+        btn.dataset.eventoId, btn.dataset.data, btn.dataset.naoContabilizado !== 'true', iniciarPainelShallom
+      ));
     });
   }
 
@@ -2779,6 +2797,7 @@
 
   let ocorrenciasAwake = []; // [{ evento, data }], mais recente primeiro
   let presencasAwake = [];
+  let metadadosAwake = []; // so' guarda nao_contabilizado (Awake nao usa contagem manual)
 
   function inicioDaSemanaUtc(data) {
     const d = new Date(data);
@@ -2849,13 +2868,35 @@
     }
     presencasAwake = presencas || [];
 
+    const { data: metadados, error: erroMeta } = await supa
+      .from('contagem_manual_eventos')
+      .select('evento_id, data_ocorrencia, nao_contabilizado')
+      .in('evento_id', eventoIds);
+
+    if (erroMeta) {
+      dashEl.innerHTML = `<div class="vazio-lateral">Erro ao carregar: ${escaparHtml(erroMeta.message)}</div>`;
+      return;
+    }
+    metadadosAwake = metadados || [];
+
     renderizarDashboardAwake();
     renderizarListaAwake();
   }
 
+  function _naoContabilizadoAwake(oc) {
+    const dataStr = oc.data.toISOString().slice(0, 10);
+    const linha = metadadosAwake.find(m => m.evento_id === oc.evento.id && m.data_ocorrencia === dataStr);
+    return linha ? !!linha.nao_contabilizado : false;
+  }
+
   function renderizarDashboardAwake() {
-    const totalOcorrencias = ocorrenciasAwake.length;
-    const totalCheckins = presencasAwake.length;
+    // Evento marcado "nao contabilizado" continua na lista, mas sai
+    // inteiro da conta (nem entra no total de eventos, nem no total de
+    // check-ins, nem na media).
+    const ocorrenciasContadas = ocorrenciasAwake.filter(oc => !_naoContabilizadoAwake(oc));
+    const totalOcorrencias = ocorrenciasContadas.length;
+    const dataStrsContadas = new Set(ocorrenciasContadas.map(oc => `${oc.evento.id}_${oc.data.toISOString().slice(0, 10)}`));
+    const totalCheckins = presencasAwake.filter(p => dataStrsContadas.has(`${p.evento_id}_${p.data_ocorrencia}`)).length;
     const media = totalOcorrencias ? totalCheckins / totalOcorrencias : 0;
 
     document.getElementById('dashboard-awake').innerHTML = `
@@ -2878,6 +2919,7 @@
       const nomes = presencasDoEvento
         .map(p => (p.profiles && p.profiles.nome) || '(sem nome)')
         .sort();
+      const naoContabilizado = _naoContabilizadoAwake(oc);
 
       const inicioSemana = inicioDaSemanaUtc(oc.data);
       const semanaChave = inicioSemana.toISOString().slice(0, 10);
@@ -2889,10 +2931,14 @@
         cabecalhoSemana = `<div class="cabecalho-dia-visitantes">Semana de ${inicioSemana.toLocaleDateString('pt-BR', OPCOES_FUSO_UTC)} a ${fimSemana.toLocaleDateString('pt-BR', OPCOES_FUSO_UTC)}</div>`;
       }
 
+      const badge = naoContabilizado
+        ? `<span class="badge badge-neutro">Não contabilizado</span>`
+        : `<span class="badge badge-checkin">${presencasDoEvento.length} ${presencasDoEvento.length === 1 ? 'veio' : 'vieram'}</span>`;
+
       return `
         ${cabecalhoSemana}
-        <div class="linha-usuario">
-          <span class="nome-usuario">${escaparHtml(oc.evento.titulo)}</span><span class="badge badge-checkin">${presencasDoEvento.length} ${presencasDoEvento.length === 1 ? 'veio' : 'vieram'}</span>
+        <div class="linha-usuario" ${naoContabilizado ? 'style="opacity:0.6;"' : ''}>
+          <span class="nome-usuario">${escaparHtml(oc.evento.titulo)}</span>${badge}
           <div style="font-size:12px; color:#888; margin-top:2px;">
             ${oc.data.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit', ...OPCOES_FUSO_UTC })}
           </div>
@@ -2901,7 +2947,7 @@
             : `<div style="font-size:12px; color:#aaa; margin-top:8px;">Ninguém fez check-in.</div>`}
           <div style="margin-top:10px; display:flex; gap:14px;">
             <button class="link-acao" data-evento-id="${oc.evento.id}" data-data="${dataStr}" data-titulo="${escaparAtributo(oc.evento.titulo)}" data-acao-editar-awake>Editar</button>
-            <button class="link-acao link-acao-perigo" data-evento-id="${oc.evento.id}" data-data="${dataStr}" data-titulo="${escaparAtributo(oc.evento.titulo)}" data-acao-apagar-awake>Apagar</button>
+            <button class="link-acao ${naoContabilizado ? '' : 'link-acao-perigo'}" data-evento-id="${oc.evento.id}" data-data="${dataStr}" data-nao-contabilizado="${naoContabilizado}" data-acao-nao-contabilizado-awake>${naoContabilizado ? 'Contabilizar de novo' : 'Não contabilizado'}</button>
           </div>
         </div>`;
     }).join('');
@@ -2909,21 +2955,25 @@
     listaEl.querySelectorAll('[data-acao-editar-awake]').forEach(btn => {
       btn.addEventListener('click', () => abrirEdicaoCheckinAwake(btn.dataset.eventoId, btn.dataset.data, btn.dataset.titulo));
     });
-    listaEl.querySelectorAll('[data-acao-apagar-awake]').forEach(btn => {
-      btn.addEventListener('click', () => apagarOcorrenciaEvento(btn.dataset.eventoId, btn.dataset.data, btn.dataset.titulo, iniciarPainelAwake));
+    listaEl.querySelectorAll('[data-acao-nao-contabilizado-awake]').forEach(btn => {
+      btn.addEventListener('click', () => alternarNaoContabilizado(
+        btn.dataset.eventoId, btn.dataset.data, btn.dataset.naoContabilizado !== 'true', iniciarPainelAwake
+      ));
     });
   }
 
-  /// Apaga so' UMA ocorrencia (data) de um evento, recorrente ou nao --
-  /// mesma RPC que o app usa (excluir_ocorrencia_evento). Compartilhada
-  /// entre a aba Awake e a aba Shallom -- [aoTerminar] recarrega a
-  /// lista certa depois.
-  async function apagarOcorrenciaEvento(eventoId, dataStr, titulo, aoTerminar) {
-    if (!confirm(`Apagar "${titulo}" do dia ${new Date(dataStr + 'T12:00:00Z').toLocaleDateString('pt-BR', OPCOES_FUSO_UTC)}? Só essa data -- as outras semanas da série continuam. Essa ação não pode ser desfeita.`)) return;
-
-    const { error } = await supa.rpc('excluir_ocorrencia_evento', { p_evento_id: eventoId, p_data: dataStr });
+  /// Marca (ou desmarca) uma ocorrencia como "nao contabilizada" -- o
+  /// evento continua na lista, so' sai da contagem/media do dashboard.
+  /// Compartilhada entre a aba Awake e a aba Shallom -- [aoTerminar]
+  /// recarrega a lista certa depois.
+  async function alternarNaoContabilizado(eventoId, dataStr, novoValor, aoTerminar) {
+    const { error } = await supa.rpc('definir_nao_contabilizado_evento', {
+      p_evento_id: eventoId,
+      p_data_ocorrencia: dataStr,
+      p_nao_contabilizado: novoValor,
+    });
     if (error) {
-      alert('Erro ao apagar: ' + error.message);
+      alert('Erro ao salvar: ' + error.message);
       return;
     }
     await aoTerminar();
