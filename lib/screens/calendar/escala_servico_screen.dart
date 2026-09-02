@@ -372,21 +372,44 @@ class _EscalaServicoScreenState extends State<EscalaServicoScreen> {
     );
   }
 
+  /// "da Mídia", "do Louvor", "dos Diáconos" -- artigo certo pra cada um
+  /// dos 5 ministerios que usam Escala de Servico (so' esses aparecem
+  /// aqui, ver ministeriosComEscalaServico).
+  String _comArtigo(String ministerio) {
+    switch (ministerio) {
+      case 'diaconos':
+        return 'dos Diáconos';
+      case 'louvor':
+        return 'do Louvor';
+      case 'danca':
+        return 'da Dança';
+      case 'midia':
+        return 'da Mídia';
+      case 'multimidia':
+        return 'da Multimídia';
+      default:
+        return 'de ${ministerio.labelMinisterio}';
+    }
+  }
+
   /// Monta um texto pronto pra colar num grupo do WhatsApp (usa
   /// *asterisco* pra negrito, que o WhatsApp já entende sozinho).
   String _gerarTextoWhatsApp() {
-    final buffer = StringBuffer('*Escala de ${widget.ministerio.labelMinisterio}*');
+    final buffer = StringBuffer('*Escala Semanal ${_comArtigo(widget.ministerio)}*');
     for (final ocorrencia in _ocorrencias) {
       buffer.writeln();
       buffer.writeln();
       buffer.writeln(
-        '*${DateFormat("EEEE, dd 'de' MMMM", 'pt_BR').format(ocorrencia.data)}* — ${ocorrencia.evento.titulo}',
+        '*${ocorrencia.evento.titulo} — ${DateFormat("EEEE, dd 'de' MMMM", 'pt_BR').format(ocorrencia.data)}*',
       );
-      for (final posicao in ocorrencia.posicoes) {
+      buffer.writeln();
+      final posicoesOrdenadas = ocorrencia.posicoes.toList()
+        ..sort((a, b) => a.ordem.compareTo(b.ordem));
+      for (final posicao in posicoesOrdenadas) {
         final quem = _ehDiaconos
             ? _formatarCasal(posicao.nomePessoa, posicao.nomePessoa2)
             : (posicao.nomePessoa ?? '—');
-        buffer.writeln('${posicao.funcao}: $quem');
+        buffer.writeln('- *${posicao.funcao}:* $quem');
       }
     }
     return buffer.toString();
