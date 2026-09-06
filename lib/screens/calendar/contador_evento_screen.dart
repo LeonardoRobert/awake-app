@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../../core/erro_amigavel.dart';
 import '../../models/event_model.dart';
 import '../../services/event_service.dart';
+import '../../services/volume_button_service.dart';
 import '../../widgets/awake_app_bar.dart';
 
 /// Contador manual de presença -- pra eventos "gerais" (EBD, Culto de
@@ -35,6 +36,18 @@ class _ContadorEventoScreenState extends State<ContadorEventoScreen> {
   void initState() {
     super.initState();
     _futuroEventosDeHoje = _buscarEventosDeHoje();
+    // So' Android -- ver volume_button_service.dart. No iOS isso vira
+    // um no-op silencioso, os botoes continuam mexendo no volume normal.
+    VolumeButtonService.ativar(
+      aoApertarMais: () => _ajustar(1),
+      aoApertarMenos: () => _ajustar(-1),
+    );
+  }
+
+  @override
+  void dispose() {
+    VolumeButtonService.desativar();
+    super.dispose();
   }
 
   Future<List<({EventModel evento, DateTime data})>> _buscarEventosDeHoje() async {
@@ -78,8 +91,11 @@ class _ContadorEventoScreenState extends State<ContadorEventoScreen> {
     }
   }
 
-  /// So' mexe no numero da tela -- nao grava nada no banco ainda.
+  /// So' mexe no numero da tela -- nao grava nada no banco ainda. Sem
+  /// efeito se nenhum evento foi escolhido ainda (ex: botao de volume
+  /// apertado sem querer enquanto ainda esta na lista de selecao).
   void _ajustar(int delta) {
+    if (_selecionado == null) return;
     setState(() => _contagem = (_contagem + delta).clamp(0, 999999));
   }
 
