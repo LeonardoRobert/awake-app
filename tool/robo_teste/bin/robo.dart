@@ -741,7 +741,12 @@ Future<void> _testarCasamentoAjustaMinisterios() async {
 /// oposto (fica -- ninguém tira automaticamente, por decisão do Leo),
 /// por isso desfaz esse efeito colateral do trigger de casamento no
 /// finally, sem checar ele aqui (já testado em
-/// _testarCasamentoAjustaMinisterios).
+/// _testarCasamentoAjustaMinisterios). Também confere, no mesmo teste
+/// (evita duplicar todo o setup/cleanup de casamento), que
+/// trg_sync_profile_ministerios_grupo_casais cria o vínculo
+/// 'casais_henrique_patricia' em profile_ministerios ao casar e
+/// remove ao descasar (2026_grupos_casais_ministerios.sql) -- vira
+/// ministério de verdade, com check-in/liderança de verdade.
 Future<void> _testarDescasarLimpaGrupoCasais() async {
   final membroId = _clienteMembro.auth.currentUser!.id;
   final original =
@@ -777,17 +782,49 @@ Future<void> _testarDescasarLimpaGrupoCasais() async {
       throw Exception('grupo_casais não foi gravado ao casar (setup do teste falhou).');
     }
 
+    final vinculoCasaisAoCasar = await _admin
+        .from('profile_ministerios')
+        .select('papel')
+        .eq('profile_id', membroId)
+        .eq('ministerio', 'casais_henrique_patricia')
+        .maybeSingle();
+    if (vinculoCasaisAoCasar == null || vinculoCasaisAoCasar['papel'] != 'membro') {
+      throw Exception('grupo_casais não criou vínculo em profile_ministerios (casais_henrique_patricia).');
+    }
+
     await _clienteMembro.from('profiles').update({'estado_civil': 'solteiro'}).eq('id', membroId);
 
     final depoisDeDescasar = await _admin.from('profiles').select('grupo_casais').eq('id', membroId).single();
     if (depoisDeDescasar['grupo_casais'] != null) {
       throw Exception('grupo_casais não foi limpo automaticamente ao "descasar".');
     }
+
+    final vinculoCasaisAoDescasar = await _admin
+        .from('profile_ministerios')
+        .select('papel')
+        .eq('profile_id', membroId)
+        .eq('ministerio', 'casais_henrique_patricia')
+        .maybeSingle();
+    if (vinculoCasaisAoDescasar != null) {
+      throw Exception('Vínculo casais_henrique_patricia não foi removido ao "descasar".');
+    }
   } finally {
     await _admin.from('profiles').update({
       'estado_civil': estadoCivilOriginal,
       'grupo_casais': grupoCasaisOriginal,
     }).eq('id', membroId);
+
+    // Se por algum motivo o teste falhou antes de confirmar a remocao
+    // acima, nao deixa o vinculo de casais sobrando (so' remove se o
+    // grupo original NAO era esse mesmo, pra nunca apagar um vinculo
+    // legitimo da conta de teste).
+    if (grupoCasaisOriginal != 'henrique_patricia') {
+      await _admin
+          .from('profile_ministerios')
+          .delete()
+          .eq('profile_id', membroId)
+          .eq('ministerio', 'casais_henrique_patricia');
+    }
 
     // O "casar" temporario acima tambem disparou
     // trg_ajustar_ministerios_ao_entrar_one -- desfaz esse efeito
@@ -807,6 +844,100 @@ Future<void> _testarDescasarLimpaGrupoCasais() async {
       );
     }
   }
+}
+
+// ---------- Ferramentas da Liderança: check-in em massa por ministério ----------
+// (ver supabase/sql/2026_checkin_ministerio.sql -- 100% separado da
+// Escala de Serviço e do Awake, checkin_em_massa_ministerio())
+
+/// Líder de um ministério faz check-in em massa e deve: criar (ou
+/// reaproveitar) a ocasião de HOJE, e registrar presença de quem for
+/// passado como membro de verdade daquele ministério. A conta Lider de
+/// teste lidera 'danca' (entre outras) -- usa o próprio id como "quem
+/// veio", já que ela também é membro de danca.
+Future<void> _testarLiderCheckinEmMassaMinisterio() async {
+  const ministerio = 'danca';
+  final liderId = _clienteLider.auth.currentUser!.id;
+
+  final ocasiaoId = await _clienteLider.rpc('checkin_em_massa_ministerio', params: {
+    'p_ministerio': ministerio,
+    'p_tipo_ocasiao': 'Ensaio',
+    'p_profile_ids': [liderId],
+  }) as String;
+
+  try {
+    final ocasiao = await _admin
+        .from('ocasioes_ministerio')
+        .select('ministerio, tipo, data')
+        .eq('id', ocasiaoId)
+        .single();
+    if (ocasiao['ministerio'] != ministerio || ocasiao['data'] != _hojeBrasiliaStr()) {
+      throw Exception('Ocasião criada com ministério/data errados: $ocasiao');
+    }
+
+    final presenca = await _admin
+        .from('presencas_ministerio')
+        .select('profile_id')
+        .eq('ocasiao_id', ocasiaoId)
+        .eq('profile_id', liderId)
+        .maybeSingle();
+    if (presenca == null) {
+      throw Exception('Check-in em massa não registrou a presença.');
+    }
+  } finally {
+    // Apaga a ocasiao -- "on delete cascade" leva a presenca junto.
+    await _admin.from('ocasioes_ministerio').delete().eq('id', ocasiaoId);
+  }
+}
+
+/// Quem passar um profile_id que NÃO é membro real do ministério deve
+/// ser ignorado silenciosamente (a função confere de novo no banco,
+/// mesmo que a busca do app já filtre isso) -- usa a conta Membro (que
+/// não participa de 'danca') como alvo.
+Future<void> _testarCheckinIgnoraNaoMembroDoMinisterio() async {
+  const ministerio = 'danca';
+  final membroId = _clienteMembro.auth.currentUser!.id;
+
+  final jaEhMembro = await _admin
+      .from('profile_ministerios')
+      .select('papel')
+      .eq('profile_id', membroId)
+      .eq('ministerio', ministerio)
+      .maybeSingle();
+  if (jaEhMembro != null) {
+    throw Exception('Setup inválido: conta Membro já está vinculada a "$ministerio" -- teste não é confiável.');
+  }
+
+  final ocasiaoId = await _clienteLider.rpc('checkin_em_massa_ministerio', params: {
+    'p_ministerio': ministerio,
+    'p_tipo_ocasiao': 'Ensaio',
+    'p_profile_ids': [membroId],
+  }) as String;
+
+  try {
+    final presenca = await _admin
+        .from('presencas_ministerio')
+        .select('profile_id')
+        .eq('ocasiao_id', ocasiaoId)
+        .eq('profile_id', membroId)
+        .maybeSingle();
+    if (presenca != null) {
+      throw Exception('Check-in registrou presença de quem NÃO é membro do ministério.');
+    }
+  } finally {
+    await _admin.from('ocasioes_ministerio').delete().eq('id', ocasiaoId);
+  }
+}
+
+/// Membro comum (não líder de 'danca') tentando fazer check-in em massa
+/// deve ser bloqueado pela própria função (raise exception), não só
+/// pela RLS de select.
+Future<void> _testarMembroNaoPodeCheckinMassaMinisterio() async {
+  await _clienteMembro.rpc('checkin_em_massa_ministerio', params: {
+    'p_ministerio': 'danca',
+    'p_tipo_ocasiao': 'Ensaio',
+    'p_profile_ids': [_clienteMembro.auth.currentUser!.id],
+  });
 }
 
 Future<void> _testarMinhasContribuicoes() async {
@@ -2177,6 +2308,10 @@ Future<void> main() async {
           'membro_nao_pode_escalar_outra_pessoa', _testarMembroNaoPodeEscalarOutraPessoa));
       resultados.add(await _rodar('lider_awake_ver_e_marcar_visitante', _testarLiderAwakeVerEMarcarVisitante));
       resultados.add(await _rodar('lider_dashboard_ve_time_inteiro', _testarDashboardMinisterio));
+      resultados.add(await _rodar('lider_checkin_massa_ministerio', _testarLiderCheckinEmMassaMinisterio));
+      resultados.add(await _rodar('checkin_massa_ignora_nao_membro', _testarCheckinIgnoraNaoMembroDoMinisterio));
+      resultados.add(await _rodarEsperandoFalha(
+          'membro_nao_pode_checkin_massa_ministerio', _testarMembroNaoPodeCheckinMassaMinisterio));
       // Lider (de qualquer ministerio, nao so Awake -- ver comentario
       // em _testarCheckInEscala) tambem pode fazer check-in.
       resultados.add(await _rodar('lider_check_in_escala', () => _testarCheckInEscala(_clienteLider)));
