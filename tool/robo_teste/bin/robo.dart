@@ -24,6 +24,8 @@
 //   TESTE_MEMBRO_EMAIL, TESTE_MEMBRO_SENHA
 //   TESTE_LIDER_EMAIL, TESTE_LIDER_SENHA
 //   TESTE_ADMIN_EMAIL, TESTE_ADMIN_SENHA
+//   TESTE_LIDER_CODIGO                       -- opcional, ver
+//                                                _testarCodigoLiderCerto
 //
 // Notificacoes push: NAO tem teste dedicado, mas todo fluxo que
 // dispara uma (pedido de oracao, testemunho, visitante, evento novo,
@@ -174,6 +176,47 @@ Future<void> _testarCodigoLiderErrado() async {
     // Limpa a sujeira antes de reportar a falha.
     await _admin.from('profile_ministerios').delete().eq('profile_id', membroId).eq('ministerio', ministerioTeste);
     throw Exception('Código de líder errado mesmo assim criou vínculo em profile_ministerios.');
+  }
+}
+
+/// Código de líder CERTO deve promover de verdade -- o teste acima só
+/// cobria o código errado (de propósito, pra não versionar o código
+/// real). Esse aqui pega o código verdadeiro de uma env var opcional
+/// (TESTE_LIDER_CODIGO, configurada só no GitHub Actions Secrets, igual
+/// as outras) -- se não estiver configurada, pula o teste em vez de
+/// falhar o robô inteiro. Achado root-causando reclamação do Leo de que
+/// "ninguém consegue virar líder pelo código": não existia NENHUM teste
+/// cobrindo o caminho feliz, e o app de fato tinha um bug (sem retry
+/// pra sessão recém-criada, ver AuthService.solicitarPapelLider).
+Future<void> _testarCodigoLiderCerto() async {
+  final codigo = Platform.environment['TESTE_LIDER_CODIGO'];
+  if (codigo == null || codigo.isEmpty) {
+    stdout.writeln('  (pulado -- TESTE_LIDER_CODIGO não configurado nos Secrets)');
+    return;
+  }
+
+  const ministerioTeste = 'teatro'; // area que a conta Membro de teste nao lidera de verdade
+  final membroId = _clienteMembro.auth.currentUser!.id;
+
+  try {
+    await _clienteMembro.rpc('solicitar_papel_lider', params: {
+      'p_codigo': codigo,
+      'p_ministerio': ministerioTeste,
+    });
+
+    final vinculo = await _admin
+        .from('profile_ministerios')
+        .select('papel')
+        .eq('profile_id', membroId)
+        .eq('ministerio', ministerioTeste)
+        .maybeSingle();
+
+    if (vinculo == null || vinculo['papel'] != 'lider') {
+      throw Exception('Código certo não lançou erro, mas não promoveu a lider de verdade.');
+    }
+  } finally {
+    // Sempre limpa -- 'teatro' nao e' um ministerio real dessa conta.
+    await _admin.from('profile_ministerios').delete().eq('profile_id', membroId).eq('ministerio', ministerioTeste);
   }
 }
 
@@ -2089,6 +2132,7 @@ Future<void> main() async {
     resultados.add(await _rodar('membro_descasar_limpa_grupo_casais', _testarDescasarLimpaGrupoCasais));
     resultados.add(await _rodar('membro_editar_perfil', _testarEditarPerfil));
     resultados.add(await _rodar('codigo_lider_errado', _testarCodigoLiderErrado));
+    resultados.add(await _rodar('codigo_lider_certo', _testarCodigoLiderCerto));
     resultados.add(await _rodar('membro_cadastro_primeira_vez', _testarCadastroPrimeiraVez));
     resultados.add(await _rodar('primeira_vez_so_no_dia', _testarPrimeiraVezSoNoDia));
     resultados.add(await _rodar('membro_inscrever_e_cancelar_escala', _testarInscreverECancelarEscalaAwake));

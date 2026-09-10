@@ -30,4 +30,8 @@ jobs:
           TESTE_LIDER_SENHA: ${{ secrets.TESTE_LIDER_SENHA }}
           TESTE_ADMIN_EMAIL: ${{ secrets.TESTE_ADMIN_EMAIL }}
           TESTE_ADMIN_SENHA: ${{ secrets.TESTE_ADMIN_SENHA }}
+          # Opcional -- so' habilita o teste do codigo de lider CERTO
+          # (codigo_lider_certo). Sem esse secret configurado, o robo
+          # pula esse teste em vez de falhar.
+          TESTE_LIDER_CODIGO: ${{ secrets.TESTE_LIDER_CODIGO }}
         run: dart run bin/robo.dart

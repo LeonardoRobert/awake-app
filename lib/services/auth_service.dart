@@ -148,11 +148,31 @@ class AuthService {
   /// Valida o codigo de lider no backend e, se correto, eleva o papel
   /// do usuario atual para 'lider' NO MINISTERIO informado. Lanca
   /// excecao se o codigo for invalido.
-  Future<void> solicitarPapelLider(String codigo, {required String ministerio}) {
-    return _client.rpc('solicitar_papel_lider', params: {
-      'p_codigo': codigo,
-      'p_ministerio': ministerio,
-    });
+  ///
+  /// Chamado logo apos signUp() (ver _SignupScreenState._cadastrar em
+  /// signup_screen.dart) -- mesmo caso da sessao nova as vezes nao ter
+  /// "assentado" a tempo de auth.uid() funcionar direito (documentado
+  /// aqui mesmo no signUp acima, pro update de profiles). Sem retry
+  /// aqui, isso batia null em profile_id e a pessoa ficava so' como
+  /// membro sem nenhum aviso claro do motivo real. So' tenta de novo
+  /// em erro "estranho" (ex: constraint) -- codigo/ministerio realmente
+  /// invalidos falham sempre do mesmo jeito, entao retry so' atrasaria
+  /// a mensagem de erro certa sem chance de ajudar.
+  Future<void> solicitarPapelLider(String codigo, {required String ministerio}) async {
+    for (var tentativa = 0; tentativa < 4; tentativa++) {
+      try {
+        await _client.rpc('solicitar_papel_lider', params: {
+          'p_codigo': codigo,
+          'p_ministerio': ministerio,
+        });
+        return;
+      } catch (e) {
+        final mensagem = e.toString().toLowerCase();
+        final erroConhecido = mensagem.contains('invalido') || mensagem.contains('invalid');
+        if (erroConhecido || tentativa == 3) rethrow;
+        await Future.delayed(const Duration(milliseconds: 400));
+      }
+    }
   }
 
   Future<ProfileModel?> fetchCurrentProfile() async {
