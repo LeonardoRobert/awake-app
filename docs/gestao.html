@@ -543,7 +543,7 @@
   const SECOES = [
     { id: 'calendario', label: 'Calendário' },
     { id: 'shallom', label: 'Shallom' },
-    { id: 'awake', label: 'Awake' },
+    { id: 'ministerios', label: 'Ministérios' },
     { id: 'usuarios', label: 'Usuários' },
     { id: 'visitantes', label: 'Visitantes' },
     { id: 'financeiro', label: 'Financeiro' },
@@ -552,6 +552,17 @@
   let secaoAtual = null;
   // Sub-aba de 2o nivel, so dentro da secao Financeiro.
   let subSecaoFinanceiro = 'lancamento';
+  // Ministerio selecionado dentro da aba "Ministérios" -- Awake entrou
+  // aqui tambem (era uma aba separada antes), com a MESMA tela/logica
+  // de sempre (iniciarPainelAwake), so' que agora dentro dessa lista de
+  // botoes em vez de uma aba propria no topo.
+  let ministerioSelecionadoGestao = 'awake';
+  const MINISTERIOS_LIDERAVEIS_FIXOS = [
+    ['awake', 'Awake'], ['homens', 'Homens'], ['mulheres', 'Mulheres'],
+    ['diaconos', 'Diáconos'], ['louvor', 'Louvor'], ['danca', 'Dança'],
+    ['midia', 'Mídia'], ['multimidia', 'Multimídia'], ['teatro', 'Teatro'],
+    ['coral', 'Coral'], ['intercessao', 'Intercessão'],
+  ];
 
   async function carregarPainel(session) {
     const { data: perfil, error } = await supa
@@ -621,16 +632,15 @@
         <h3>Últimos eventos</h3>
         <div id="lista-shallom"></div>`;
       iniciarPainelShallom();
-    } else if (secaoAtual === 'awake') {
+    } else if (secaoAtual === 'ministerios') {
       secaoEl.innerHTML = `
-        <h2 style="margin-top:0;">Awake</h2>
+        <h2 style="margin-top:0;">Ministérios</h2>
         <p style="color:#888; font-size:13px; margin-top:-8px;">
-          Últimas 8 semanas de eventos do Awake, com check-ins e quem foi.
+          Escolha um ministério pra ver as participações dele.
         </p>
-        <div id="dashboard-awake"></div>
-        <h3>Últimos eventos</h3>
-        <div id="lista-awake"></div>`;
-      iniciarPainelAwake();
+        <div id="seletor-ministerios" style="display:flex; flex-wrap:wrap; gap:8px; margin:12px 0 20px;"></div>
+        <div id="conteudo-ministerio-selecionado"></div>`;
+      iniciarPainelMinisterios();
     } else if (secaoAtual === 'financeiro') {
       // A tesouraria decidiu nao adotar o lancamento/import geral de
       // dizimo/oferta (conversa com o Leo em 13/08/2026) -- as abas
@@ -2806,6 +2816,144 @@
       fecharModal();
       await iniciarPainelShallom();
     });
+  }
+
+  // ---------- Ministerios: botao por ministerio, Awake incluso ----------
+  //
+  // Awake usa a MESMA tela/logica de sempre (iniciarPainelAwake, logo
+  // abaixo) -- so' mudou de lugar (era uma aba propria no topo, agora e'
+  // um dos botoes aqui dentro). Os demais ministerios (incluindo os
+  // grupos de casais dinamicos) usam uma tela generica nova, baseada em
+  // ocasioes_ministerio/presencas_ministerio (ver
+  // 2026_checkin_ministerio.sql / 2026_grupos_casais_ministerios.sql).
+
+  async function iniciarPainelMinisterios() {
+    const { data: gruposCasais } = await supa
+      .from('grupos_casais_catalogo')
+      .select('slug, nome')
+      .eq('ativo', true)
+      .order('nome');
+
+    const ministerios = [
+      ...MINISTERIOS_LIDERAVEIS_FIXOS,
+      ...(gruposCasais || []).map(g => ['casais_' + g.slug, g.nome]),
+    ];
+
+    const seletorEl = document.getElementById('seletor-ministerios');
+    seletorEl.innerHTML = ministerios.map(([valor, label]) => `
+      <button type="button" class="aba-secao ${valor === ministerioSelecionadoGestao ? 'ativa' : ''}"
+              data-ministerio="${valor}" data-label="${escaparAtributo(label)}">${escaparHtml(label)}</button>
+    `).join('');
+    seletorEl.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', () => selecionarMinisterioGestao(btn.dataset.ministerio, btn.dataset.label));
+    });
+
+    const atual = ministerios.find(([valor]) => valor === ministerioSelecionadoGestao) || ministerios[0];
+    selecionarMinisterioGestao(atual[0], atual[1]);
+  }
+
+  function selecionarMinisterioGestao(ministerio, label) {
+    ministerioSelecionadoGestao = ministerio;
+    document.querySelectorAll('#seletor-ministerios button').forEach(btn => {
+      btn.classList.toggle('ativa', btn.dataset.ministerio === ministerio);
+    });
+
+    const el = document.getElementById('conteudo-ministerio-selecionado');
+    if (ministerio === 'awake') {
+      el.innerHTML = `
+        <p style="color:#888; font-size:13px;">
+          Últimas 8 semanas de eventos do Awake, com check-ins e quem foi.
+        </p>
+        <div id="dashboard-awake"></div>
+        <h3>Últimos eventos</h3>
+        <div id="lista-awake"></div>`;
+      iniciarPainelAwake();
+    } else {
+      el.innerHTML = `
+        <p style="color:#888; font-size:13px;">
+          A partir do check-in em massa feito pelo líder no app ("Ferramentas da Liderança").
+        </p>
+        <div id="dashboard-ministerio-generico"></div>
+        <h3>Últimas ocasiões</h3>
+        <div id="lista-ministerio-generico"></div>`;
+      iniciarPainelMinisterioGenerico(ministerio, label);
+    }
+  }
+
+  async function iniciarPainelMinisterioGenerico(ministerio, label) {
+    const dashEl = document.getElementById('dashboard-ministerio-generico');
+    const listaEl = document.getElementById('lista-ministerio-generico');
+    dashEl.innerHTML = '<div class="vazio-lateral">Carregando...</div>';
+    listaEl.innerHTML = '';
+
+    const { data: ocasioes, error: erroOc } = await supa
+      .from('ocasioes_ministerio')
+      .select('id, tipo, data')
+      .eq('ministerio', ministerio)
+      .order('data', { ascending: false })
+      .limit(20);
+
+    if (erroOc) {
+      dashEl.innerHTML = `<div class="vazio-lateral">Erro ao carregar: ${escaparHtml(erroOc.message)}</div>`;
+      return;
+    }
+
+    const lista = ocasioes || [];
+    if (lista.length === 0) {
+      dashEl.innerHTML = `<div class="vazio-lateral">Nenhum check-in registrado ainda em ${escaparHtml(label)}.</div>`;
+      return;
+    }
+
+    const ocasiaoIds = lista.map(o => o.id);
+    // profiles!presencas_ministerio_profile_id_fkey -- precisa qualificar
+    // (a tabela tem profile_id E criado_por apontando pra profiles, mesmo
+    // bug de embed ambiguo ja visto em presencas_eventos/visitantes).
+    const { data: presencas, error: erroPres } = await supa
+      .from('presencas_ministerio')
+      .select('ocasiao_id, profiles!presencas_ministerio_profile_id_fkey(nome)')
+      .in('ocasiao_id', ocasiaoIds);
+
+    if (erroPres) {
+      dashEl.innerHTML = `<div class="vazio-lateral">Erro ao carregar presenças: ${escaparHtml(erroPres.message)}</div>`;
+      return;
+    }
+
+    const presencasPorOcasiao = {};
+    (presencas || []).forEach(p => {
+      const nome = (p.profiles && p.profiles.nome) || '(sem nome)';
+      (presencasPorOcasiao[p.ocasiao_id] || (presencasPorOcasiao[p.ocasiao_id] = [])).push(nome);
+    });
+
+    const totalOcasioes = lista.length;
+    const totalPresencas = (presencas || []).length;
+    const media = totalOcasioes ? totalPresencas / totalOcasioes : 0;
+
+    dashEl.innerHTML = `
+      <div class="grade-agregados">
+        <div class="cartao-agregado"><div class="nome-agregado">Ocasiões (últimas ${totalOcasioes})</div><div class="contagem-agregado">${totalOcasioes}</div></div>
+        <div class="cartao-agregado"><div class="nome-agregado">Total de presenças</div><div class="contagem-agregado">${totalPresencas}</div></div>
+        <div class="cartao-agregado"><div class="nome-agregado">Média de presença por ocasião</div><div class="contagem-agregado">${media.toFixed(1)}</div></div>
+      </div>`;
+
+    listaEl.innerHTML = lista.map(oc => {
+      const nomes = (presencasPorOcasiao[oc.id] || []).slice().sort();
+      // "oc.data" e' uma coluna "date" pura (ex: "2026-09-10") -- o
+      // Javascript ja interpreta isso como meia-noite UTC sozinho (sem
+      // precisar somar horario), entao so formata de volta com
+      // timeZone:'UTC' pra nao deslocar o dia (mesma logica de
+      // hojeUtc/OPCOES_FUSO_UTC usada no resto do arquivo).
+      const dataObj = new Date(oc.data);
+      return `
+        <div class="linha-usuario">
+          <span class="nome-usuario">${escaparHtml(oc.tipo)}</span><span class="badge badge-checkin">${nomes.length} ${nomes.length === 1 ? 'presente' : 'presentes'}</span>
+          <div style="font-size:12px; color:#888; margin-top:2px;">
+            ${dataObj.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit', ...OPCOES_FUSO_UTC })}
+          </div>
+          ${nomes.length
+            ? `<div style="font-size:12px; color:var(--navy); margin-top:8px;">${nomes.map(escaparHtml).join(', ')}</div>`
+            : `<div style="font-size:12px; color:#aaa; margin-top:8px;">Ninguém registrado.</div>`}
+        </div>`;
+    }).join('');
   }
 
   // ---------- Awake: eventos + check-ins ----------
