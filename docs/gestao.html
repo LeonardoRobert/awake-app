@@ -2924,28 +2924,37 @@
       (presencasPorOcasiao[p.ocasiao_id] || (presencasPorOcasiao[p.ocasiao_id] = [])).push(nome);
     });
 
-    const totalOcasioes = lista.length;
+    // Ocasiao com 0 presenca conta como "nao contabilizada"
+    // automaticamente -- sai da media (evita que um check-in vazio/
+    // enviado sem querer derrube o numero), mas continua aparecendo na
+    // lista com um badge neutro em vez do de check-in.
+    const ocasioesContadas = lista.filter(oc => (presencasPorOcasiao[oc.id] || []).length > 0);
+    const totalOcasioes = ocasioesContadas.length;
     const totalPresencas = (presencas || []).length;
     const media = totalOcasioes ? totalPresencas / totalOcasioes : 0;
 
     dashEl.innerHTML = `
       <div class="grade-agregados">
-        <div class="cartao-agregado"><div class="nome-agregado">Ocasiões (últimas ${totalOcasioes})</div><div class="contagem-agregado">${totalOcasioes}</div></div>
+        <div class="cartao-agregado"><div class="nome-agregado">Ocasiões contabilizadas</div><div class="contagem-agregado">${totalOcasioes}</div></div>
         <div class="cartao-agregado"><div class="nome-agregado">Total de presenças</div><div class="contagem-agregado">${totalPresencas}</div></div>
         <div class="cartao-agregado"><div class="nome-agregado">Média de presença por ocasião</div><div class="contagem-agregado">${media.toFixed(1)}</div></div>
       </div>`;
 
     listaEl.innerHTML = lista.map(oc => {
       const nomes = (presencasPorOcasiao[oc.id] || []).slice().sort();
+      const naoContabilizado = nomes.length === 0;
       // "oc.data" e' uma coluna "date" pura (ex: "2026-09-10") -- o
       // Javascript ja interpreta isso como meia-noite UTC sozinho (sem
       // precisar somar horario), entao so formata de volta com
       // timeZone:'UTC' pra nao deslocar o dia (mesma logica de
       // hojeUtc/OPCOES_FUSO_UTC usada no resto do arquivo).
       const dataObj = new Date(oc.data);
+      const badge = naoContabilizado
+        ? `<span class="badge badge-neutro">Não contabilizado</span>`
+        : `<span class="badge badge-checkin">${nomes.length} ${nomes.length === 1 ? 'presente' : 'presentes'}</span>`;
       return `
-        <div class="linha-usuario">
-          <span class="nome-usuario">${escaparHtml(oc.tipo)}</span><span class="badge badge-checkin">${nomes.length} ${nomes.length === 1 ? 'presente' : 'presentes'}</span>
+        <div class="linha-usuario" ${naoContabilizado ? 'style="opacity:0.6;"' : ''}>
+          <span class="nome-usuario">${escaparHtml(oc.tipo)}</span>${badge}
           <div style="font-size:12px; color:#888; margin-top:2px;">
             ${dataObj.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit', ...OPCOES_FUSO_UTC })}
           </div>
@@ -3044,7 +3053,13 @@
 
   function _naoContabilizadoAwake(oc) {
     const dataStr = oc.data.toISOString().slice(0, 10);
-    return naoContabilizadasAwake.has(`${oc.evento.id}_${dataStr}`);
+    if (naoContabilizadasAwake.has(`${oc.evento.id}_${dataStr}`)) return true;
+    // Evento com 0 check-in conta como "nao contabilizado"
+    // automaticamente tambem -- mesma regra aplicada na aba
+    // Ministerios (a pedido do Leo), evita que um evento sem nenhum
+    // check-in derrube a media sozinho.
+    const temCheckin = presencasAwake.some(p => p.evento_id === oc.evento.id && p.data_ocorrencia === dataStr);
+    return !temCheckin;
   }
 
   function renderizarDashboardAwake() {

@@ -219,19 +219,27 @@ class _DashboardMinisterioScreenState extends State<DashboardMinisterioScreen> {
               ))
           .toList();
 
-      if (ultimasOito.isEmpty) {
+      // Ocasiao com 0 presenca conta como "nao contabilizada"
+      // automaticamente -- sai da media (evita que um check-in vazio/
+      // enviado sem querer derrube o numero), mas continua aparecendo
+      // no historico (com o badge de 0).
+      final ocasioesContadas = ultimasOito
+          .where((o) => (contagemPorOcasiao[o['id'] as String] ?? 0) > 0)
+          .toList();
+
+      if (ocasioesContadas.isEmpty) {
         _mediaPresencaPorOcasiao = null;
         _mediaParticipacaoOcasioes = null;
         _pessoasAusentes = [];
       } else {
-        final contagens = ultimasOito.map((o) => contagemPorOcasiao[o['id'] as String] ?? 0);
-        _mediaPresencaPorOcasiao = contagens.reduce((a, b) => a + b) / ultimasOito.length;
+        final contagens = ocasioesContadas.map((o) => contagemPorOcasiao[o['id'] as String] ?? 0);
+        _mediaPresencaPorOcasiao = contagens.reduce((a, b) => a + b) / ocasioesContadas.length;
         _mediaParticipacaoOcasioes = _totalMembros == 0
             ? null
-            : contagens.map((c) => c / _totalMembros).reduce((a, b) => a + b) / ultimasOito.length;
+            : contagens.map((c) => c / _totalMembros).reduce((a, b) => a + b) / ocasioesContadas.length;
 
         final presentesNaJanela = <String>{
-          for (final o in ultimasOito) ...?presentesPorOcasiao[o['id'] as String],
+          for (final o in ocasioesContadas) ...?presentesPorOcasiao[o['id'] as String],
         };
         _pessoasAusentes = listaMembros
             .where((m) => !presentesNaJanela.contains(m['profile_id'] as String))
@@ -441,7 +449,12 @@ class _DashboardMinisterioScreenState extends State<DashboardMinisterioScreen> {
                                     leading: const Icon(Icons.event_available_outlined),
                                     title: Text(o.tipo),
                                     subtitle: Text(DateFormat('dd/MM/yyyy').format(o.data)),
-                                    trailing: Text('${o.contagem} presente(s)'),
+                                    trailing: Text(
+                                      o.contagem == 0 ? 'Não contabilizado' : '${o.contagem} presente(s)',
+                                      style: o.contagem == 0
+                                          ? TextStyle(color: Theme.of(context).disabledColor)
+                                          : null,
+                                    ),
                                   ))
                               .toList(),
                         ),
