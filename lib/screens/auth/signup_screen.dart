@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/erro_amigavel.dart';
 import '../../models/profile_model.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/grupo_casais_provider.dart';
 import '../../services/cep_service.dart';
 import '../../services/filho_service.dart';
 
@@ -139,7 +140,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   // Passo 1 -- Ministerio
   bool _preSelecaoMinisterioAplicada = false;
   final Set<String> _ministeriosSelecionados = {}; // 'awake' | 'homens' | 'mulheres'
-  GrupoCasais? _grupoCasais;
+  String? _grupoCasais; // slug, ver grupos_casais_catalogo
   final Set<String> _areasServico = {}; // 'coral', 'danca', 'diaconos', etc.
 
   // Passo 2 -- Contato
@@ -695,25 +696,20 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
             const Text('Qual grupo de casais vocês participam?',
                 style: TextStyle(fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
-            DropdownButtonFormField<GrupoCasais?>(
-              value: _grupoCasais,
-              decoration: const InputDecoration(labelText: 'Grupo'),
-              items: const [
-                DropdownMenuItem(value: null, child: Text('Ainda não tenho grupo')),
-                DropdownMenuItem(
-                  value: GrupoCasais.henriquePatricia,
-                  child: Text('Grupo do Henrique e Patrícia'),
-                ),
-                DropdownMenuItem(
-                  value: GrupoCasais.ivaldoSonja,
-                  child: Text('Grupo do Ivaldo e Sonja'),
-                ),
-                DropdownMenuItem(
-                  value: GrupoCasais.marceloAndreia,
-                  child: Text('Grupo do Marcelo e Andréia'),
-                ),
-              ],
-              onChanged: (v) => setState(() => _grupoCasais = v),
+            Consumer(
+              builder: (context, ref, _) {
+                final gruposAsync = ref.watch(gruposCasaisAtivosProvider);
+                final grupos = gruposAsync.value ?? [];
+                return DropdownButtonFormField<String?>(
+                  value: _grupoCasais,
+                  decoration: const InputDecoration(labelText: 'Grupo'),
+                  items: [
+                    const DropdownMenuItem(value: null, child: Text('Ainda não tenho grupo')),
+                    ...grupos.map((g) => DropdownMenuItem(value: g.slug, child: Text(g.nome))),
+                  ],
+                  onChanged: (v) => setState(() => _grupoCasais = v),
+                );
+              },
             ),
           ],
           const SizedBox(height: 24),
@@ -936,16 +932,25 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              children: _todosMinisteriosLideranca
-                  .map((m) => FilterChip(
-                        label: Text(m.$2),
-                        selected: _liderPorMinisterio[m.$1] ?? false,
-                        onSelected: (marcado) =>
-                            setState(() => _liderPorMinisterio[m.$1] = marcado),
-                      ))
-                  .toList(),
+            Consumer(
+              builder: (context, ref, _) {
+                final gruposCasais = ref.watch(gruposCasaisAtivosProvider).value ?? [];
+                final opcoes = [
+                  ..._todosMinisteriosLideranca,
+                  ...gruposCasais.map((g) => (g.ministerio, g.nome)),
+                ];
+                return Wrap(
+                  spacing: 8,
+                  children: opcoes
+                      .map((m) => FilterChip(
+                            label: Text(m.$2),
+                            selected: _liderPorMinisterio[m.$1] ?? false,
+                            onSelected: (marcado) =>
+                                setState(() => _liderPorMinisterio[m.$1] = marcado),
+                          ))
+                      .toList(),
+                );
+              },
             ),
             const SizedBox(height: 16),
             TextFormField(

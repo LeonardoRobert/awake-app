@@ -2360,19 +2360,23 @@
   // ver LABEL_GRUPO_CASAIS/LABEL_CATEGORIA logo abaixo.
   const GRUPO_FAIXA_ETARIA = ['awake', 'homens', 'mulheres', 'criancas'];
   const GRUPO_SERVICO = ['diaconos', 'louvor', 'danca', 'midia', 'multimidia', 'teatro', 'coral', 'intercessao'];
-  const LABEL_MINISTERIO_AGREGADO = {
+  // Base fixa + os grupos de casais dinamicos (ver
+  // grupos_casais_catalogo/2026_grupos_casais_ministerios.sql), que
+  // agora sao ministerios de verdade (com "casais_" na frente do slug)
+  // -- entram nesse mapa em tempo de execucao, dentro de
+  // iniciarPainelUsuarios(). "let" em vez de "const" por causa disso.
+  let LABEL_MINISTERIO_AGREGADO = {
     awake: 'Awake', homens: 'Homens', mulheres: 'Mulheres', criancas: 'Crianças',
     diaconos: 'Diáconos', louvor: 'Louvor', danca: 'Dança', midia: 'Mídia',
     multimidia: 'Multimídia', teatro: 'Teatro', coral: 'Coral', intercessao: 'Intercessão',
   };
-  // Discipulado (Grupo de Casais) -- coluna direta em profiles, nao um
-  // vinculo em profile_ministerios, e sem conceito de "lider" (o grupo
-  // ja carrega o nome do casal que discipula no proprio label).
-  const LABEL_GRUPO_CASAIS = {
-    henrique_patricia: 'Grupo do Henrique e Patrícia',
-    ivaldo_sonja: 'Grupo do Ivaldo e Sonja',
-    marcelo_andreia: 'Grupo do Marcelo e Andréia',
-  };
+  // Grupo de casais que a pessoa participa (coluna direta em profiles,
+  // grupo_casais guarda so' o slug puro, sem o prefixo "casais_") --
+  // populado dinamicamente junto com LABEL_MINISTERIO_AGREGADO acima.
+  // Cada grupo TAMBEM vira um vinculo normal em profile_ministerios
+  // (ministerio = 'casais_' + slug), entao pode ter lider igual
+  // qualquer outro ministerio -- ver cartaoMinisterioAgregado().
+  let LABEL_GRUPO_CASAIS = {};
   const LABEL_CATEGORIA = { genesis: 'Genesis', next: 'Next', one: 'One' };
 
   // ---------- Visitantes -- Primeira Vez ----------
@@ -3161,9 +3165,14 @@
 
   let todosUsuarios = [];
   let todosVinculosMinisterio = [];
+  let gruposCasaisCatalogo = [];
 
   async function iniciarPainelUsuarios() {
-    const [{ data: perfis, error: erroPerfis }, { data: vinculos, error: erroVinculos }] = await Promise.all([
+    const [
+      { data: perfis, error: erroPerfis },
+      { data: vinculos, error: erroVinculos },
+      { data: gruposCasais },
+    ] = await Promise.all([
       supa.from('profiles')
         .select(
           'id, nome, telefone, endereco, sexo, papel, ativo, categoria, grupo_casais, '
@@ -3171,6 +3180,10 @@
         )
         .order('nome'),
       supa.from('profile_ministerios').select('profile_id, ministerio, papel'),
+      // Sem tratamento de erro dedicado aqui de proposito: se essa
+      // tabela ainda nao existir (SQL nao rodado), so' segue com a
+      // lista de grupos vazia em vez de travar o painel inteiro.
+      supa.from('grupos_casais_catalogo').select('slug, nome').eq('ativo', true).order('nome'),
     ]);
 
     if (erroPerfis || erroVinculos) {
@@ -3181,6 +3194,12 @@
 
     todosUsuarios = perfis || [];
     todosVinculosMinisterio = vinculos || [];
+    gruposCasaisCatalogo = gruposCasais || [];
+    LABEL_GRUPO_CASAIS = Object.fromEntries(gruposCasaisCatalogo.map(g => [g.slug, g.nome]));
+    LABEL_MINISTERIO_AGREGADO = {
+      ...LABEL_MINISTERIO_AGREGADO,
+      ...Object.fromEntries(gruposCasaisCatalogo.map(g => ['casais_' + g.slug, g.nome])),
+    };
 
     // E-mail vive em auth.users, nao em profiles -- so' admin consegue
     // ler (RPC com security definer), por isso busca separado e junta
@@ -3365,11 +3384,12 @@
 
     const cartoesFaixaEtaria = GRUPO_FAIXA_ETARIA.map(cartaoMinisterioAgregado).join('');
 
-    // Discipulado Casais = coluna grupo_casais, direto em profiles.
-    const cartoesCasais = Object.entries(LABEL_GRUPO_CASAIS).map(([valor, label]) => {
-      const qtd = todosUsuarios.filter(p => p.grupo_casais === valor).length;
-      return `<div class="cartao-agregado"><div class="nome-agregado">${label}</div><div class="contagem-agregado">${qtd}</div></div>`;
-    }).join('');
+    // Discipulado Casais -- cada grupo agora e' um vinculo normal em
+    // profile_ministerios ('casais_' + slug), entao reaproveita o MESMO
+    // cartao generico dos outros ministerios (ja mostra lider).
+    const cartoesCasais = gruposCasaisCatalogo
+      .map(g => cartaoMinisterioAgregado('casais_' + g.slug))
+      .join('');
 
     // Discipulado Awake = coluna categoria -- MAS categoria e calculada
     // pra QUALQUER perfil (a partir de estado civil/idade), nao so pra
@@ -3441,16 +3461,21 @@
           </span>`;
       }).join('');
 
-      const chipCasal = pessoa.grupo_casais
-        ? `<span class="chip-casal">${escaparHtml(LABEL_GRUPO_CASAIS[pessoa.grupo_casais] || pessoa.grupo_casais)}</span>`
-        : '';
-
-      const ehAdminAtual = pessoa.papel === 'admin' || pessoa.papel === 'admin_financeiro';
-
       // So oferece no seletor os ministerios que a pessoa AINDA NAO tem
       // vinculo -- os que ja tem aparecem como chip (clica pra alternar
       // membro<->lider ali mesmo).
       const ministeriosVinculados = new Set(vinculos.map(v => v.ministerio));
+
+      // grupo_casais vira automaticamente um vinculo em
+      // profile_ministerios (ver trigger em
+      // 2026_grupos_casais_ministerios.sql), entao normalmente ja
+      // aparece em chipsMinisterios -- esse chip so' cobre o caso raro
+      // de estar fora de sincronia (ex: dado de antes da migracao).
+      const chipCasal = (pessoa.grupo_casais && !ministeriosVinculados.has('casais_' + pessoa.grupo_casais))
+        ? `<span class="chip-casal">${escaparHtml(LABEL_GRUPO_CASAIS[pessoa.grupo_casais] || pessoa.grupo_casais)}</span>`
+        : '';
+
+      const ehAdminAtual = pessoa.papel === 'admin' || pessoa.papel === 'admin_financeiro';
       const opcoesNovoMinisterio = Object.entries(LABEL_MINISTERIO_AGREGADO)
         .filter(([chave]) => !ministeriosVinculados.has(chave))
         .map(([chave, label]) => `<option value="${chave}">${escaparHtml(label)}</option>`)

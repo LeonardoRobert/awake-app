@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/erro_amigavel.dart';
 import '../../models/profile_model.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/grupo_casais_provider.dart';
 import '../../services/cep_service.dart';
 import '../../widgets/awake_app_bar.dart';
 
@@ -44,7 +45,7 @@ class _EditarPerfilScreenState extends ConsumerState<EditarPerfilScreen> {
   bool _semNumero = false;
   EstadoCivil? _estadoCivil;
   Sexo? _sexo;
-  GrupoCasais? _grupoCasais;
+  String? _grupoCasais; // slug, ver grupos_casais_catalogo
   bool _buscandoCep = false;
   bool _saving = false;
 
@@ -90,7 +91,7 @@ class _EditarPerfilScreenState extends ConsumerState<EditarPerfilScreen> {
         'telefone': _telefoneController.text.trim(),
         'estado_civil': _estadoCivil?.name,
         'sexo': _sexo?.name,
-        'grupo_casais': _grupoCasais?.valorBanco,
+        'grupo_casais': _grupoCasais,
       };
 
       if (_ruaController.text.trim().isNotEmpty) {
@@ -311,25 +312,19 @@ class _EditarPerfilScreenState extends ConsumerState<EditarPerfilScreen> {
             ),
             if (_estadoCivil == EstadoCivil.casado && !widget.perfil.pertenceAwake) ...[
               const SizedBox(height: 16),
-              DropdownButtonFormField<GrupoCasais?>(
-                value: _grupoCasais,
-                decoration: const InputDecoration(labelText: 'Grupo de casais'),
-                items: const [
-                  DropdownMenuItem(value: null, child: Text('Ainda não tenho grupo')),
-                  DropdownMenuItem(
-                    value: GrupoCasais.henriquePatricia,
-                    child: Text('Grupo do Henrique e Patrícia'),
-                  ),
-                  DropdownMenuItem(
-                    value: GrupoCasais.ivaldoSonja,
-                    child: Text('Grupo do Ivaldo e Sonja'),
-                  ),
-                  DropdownMenuItem(
-                    value: GrupoCasais.marceloAndreia,
-                    child: Text('Grupo do Marcelo e Andréia'),
-                  ),
-                ],
-                onChanged: (v) => setState(() => _grupoCasais = v),
+              Consumer(
+                builder: (context, ref, _) {
+                  final grupos = ref.watch(gruposCasaisAtivosProvider).value ?? [];
+                  return DropdownButtonFormField<String?>(
+                    value: _grupoCasais,
+                    decoration: const InputDecoration(labelText: 'Grupo de casais'),
+                    items: [
+                      const DropdownMenuItem(value: null, child: Text('Ainda não tenho grupo')),
+                      ...grupos.map((g) => DropdownMenuItem(value: g.slug, child: Text(g.nome))),
+                    ],
+                    onChanged: (v) => setState(() => _grupoCasais = v),
+                  );
+                },
               ),
             ],
             const SizedBox(height: 24),

@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../core/erro_amigavel.dart';
 import '../../models/profile_model.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/grupo_casais_provider.dart';
 import '../../services/notification_service.dart';
 import '../../widgets/awake_app_bar.dart';
 import 'editar_perfil_screen.dart';
@@ -167,12 +168,19 @@ class MeuPerfilScreen extends ConsumerWidget {
                   subtitle: Text(profile.categoria?.label ?? 'Não definido'),
                 ),
               if (profile.estadoCivil == EstadoCivil.casado && !profile.pertenceAwake)
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.favorite_outline),
-                  title: const Text('Grupo de casais'),
-                  subtitle: Text(profile.grupoCasais?.label ?? 'Ainda não tenho grupo'),
-                ),
+                Builder(builder: (context) {
+                  final grupos = ref.watch(gruposCasaisAtivosProvider).value ?? [];
+                  final encontrados = grupos.where((g) => g.slug == profile.grupoCasais);
+                  final nomeGrupo = encontrados.isEmpty ? null : encontrados.first.nome;
+                  return ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.favorite_outline),
+                    title: const Text('Grupo de casais'),
+                    subtitle: Text(profile.grupoCasais == null
+                        ? 'Ainda não tenho grupo'
+                        : (nomeGrupo ?? profile.grupoCasais!)),
+                  );
+                }),
               const SizedBox(height: 32),
               const Divider(),
               const SizedBox(height: 8),

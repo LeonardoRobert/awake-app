@@ -42,46 +42,12 @@ extension SexoLabel on Sexo {
   String get label => this == Sexo.masculino ? 'Masculino' : 'Feminino';
 }
 
-/// Subgrupos dentro de "Casais" -- so pra quem e casado e NAO e do
-/// Awake (quem e casado e Awake ja cai automaticamente em "One").
-enum GrupoCasais { henriquePatricia, ivaldoSonja, marceloAndreia }
-
-GrupoCasais? grupoCasaisFromString(String? value) {
-  switch (value) {
-    case 'henrique_patricia':
-      return GrupoCasais.henriquePatricia;
-    case 'ivaldo_sonja':
-      return GrupoCasais.ivaldoSonja;
-    case 'marcelo_andreia':
-      return GrupoCasais.marceloAndreia;
-    default:
-      return null;
-  }
-}
-
-extension GrupoCasaisDb on GrupoCasais {
-  String get valorBanco {
-    switch (this) {
-      case GrupoCasais.henriquePatricia:
-        return 'henrique_patricia';
-      case GrupoCasais.ivaldoSonja:
-        return 'ivaldo_sonja';
-      case GrupoCasais.marceloAndreia:
-        return 'marcelo_andreia';
-    }
-  }
-
-  String get label {
-    switch (this) {
-      case GrupoCasais.henriquePatricia:
-        return 'Grupo do Henrique e Patrícia';
-      case GrupoCasais.ivaldoSonja:
-        return 'Grupo do Ivaldo e Sonja';
-      case GrupoCasais.marceloAndreia:
-        return 'Grupo do Marcelo e Andréia';
-    }
-  }
-}
+/// O grupo de casais (ex: "henrique_patricia") e' so o slug bruto --
+/// nao e' mais um enum fixo, porque a lista de grupos agora e' dinamica
+/// (tabela grupos_casais_catalogo, ver
+/// 2026_grupos_casais_ministerios.sql). Pra exibir o nome bonito
+/// ("Grupo do Henrique e Patrícia"), consulte gruposCasaisAtivosProvider
+/// e cruze pelo slug.
 
 /// Genesis (13-16, solteiro/namorando), Next (17+, solteiro/namorando),
 /// One (noivo ou casado, qualquer idade). Calculado automaticamente
@@ -148,6 +114,19 @@ extension MinisterioLabel on String {
       case 'teatro':
         return 'Teatro';
       default:
+        // Grupo de casais dinamico ('casais_henrique_patricia') -- essa
+        // extensao e' sincrona (usada em varios lugares sem acesso ao
+        // banco), entao monta um nome legivel a partir do slug em vez
+        // de ir buscar o nome exato do catalogo (isso ja acontece nos
+        // lugares que tem o nome certo: dropdown de cadastro/editar
+        // perfil, meu perfil, e o gestao.html).
+        if (startsWith('casais_')) {
+          final partes = substring('casais_'.length)
+              .split('_')
+              .where((p) => p.isNotEmpty)
+              .map((p) => p[0].toUpperCase() + p.substring(1));
+          return 'Casais – ${partes.join(' e ')}';
+        }
         return this;
     }
   }
@@ -162,7 +141,7 @@ class ProfileModel {
   final String? tempoParticipacao;
   final EstadoCivil? estadoCivil;
   final Sexo? sexo;
-  final GrupoCasais? grupoCasais;
+  final String? grupoCasais;
   final String? fotoUrl;
   final Categoria? categoria;
   final UserRole papel;
@@ -224,7 +203,7 @@ class ProfileModel {
       tempoParticipacao: map['tempo_participacao'] as String?,
       estadoCivil: estadoCivilFromString(map['estado_civil'] as String?),
       sexo: sexoFromString(map['sexo'] as String?),
-      grupoCasais: grupoCasaisFromString(map['grupo_casais'] as String?),
+      grupoCasais: map['grupo_casais'] as String?,
       fotoUrl: map['foto_url'] as String?,
       categoria: categoriaFromString(map['categoria'] as String?),
       papel: userRoleFromString(map['papel'] as String? ?? 'membro'),
@@ -245,7 +224,7 @@ class ProfileModel {
       'tempo_participacao': tempoParticipacao,
       'estado_civil': estadoCivil?.name,
       'sexo': sexo?.name,
-      'grupo_casais': grupoCasais?.valorBanco,
+      'grupo_casais': grupoCasais,
     };
   }
 }

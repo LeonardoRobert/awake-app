@@ -19,7 +19,7 @@ class AuthService {
     required DateTime dataNascimento,
     required EstadoCivil estadoCivil,
     required Sexo sexo,
-    GrupoCasais? grupoCasais,
+    String? grupoCasais,
     String? telefone,
     String? endereco,
     String? tempoParticipacao,
@@ -45,7 +45,7 @@ class AuthService {
         'tempo_participacao': tempoParticipacao,
         'estado_civil': estadoCivil.name,
         'sexo': sexo.name,
-        'grupo_casais': grupoCasais?.valorBanco,
+        'grupo_casais': grupoCasais,
       };
 
       // Logo apos o signUp, a sessao nova as vezes ainda nao "assentou"
