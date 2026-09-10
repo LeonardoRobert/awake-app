@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/erro_amigavel.dart';
 import '../../providers/auth_provider.dart';
-import '../../providers/event_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../screens/financeiro/financeiro_screen.dart';
 import '../../screens/messages/admin_mensagens_screen.dart';
@@ -24,7 +23,6 @@ import '../../services/escala_servico_service.dart';
 import '../../services/notification_service.dart';
 import '../../widgets/awake_app_bar.dart';
 import '../../widgets/link_formulario_visitante.dart';
-import '../../widgets/tarja_evento_ingressado.dart';
 import 'meu_perfil_screen.dart';
 
 /// Essa tela virou um MENU (antes era a lista direta de dados do
@@ -102,17 +100,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final profileAsync = ref.watch(currentProfileProvider);
     final email = ref.watch(authServiceProvider).currentUserEmail;
     final themeMode = ref.watch(themeModeProvider);
-
-    // Evento ingressado mais proximo (ainda nao aconteceu) -- mostrado
-    // numa tarja aqui no Menu, logo abaixo do formulario de visitante
-    // (antes ficava na tela de Inicio).
-    final eventosAsync = ref.watch(upcomingEventsProvider);
-    final eventosIngressados = (eventosAsync.value ?? [])
-        .where((e) => e.ingressado && e.dataInicio.isAfter(DateTime.now()))
-        .toList()
-      ..sort((a, b) => a.dataInicio.compareTo(b.dataInicio));
-    final eventoIngressado =
-        eventosIngressados.isEmpty ? null : eventosIngressados.first;
 
     return Scaffold(
       appBar: const AwakeAppBar(title: 'Menu'),
@@ -204,10 +191,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 const SizedBox(height: 8),
               ],
               const LinkFormularioVisitante(),
-              if (eventoIngressado != null) ...[
-                const SizedBox(height: 16),
-                TarjaEventoIngressado(evento: eventoIngressado),
-              ],
               const SizedBox(height: 8),
               ListTile(
                 contentPadding: EdgeInsets.zero,

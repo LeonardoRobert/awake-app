@@ -7,7 +7,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../models/contribuicao_model.dart';
 import '../../providers/contribuicao_provider.dart';
+import '../../providers/event_provider.dart';
 import '../../widgets/awake_app_bar.dart';
+import '../../widgets/tarja_evento_ingressado.dart';
 
 const _dadosBancarios = 'Banco Santander\n'
     'Ag. 3306 - C.C 13000184-9\n'
@@ -390,6 +392,17 @@ class _FinanceiroScreenState extends ConsumerState<FinanceiroScreen> {
     final contribuicoesAsync = ref.watch(minhasContribuicoesProvider);
     final formatoMoeda = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
 
+    // Evento ingressado mais proximo (ainda nao aconteceu) -- mostrado
+    // numa tarja aqui em Contribua, acima de "Projetos missionarios que
+    // apoiamos" (antes ficava no Menu/Perfil).
+    final eventosAsync = ref.watch(upcomingEventsProvider);
+    final eventosIngressados = (eventosAsync.value ?? [])
+        .where((e) => e.ingressado && e.dataInicio.isAfter(DateTime.now()))
+        .toList()
+      ..sort((a, b) => a.dataInicio.compareTo(b.dataInicio));
+    final eventoIngressado =
+        eventosIngressados.isEmpty ? null : eventosIngressados.first;
+
     return Scaffold(
       appBar: const AwakeAppBar(title: 'Contribua', showQrButton: false),
       body: RefreshIndicator(
@@ -439,6 +452,10 @@ class _FinanceiroScreenState extends ConsumerState<FinanceiroScreen> {
                 ),
               ),
             ),
+            if (eventoIngressado != null) ...[
+              const SizedBox(height: 24),
+              TarjaEventoIngressado(evento: eventoIngressado),
+            ],
             const SizedBox(height: 32),
             Text('Projetos missionários que apoiamos',
                 style: Theme.of(context).textTheme.titleLarge),
