@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../../models/profile_model.dart';
 import '../../services/escala_servico_service.dart';
 import '../../services/supabase_service.dart';
@@ -42,8 +43,22 @@ class _DashboardMinisterioScreenState extends State<DashboardMinisterioScreen> {
   Map<String, int> _rankingParticipacao = {};
   double? _taxaPreenchimento;
 
+  // Presenca em ocasioes do ministerio (Ensaio/Reuniao/Culto que
+  // servimos/Outro -- ver "Ferramentas da Lideranca" -> check-in em
+  // massa, supabase/sql/2026_checkin_ministerio.sql). Totalmente
+  // separado da Escala de Servico acima: aqui e' "apareceu na
+  // ocasiao", la e' "estava escalado pra servir".
+  List<_OcasiaoComContagem> _historicoOcasioes = [];
+  double? _mediaPresencaPorOcasiao;
+  double? _mediaParticipacaoOcasioes;
+  List<String> _pessoasAusentes = [];
+  List<String> _pessoasSemParticiparEsseMes = [];
+
   bool get _ehFaixaEtaria => _faixasEtarias.contains(widget.ministerio);
   bool get _temEscalaDeServico => ministeriosComEscalaServico.contains(widget.ministerio);
+  // O check-in em massa por ocasiao existe pra qualquer ministerio que
+  // NAO seja Awake (que tem seu proprio check-in/contador, intocado).
+  bool get _temOcasioesMinisterio => widget.ministerio != 'awake';
 
   @override
   void initState() {
@@ -166,6 +181,85 @@ class _DashboardMinisterioScreenState extends State<DashboardMinisterioScreen> {
       _rankingParticipacao = contagem;
     }
 
+    if (_temOcasioesMinisterio) {
+      final ocasioesData = await _client
+          .from('ocasioes_ministerio')
+          .select('id, data, tipo')
+          .eq('ministerio', widget.ministerio)
+          .order('data', ascending: false)
+          .limit(20);
+      final ocasioes = (ocasioesData as List).cast<Map<String, dynamic>>();
+      final ocasiaoIds = ocasioes.map((o) => o['id'] as String).toList();
+
+      final contagemPorOcasiao = <String, int>{for (final o in ocasioes) o['id'] as String: 0};
+      final presentesPorOcasiao = <String, Set<String>>{};
+
+      if (ocasiaoIds.isNotEmpty) {
+        final presencasData = await _client
+            .from('presencas_ministerio')
+            .select('ocasiao_id, profile_id')
+            .inFilter('ocasiao_id', ocasiaoIds);
+        for (final p in presencasData as List) {
+          final mapa = p as Map<String, dynamic>;
+          final ocasiaoId = mapa['ocasiao_id'] as String;
+          final profileId = mapa['profile_id'] as String;
+          contagemPorOcasiao[ocasiaoId] = (contagemPorOcasiao[ocasiaoId] ?? 0) + 1;
+          presentesPorOcasiao.putIfAbsent(ocasiaoId, () => {}).add(profileId);
+        }
+      }
+
+      // Historico + medias usam so' as ultimas 8 ocasioes (mesma janela
+      // usada pra Escala de Servico acima, pra ficar consistente).
+      final ultimasOito = ocasioes.take(8).toList();
+      _historicoOcasioes = ultimasOito
+          .map((o) => _OcasiaoComContagem(
+                data: DateTime.parse(o['data'] as String),
+                tipo: o['tipo'] as String,
+                contagem: contagemPorOcasiao[o['id'] as String] ?? 0,
+              ))
+          .toList();
+
+      if (ultimasOito.isEmpty) {
+        _mediaPresencaPorOcasiao = null;
+        _mediaParticipacaoOcasioes = null;
+        _pessoasAusentes = [];
+      } else {
+        final contagens = ultimasOito.map((o) => contagemPorOcasiao[o['id'] as String] ?? 0);
+        _mediaPresencaPorOcasiao = contagens.reduce((a, b) => a + b) / ultimasOito.length;
+        _mediaParticipacaoOcasioes = _totalMembros == 0
+            ? null
+            : contagens.map((c) => c / _totalMembros).reduce((a, b) => a + b) / ultimasOito.length;
+
+        final presentesNaJanela = <String>{
+          for (final o in ultimasOito) ...?presentesPorOcasiao[o['id'] as String],
+        };
+        _pessoasAusentes = listaMembros
+            .where((m) => !presentesNaJanela.contains(m['profile_id'] as String))
+            .map((m) => (m['profiles'] as Map<String, dynamic>?)?['nome'] as String? ?? '(sem nome)')
+            .toList();
+      }
+
+      // Alerta mensal: quem nao apareceu em NENHUMA ocasiao desse
+      // ministerio dentro do mes corrente ate agora -- so' dashboard,
+      // sem notificacao (ver conversa com o Leo). So' calcula se o
+      // ministerio ja tem AO MENOS UMA ocasiao registrada -- sem isso,
+      // "ninguem participou" seria so' ruido (o check-in nunca foi
+      // usado ainda), nao um alerta de verdade.
+      if (ocasioes.isEmpty) {
+        _pessoasSemParticiparEsseMes = [];
+      } else {
+        final ocasioesDoMes =
+            ocasioes.where((o) => !DateTime.parse(o['data'] as String).isBefore(inicioMes));
+        final presentesNoMes = <String>{
+          for (final o in ocasioesDoMes) ...?presentesPorOcasiao[o['id'] as String],
+        };
+        _pessoasSemParticiparEsseMes = listaMembros
+            .where((m) => !presentesNoMes.contains(m['profile_id'] as String))
+            .map((m) => (m['profiles'] as Map<String, dynamic>?)?['nome'] as String? ?? '(sem nome)')
+            .toList();
+      }
+    }
+
     if (mounted) setState(() => _carregando = false);
   }
 
@@ -277,7 +371,128 @@ class _DashboardMinisterioScreenState extends State<DashboardMinisterioScreen> {
                     ),
                     const SizedBox(height: 16),
                     _SecaoRanking(rankingCompleto: _rankingParticipacao),
-                  ] else ...[
+                  ],
+                  if (_temOcasioesMinisterio) ...[
+                    const SizedBox(height: 16),
+                    Text('Presença nas ocasiões do ministério',
+                        style: Theme.of(context).textTheme.titleMedium),
+                    const SizedBox(height: 4),
+                    Text(
+                      'A partir do check-in em massa em "Ferramentas da Liderança" '
+                      '(Ensaio, Reunião, Culto que servimos, etc).',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 8),
+                    if (_historicoOcasioes.isEmpty)
+                      const Text('Nenhum check-in registrado ainda.')
+                    else ...[
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Média de presença por ocasião',
+                                  style: TextStyle(fontWeight: FontWeight.w600)),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Nas últimas ${_historicoOcasioes.length} ocasiões registradas',
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                _mediaPresencaPorOcasiao!.toStringAsFixed(1),
+                                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                              ),
+                              if (_mediaParticipacaoOcasioes != null) ...[
+                                const SizedBox(height: 16),
+                                const Text('Média de participação',
+                                    style: TextStyle(fontWeight: FontWeight.w600)),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Média de quanto dos membros aparece por ocasião',
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                                const SizedBox(height: 12),
+                                LinearProgressIndicator(
+                                  value: _mediaParticipacaoOcasioes!.clamp(0, 1),
+                                  minHeight: 8,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  '${(_mediaParticipacaoOcasioes! * 100).toStringAsFixed(0)}% em média',
+                                  style: const TextStyle(fontWeight: FontWeight.w600),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text('Histórico de ocasiões',
+                          style: Theme.of(context).textTheme.titleMedium),
+                      const SizedBox(height: 8),
+                      Card(
+                        child: Column(
+                          children: _historicoOcasioes
+                              .map((o) => ListTile(
+                                    dense: true,
+                                    leading: const Icon(Icons.event_available_outlined),
+                                    title: Text(o.tipo),
+                                    subtitle: Text(DateFormat('dd/MM/yyyy').format(o.data)),
+                                    trailing: Text('${o.contagem} presente(s)'),
+                                  ))
+                              .toList(),
+                        ),
+                      ),
+                      if (_pessoasAusentes.isNotEmpty) ...[
+                        const SizedBox(height: 16),
+                        Text(
+                          'Ausentes nas últimas ${_historicoOcasioes.length} ocasiões',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 8),
+                        Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: _pessoasAusentes
+                                  .map((nome) => Chip(label: Text(nome)))
+                                  .toList(),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                    if (_pessoasSemParticiparEsseMes.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      Card(
+                        color: Colors.red.withOpacity(0.08),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Não participaram de nada esse mês',
+                                  style: TextStyle(fontWeight: FontWeight.w600)),
+                              const SizedBox(height: 8),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: _pessoasSemParticiparEsseMes
+                                    .map((nome) => Chip(label: Text(nome)))
+                                    .toList(),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                  if (!_temEscalaDeServico && !_temOcasioesMinisterio) ...[
                     const SizedBox(height: 16),
                     const Text(
                       'Esse ministério ainda não usa o sistema de escalas — '
@@ -289,6 +504,13 @@ class _DashboardMinisterioScreenState extends State<DashboardMinisterioScreen> {
             ),
     );
   }
+}
+
+class _OcasiaoComContagem {
+  final DateTime data;
+  final String tipo;
+  final int contagem;
+  const _OcasiaoComContagem({required this.data, required this.tipo, required this.contagem});
 }
 
 class _CardNumero extends StatelessWidget {
