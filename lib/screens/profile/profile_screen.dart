@@ -11,7 +11,6 @@ import '../../screens/messages/admin_mensagens_screen.dart';
 import '../../screens/messages/enviar_mensagem_screen.dart';
 import '../../screens/pages/nossas_paginas_screen.dart';
 import '../../models/profile_model.dart';
-import '../../screens/calendar/contador_evento_screen.dart';
 import '../../screens/calendar/outdoors_admin_screen.dart';
 import '../../screens/pages/meus_conteudos_screen.dart';
 import '../../screens/pages/nossos_conteudos_screen.dart';
@@ -19,6 +18,7 @@ import '../../screens/pages/quem_somos_screen.dart';
 import '../../screens/calendar/escala_grade_screen.dart';
 import '../../screens/volunteering/admin_visitantes_screen.dart';
 import '../../screens/volunteering/dashboard_ministerio_screen.dart';
+import '../../screens/volunteering/ferramentas_lideranca_screen.dart';
 import '../../services/escala_servico_service.dart';
 import '../../services/notification_service.dart';
 import '../../widgets/awake_app_bar.dart';
@@ -175,21 +175,25 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ],
               ),
               const SizedBox(height: 24),
-              if (profile.isAdmin) ...[
+              if (profile.ehLiderDeAlgumMinisterio) ...[
                 Card(
                   color: Colors.amber.withOpacity(0.15),
                   child: ListTile(
-                    leading: const Icon(Icons.pin_outlined),
-                    title: const Text('Contador de evento'),
-                    subtitle: const Text('EBD, Culto de Celebração e Culto da Família'),
+                    leading: const Icon(Icons.groups_2_outlined),
+                    title: const Text('Ferramentas da Liderança'),
+                    subtitle: const Text('Contador/check-in de eventos, registrar visitante'),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                      builder: (_) => const ContadorEventoScreen(),
+                      builder: (_) => const FerramentasLiderancaScreen(),
                     )),
                   ),
                 ),
                 const SizedBox(height: 8),
               ],
+              // Fica FORA do gate de lider de proposito: quem nao lidera
+              // nenhum ministerio mas esta escalado hoje em Recepcao/
+              // Primeira Vez tambem precisa enxergar esse link (o widget
+              // se auto-esconde sozinho quando ninguem se qualifica).
               const LinkFormularioVisitante(),
               const SizedBox(height: 8),
               ListTile(
