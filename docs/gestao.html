@@ -666,9 +666,19 @@
         <div id="visao-geral-usuarios"></div>
         <h3>Por ministério/grupo</h3>
         <div id="agregados-usuarios"></div>
-        <div class="campo-form" style="max-width:320px;">
-          <label>Buscar pessoa</label>
-          <input type="text" id="busca-usuario" placeholder="Nome...">
+        <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:flex-end;">
+          <div class="campo-form" style="max-width:320px; flex:1;">
+            <label>Buscar pessoa</label>
+            <input type="text" id="busca-usuario" placeholder="Nome...">
+          </div>
+          <div class="campo-form" style="max-width:220px;">
+            <label>Ordenar por</label>
+            <select id="ordenar-usuarios">
+              <option value="nome">Nome (A-Z)</option>
+              <option value="recente">Mais recente primeiro</option>
+              <option value="antigo">Mais antigo primeiro</option>
+            </select>
+          </div>
         </div>
         <div id="lista-usuarios"></div>`;
       iniciarPainelUsuarios();
@@ -2868,7 +2878,11 @@
         <h3>Últimos eventos</h3>
         <div id="lista-awake"></div>`;
       iniciarPainelAwake();
-    } else {
+    } else if (ministerio.startsWith('casais_')) {
+      // Grupo de casais NAO tem escopo de calendario proprio (todo
+      // evento de "Casais" cai no mesmo escopo=casais, nao da pra
+      // separar por grupo) -- so' da pra mostrar as ocasioes que o
+      // lider realmente registrou via check-in.
       el.innerHTML = `
         <p style="color:#888; font-size:13px;">
           A partir do check-in em massa feito pelo líder no app ("Ferramentas da Liderança").
@@ -2877,9 +2891,168 @@
         <h3>Últimas ocasiões</h3>
         <div id="lista-ministerio-generico"></div>`;
       iniciarPainelMinisterioGenerico(ministerio, label);
+    } else {
+      // Ministerios com escopo de calendario proprio (Homens, Mulheres,
+      // Diaconos, etc): mostra TODO evento do calendario daquele escopo
+      // nas ultimas 8 semanas, igual Awake/Shallom -- o que nao teve
+      // check-in lancado entra como "Nao contabilizado".
+      el.innerHTML = `
+        <p style="color:#888; font-size:13px;">
+          Últimas 8 semanas de eventos de ${escaparHtml(label)}. O que não teve
+          check-in lançado pelo líder entra como "Não contabilizado".
+        </p>
+        <div id="dashboard-ministerio-calendario"></div>
+        <h3>Últimos eventos</h3>
+        <div id="lista-ministerio-calendario"></div>`;
+      iniciarPainelMinisterioCalendario(ministerio, label);
     }
   }
 
+  /// Ministerios com escopo de calendario proprio (tudo, menos Awake e
+  /// os grupos de casais dinamicos) -- mesma logica do Awake/Shallom:
+  /// expande as ocorrencias do calendario (ocorrenciasNoIntervalo, ja
+  /// respeita recorrencia/excecoes) e cruza com o check-in em massa
+  /// (ocasioes_ministerio/presencas_ministerio) casando por MINISTERIO
+  /// + DATA -- o check-in nao guarda o id do evento do calendario (o
+  /// lider so escolhe um "tipo" livre, tipo Ensaio/Reuniao), entao a
+  /// unica chave em comum entre calendario e check-in e' a data.
+  async function iniciarPainelMinisterioCalendario(ministerio, label) {
+    const dashEl = document.getElementById('dashboard-ministerio-calendario');
+    const listaEl = document.getElementById('lista-ministerio-calendario');
+    dashEl.innerHTML = '<div class="vazio-lateral">Carregando...</div>';
+    listaEl.innerHTML = '';
+
+    const hoje = hojeUtc();
+    const inicioJanela = new Date(hoje);
+    inicioJanela.setUTCDate(inicioJanela.getUTCDate() - 56); // ultimas 8 semanas
+
+    const { data: eventos, error: erroEv } = await supa
+      .from('eventos')
+      .select('id, titulo, data_inicio, recorrente, recorrencia_fim, semanas_do_mes, tipo, excecoes')
+      .eq('escopo', ministerio)
+      .order('data_inicio', { ascending: false });
+
+    if (erroEv) {
+      dashEl.innerHTML = `<div class="vazio-lateral">Erro ao carregar eventos: ${escaparHtml(erroEv.message)}</div>`;
+      return;
+    }
+
+    const ocorrencias = [];
+    (eventos || []).forEach(ev => {
+      ocorrenciasNoIntervalo(ev, inicioJanela, hoje).forEach(data => {
+        ocorrencias.push({ evento: ev, data });
+      });
+    });
+    ocorrencias.sort((a, b) => b.data - a.data);
+
+    if (ocorrencias.length === 0) {
+      dashEl.innerHTML = `<div class="vazio-lateral">Nenhum evento de ${escaparHtml(label)} nas últimas 8 semanas.</div>`;
+      return;
+    }
+
+    const dataMaisAntiga = ocorrencias[ocorrencias.length - 1].data.toISOString().slice(0, 10);
+    const { data: ocasioes, error: erroOc } = await supa
+      .from('ocasioes_ministerio')
+      .select('id, data')
+      .eq('ministerio', ministerio)
+      .gte('data', dataMaisAntiga);
+
+    if (erroOc) {
+      dashEl.innerHTML = `<div class="vazio-lateral">Erro ao carregar check-ins: ${escaparHtml(erroOc.message)}</div>`;
+      return;
+    }
+
+    const ocasiaoIdsPorData = {};
+    (ocasioes || []).forEach(oc => {
+      (ocasiaoIdsPorData[oc.data] || (ocasiaoIdsPorData[oc.data] = [])).push(oc.id);
+    });
+
+    const todosOcasiaoIds = (ocasioes || []).map(o => o.id);
+    let nomesPorOcasiao = {};
+    if (todosOcasiaoIds.length > 0) {
+      // profiles!presencas_ministerio_profile_id_fkey -- precisa
+      // qualificar (mesmo bug de embed ambiguo ja visto antes: a
+      // tabela tem profile_id E criado_por apontando pra profiles).
+      const { data: presencas, error: erroPres } = await supa
+        .from('presencas_ministerio')
+        .select('ocasiao_id, profiles!presencas_ministerio_profile_id_fkey(nome)')
+        .in('ocasiao_id', todosOcasiaoIds);
+
+      if (erroPres) {
+        dashEl.innerHTML = `<div class="vazio-lateral">Erro ao carregar presenças: ${escaparHtml(erroPres.message)}</div>`;
+        return;
+      }
+
+      (presencas || []).forEach(p => {
+        const nome = (p.profiles && p.profiles.nome) || '(sem nome)';
+        (nomesPorOcasiao[p.ocasiao_id] || (nomesPorOcasiao[p.ocasiao_id] = [])).push(nome);
+      });
+    }
+
+    // Junta os nomes de TODAS as ocasioes lancadas naquela data (pode
+    // ter mais de um check-in no mesmo dia, ex: Ensaio + Culto) --
+    // dedupe com Set pra nao contar a mesma pessoa 2x.
+    function nomesNaData(dataStr) {
+      const ids = ocasiaoIdsPorData[dataStr] || [];
+      const nomes = new Set();
+      ids.forEach(id => (nomesPorOcasiao[id] || []).forEach(n => nomes.add(n)));
+      return [...nomes];
+    }
+
+    const ocorrenciasContadas = ocorrencias.filter(
+      oc => nomesNaData(oc.data.toISOString().slice(0, 10)).length > 0
+    );
+    const totalOcorrencias = ocorrenciasContadas.length;
+    const totalPresencas = ocorrenciasContadas.reduce(
+      (soma, oc) => soma + nomesNaData(oc.data.toISOString().slice(0, 10)).length, 0
+    );
+    const media = totalOcorrencias ? totalPresencas / totalOcorrencias : 0;
+
+    dashEl.innerHTML = `
+      <div class="grade-agregados">
+        <div class="cartao-agregado"><div class="nome-agregado">Eventos (últimas 8 semanas)</div><div class="contagem-agregado">${ocorrencias.length}</div></div>
+        <div class="cartao-agregado"><div class="nome-agregado">Contabilizados</div><div class="contagem-agregado">${totalOcorrencias}</div></div>
+        <div class="cartao-agregado"><div class="nome-agregado">Média de presença por evento</div><div class="contagem-agregado">${media.toFixed(1)}</div></div>
+      </div>`;
+
+    let semanaAtualChave = null;
+    listaEl.innerHTML = ocorrencias.map(oc => {
+      const dataStr = oc.data.toISOString().slice(0, 10);
+      const nomes = nomesNaData(dataStr).sort();
+      const naoContabilizado = nomes.length === 0;
+
+      const inicioSemana = inicioDaSemanaUtc(oc.data);
+      const semanaChave = inicioSemana.toISOString().slice(0, 10);
+      let cabecalhoSemana = '';
+      if (semanaChave !== semanaAtualChave) {
+        semanaAtualChave = semanaChave;
+        const fimSemana = new Date(inicioSemana);
+        fimSemana.setUTCDate(fimSemana.getUTCDate() + 6);
+        cabecalhoSemana = `<div class="cabecalho-dia-visitantes">Semana de ${inicioSemana.toLocaleDateString('pt-BR', OPCOES_FUSO_UTC)} a ${fimSemana.toLocaleDateString('pt-BR', OPCOES_FUSO_UTC)}</div>`;
+      }
+
+      const badge = naoContabilizado
+        ? `<span class="badge badge-neutro">Não contabilizado</span>`
+        : `<span class="badge badge-checkin">${nomes.length} ${nomes.length === 1 ? 'presente' : 'presentes'}</span>`;
+
+      return `
+        ${cabecalhoSemana}
+        <div class="linha-usuario" ${naoContabilizado ? 'style="opacity:0.6;"' : ''}>
+          <span class="nome-usuario">${escaparHtml(oc.evento.titulo)}</span>${badge}
+          <div style="font-size:12px; color:#888; margin-top:2px;">
+            ${oc.data.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit', ...OPCOES_FUSO_UTC })}
+          </div>
+          ${nomes.length
+            ? `<div style="font-size:12px; color:var(--navy); margin-top:8px;">${nomes.map(escaparHtml).join(', ')}</div>`
+            : `<div style="font-size:12px; color:#aaa; margin-top:8px;">Ninguém registrado.</div>`}
+        </div>`;
+    }).join('');
+  }
+
+  /// So' usado pros grupos de casais dinamicos (sem escopo de
+  /// calendario proprio, ver selecionarMinisterioGestao) -- lista as
+  /// ocasioes que o lider realmente registrou via check-in, sem
+  /// cruzar com calendario nenhum.
   async function iniciarPainelMinisterioGenerico(ministerio, label) {
     const dashEl = document.getElementById('dashboard-ministerio-generico');
     const listaEl = document.getElementById('lista-ministerio-generico');
@@ -3378,6 +3551,7 @@
     renderizarAgregados();
     renderizarListaUsuarios();
     document.getElementById('busca-usuario').addEventListener('input', renderizarListaUsuarios);
+    document.getElementById('ordenar-usuarios').addEventListener('change', renderizarListaUsuarios);
   }
 
   const FAIXAS_ETARIAS_ADMIN = ['awake', 'homens', 'mulheres', 'criancas'];
@@ -3585,9 +3759,19 @@
 
   function renderizarListaUsuarios() {
     const busca = (document.getElementById('busca-usuario').value || '').trim().toLowerCase();
-    const filtrados = busca
+    const filtrados = (busca
       ? todosUsuarios.filter(p => (p.nome || '').toLowerCase().includes(busca))
-      : todosUsuarios;
+      : todosUsuarios
+    ).slice();
+
+    const ordem = document.getElementById('ordenar-usuarios').value;
+    if (ordem === 'recente') {
+      filtrados.sort((a, b) => new Date(b.criado_em) - new Date(a.criado_em));
+    } else if (ordem === 'antigo') {
+      filtrados.sort((a, b) => new Date(a.criado_em) - new Date(b.criado_em));
+    } else {
+      filtrados.sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt-BR'));
+    }
 
     const listaEl = document.getElementById('lista-usuarios');
 
