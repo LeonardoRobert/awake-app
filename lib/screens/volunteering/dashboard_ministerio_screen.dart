@@ -182,12 +182,17 @@ class _DashboardMinisterioScreenState extends State<DashboardMinisterioScreen> {
     }
 
     if (_temOcasioesMinisterio) {
+      // Ultimos 30 dias corridos (nao "mes corrente") -- pega TODA
+      // ocasiao nesse intervalo, sem limite de linhas, pra "lista de
+      // atencao" (quem nao fez check-in em nada) ficar correta mesmo
+      // pra ministerio que faz check-in com mais frequencia.
+      final ha30Dias = agora.subtract(const Duration(days: 30));
       final ocasioesData = await _client
           .from('ocasioes_ministerio')
           .select('id, data, tipo')
           .eq('ministerio', widget.ministerio)
-          .order('data', ascending: false)
-          .limit(20);
+          .gte('data', ha30Dias.toIso8601String().split('T').first)
+          .order('data', ascending: false);
       final ocasioes = (ocasioesData as List).cast<Map<String, dynamic>>();
       final ocasiaoIds = ocasioes.map((o) => o['id'] as String).toList();
 
@@ -208,8 +213,8 @@ class _DashboardMinisterioScreenState extends State<DashboardMinisterioScreen> {
         }
       }
 
-      // Historico + medias usam so' as ultimas 8 ocasioes (mesma janela
-      // usada pra Escala de Servico acima, pra ficar consistente).
+      // Historico + medias mostram so' as ultimas 8 ocasioes (dentro
+      // dos ultimos 30 dias) pra nao virar uma lista enorme.
       final ultimasOito = ocasioes.take(8).toList();
       _historicoOcasioes = ultimasOito
           .map((o) => _OcasiaoComContagem(
@@ -247,22 +252,23 @@ class _DashboardMinisterioScreenState extends State<DashboardMinisterioScreen> {
             .toList();
       }
 
-      // Alerta mensal: quem nao apareceu em NENHUMA ocasiao desse
-      // ministerio dentro do mes corrente ate agora -- so' dashboard,
-      // sem notificacao (ver conversa com o Leo). So' calcula se o
-      // ministerio ja tem AO MENOS UMA ocasiao registrada -- sem isso,
-      // "ninguem participou" seria so' ruido (o check-in nunca foi
-      // usado ainda), nao um alerta de verdade.
+      // Lista de atencao: quem nao fez NENHUM check-in nos ultimos 30
+      // dias corridos -- so' dashboard, sem notificacao (ver conversa
+      // com o Leo). "30 dias corridos" e nao "mes corrente" de
+      // proposito: no dia 2 do mes, "mes corrente" acusaria QUALQUER
+      // pessoa como ausente, mesmo quem foi ha poucos dias (no mes
+      // anterior). So' calcula se o ministerio ja tem AO MENOS UMA
+      // ocasiao registrada nos ultimos 30 dias -- sem isso, "ninguem
+      // participou" seria so' ruido (o check-in nunca foi usado ainda
+      // ou faz mais de 30 dias que nao e' usado), nao um alerta util.
       if (ocasioes.isEmpty) {
         _pessoasSemParticiparEsseMes = [];
       } else {
-        final ocasioesDoMes =
-            ocasioes.where((o) => !DateTime.parse(o['data'] as String).isBefore(inicioMes));
-        final presentesNoMes = <String>{
-          for (final o in ocasioesDoMes) ...?presentesPorOcasiao[o['id'] as String],
+        final presentesEm30Dias = <String>{
+          for (final o in ocasioes) ...?presentesPorOcasiao[o['id'] as String],
         };
         _pessoasSemParticiparEsseMes = listaMembros
-            .where((m) => !presentesNoMes.contains(m['profile_id'] as String))
+            .where((m) => !presentesEm30Dias.contains(m['profile_id'] as String))
             .map((m) => (m['profiles'] as Map<String, dynamic>?)?['nome'] as String? ?? '(sem nome)')
             .toList();
       }
@@ -489,9 +495,26 @@ class _DashboardMinisterioScreenState extends State<DashboardMinisterioScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Não participaram de nada esse mês',
-                                  style: TextStyle(fontWeight: FontWeight.w600)),
-                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Icon(Icons.warning_amber_rounded,
+                                      color: Colors.red.shade700, size: 20),
+                                  const SizedBox(width: 8),
+                                  Text('Lista de atenção',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleMedium
+                                          ?.copyWith(color: Colors.red.shade700)),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '${_pessoasSemParticiparEsseMes.length} '
+                                '${_pessoasSemParticiparEsseMes.length == 1 ? "pessoa não fez" : "pessoas não fizeram"} '
+                                'check-in em NENHUM evento do ministério nos últimos 30 dias',
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                              const SizedBox(height: 12),
                               Wrap(
                                 spacing: 8,
                                 runSpacing: 8,
