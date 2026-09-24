@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../../models/event_model.dart';
 import '../../models/profile_model.dart';
 import '../../services/escala_servico_service.dart';
 import '../../services/supabase_service.dart';
@@ -56,9 +57,14 @@ class _DashboardMinisterioScreenState extends State<DashboardMinisterioScreen> {
 
   bool get _ehFaixaEtaria => _faixasEtarias.contains(widget.ministerio);
   bool get _temEscalaDeServico => ministeriosComEscalaServico.contains(widget.ministerio);
+  bool get _ehAwake => widget.ministerio == 'awake';
   // O check-in em massa por ocasiao existe pra qualquer ministerio que
-  // NAO seja Awake (que tem seu proprio check-in/contador, intocado).
-  bool get _temOcasioesMinisterio => widget.ministerio != 'awake';
+  // NAO seja Awake (que tem seu proprio check-in por QR Code).
+  bool get _temOcasioesMinisterio => !_ehAwake;
+  // Os dois alimentam as MESMAS secoes/campos da tela (_historicoOcasioes
+  // etc) -- so' a fonte dos dados muda (ocasioes_ministerio vs
+  // eventos+presencas_eventos).
+  bool get _temDadosDePresenca => _temOcasioesMinisterio || _ehAwake;
 
   @override
   void initState() {
@@ -272,6 +278,102 @@ class _DashboardMinisterioScreenState extends State<DashboardMinisterioScreen> {
             .map((m) => (m['profiles'] as Map<String, dynamic>?)?['nome'] as String? ?? '(sem nome)')
             .toList();
       }
+    } else if (_ehAwake) {
+      // Mesmas secoes de presenca de cima, mas pra Awake -- que tem seu
+      // proprio check-in (QR Code, presencas_eventos), nao o check-in
+      // em massa dos outros ministerios. So' os "encontros oficiais"
+      // contam (mesmo filtro por tipo usado no gestao.html): EBD/GC/
+      // Comunhao/Laje -- fica de fora Culto de Celebracao/Familia e
+      // qualquer evento tipo=outro dentro do Awake.
+      final ha30Dias = agora.subtract(const Duration(days: 30));
+      final eventosData = await _client
+          .from('eventos')
+          .select('id, titulo, data_inicio, recorrente, recorrencia_fim, semanas_do_mes, tipo, escopo, excecoes')
+          .inFilter('tipo', ['ebd', 'gc', 'comunhao', 'laje']);
+      final eventos = (eventosData as List)
+          .map((e) => EventModel.fromMap(e as Map<String, dynamic>))
+          .toList();
+
+      final ocorrencias = <MapEntry<EventModel, DateTime>>[];
+      for (final ev in eventos) {
+        for (final data in ev.occurrencesBetween(ha30Dias, agora)) {
+          ocorrencias.add(MapEntry(ev, data));
+        }
+      }
+      ocorrencias.sort((a, b) => b.value.compareTo(a.value));
+
+      String chaveDe(EventModel ev, DateTime data) =>
+          '${ev.id}_${data.toIso8601String().split('T').first}';
+
+      if (ocorrencias.isEmpty) {
+        _historicoOcasioes = [];
+        _mediaPresencaPorOcasiao = null;
+        _mediaParticipacaoOcasioes = null;
+        _pessoasAusentes = [];
+        _pessoasSemParticiparEsseMes = [];
+      } else {
+        final eventoIds = ocorrencias.map((o) => o.key.id).toSet().toList();
+        final dataMaisAntigaStr =
+            ocorrencias.last.value.toIso8601String().split('T').first;
+        final presencasData = await _client
+            .from('presencas_eventos')
+            .select('evento_id, data_ocorrencia, user_id')
+            .inFilter('evento_id', eventoIds)
+            .gte('data_ocorrencia', dataMaisAntigaStr);
+
+        final presentesPorOcorrencia = <String, Set<String>>{};
+        for (final p in presencasData as List) {
+          final mapa = p as Map<String, dynamic>;
+          final chave = '${mapa['evento_id']}_${mapa['data_ocorrencia']}';
+          presentesPorOcorrencia.putIfAbsent(chave, () => {}).add(mapa['user_id'] as String);
+        }
+
+        final ultimasOito = ocorrencias.take(8).toList();
+        _historicoOcasioes = ultimasOito
+            .map((o) => _OcasiaoComContagem(
+                  data: o.value,
+                  tipo: o.key.titulo,
+                  contagem: presentesPorOcorrencia[chaveDe(o.key, o.value)]?.length ?? 0,
+                ))
+            .toList();
+
+        // Mesma regra de "0 presenca = nao contabilizado" ja aplicada
+        // aos outros ministerios (e ao Awake no gestao.html, a pedido
+        // do Leo).
+        final ocorrenciasContadas = ultimasOito
+            .where((o) => (presentesPorOcorrencia[chaveDe(o.key, o.value)]?.length ?? 0) > 0)
+            .toList();
+
+        if (ocorrenciasContadas.isEmpty) {
+          _mediaPresencaPorOcasiao = null;
+          _mediaParticipacaoOcasioes = null;
+          _pessoasAusentes = [];
+        } else {
+          final contagens = ocorrenciasContadas
+              .map((o) => presentesPorOcorrencia[chaveDe(o.key, o.value)]?.length ?? 0);
+          _mediaPresencaPorOcasiao = contagens.reduce((a, b) => a + b) / ocorrenciasContadas.length;
+          _mediaParticipacaoOcasioes = _totalMembros == 0
+              ? null
+              : contagens.map((c) => c / _totalMembros).reduce((a, b) => a + b) /
+                  ocorrenciasContadas.length;
+
+          final presentesNaJanela = <String>{
+            for (final o in ocorrenciasContadas) ...?presentesPorOcorrencia[chaveDe(o.key, o.value)],
+          };
+          _pessoasAusentes = listaMembros
+              .where((m) => !presentesNaJanela.contains(m['profile_id'] as String))
+              .map((m) => (m['profiles'] as Map<String, dynamic>?)?['nome'] as String? ?? '(sem nome)')
+              .toList();
+        }
+
+        final presentesEm30Dias = <String>{
+          for (final o in ocorrencias) ...?presentesPorOcorrencia[chaveDe(o.key, o.value)],
+        };
+        _pessoasSemParticiparEsseMes = listaMembros
+            .where((m) => !presentesEm30Dias.contains(m['profile_id'] as String))
+            .map((m) => (m['profiles'] as Map<String, dynamic>?)?['nome'] as String? ?? '(sem nome)')
+            .toList();
+      }
     }
 
     if (mounted) setState(() => _carregando = false);
@@ -386,14 +488,19 @@ class _DashboardMinisterioScreenState extends State<DashboardMinisterioScreen> {
                     const SizedBox(height: 16),
                     _SecaoRanking(rankingCompleto: _rankingParticipacao),
                   ],
-                  if (_temOcasioesMinisterio) ...[
+                  if (_temDadosDePresenca) ...[
                     const SizedBox(height: 16),
-                    Text('Presença nas ocasiões do ministério',
-                        style: Theme.of(context).textTheme.titleMedium),
+                    Text(
+                      _ehAwake ? 'Presença nos encontros' : 'Presença nas ocasiões do ministério',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
                     const SizedBox(height: 4),
                     Text(
-                      'A partir do check-in em massa em "Ferramentas da Liderança" '
-                      '(Ensaio, Reunião, Culto que servimos, etc).',
+                      _ehAwake
+                          ? 'A partir do check-in por QR Code em EBD, GC, Comunhão e Laje '
+                              '(últimos 30 dias).'
+                          : 'A partir do check-in em massa em "Ferramentas da Liderança" '
+                              '(Ensaio, Reunião, Culto que servimos, etc).',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                     const SizedBox(height: 8),
@@ -528,7 +635,7 @@ class _DashboardMinisterioScreenState extends State<DashboardMinisterioScreen> {
                       ),
                     ],
                   ],
-                  if (!_temEscalaDeServico && !_temOcasioesMinisterio) ...[
+                  if (!_temEscalaDeServico && !_temDadosDePresenca) ...[
                     const SizedBox(height: 16),
                     const Text(
                       'Esse ministério ainda não usa o sistema de escalas — '
