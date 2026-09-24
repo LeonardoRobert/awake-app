@@ -190,12 +190,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ),
                 const SizedBox(height: 8),
               ],
-              // Fica FORA do gate de lider de proposito: quem nao lidera
-              // nenhum ministerio mas esta escalado hoje em Recepcao/
-              // Primeira Vez tambem precisa enxergar esse link (o widget
-              // se auto-esconde sozinho quando ninguem se qualifica).
-              const LinkFormularioVisitante(),
-              const SizedBox(height: 8),
+              // So' aparece solto aqui pra quem NAO lidera nada -- quem
+              // lidera algum ministerio ja tem esse link dentro de
+              // "Ferramentas da Lideranca" (evita duplicar). Continua
+              // visivel pra quem nao lidera nenhum ministerio mas esta
+              // escalado hoje em Recepcao/Primeira Vez (o widget se
+              // auto-esconde sozinho quando ninguem se qualifica).
+              if (!profile.ehLiderDeAlgumMinisterio) ...[
+                const LinkFormularioVisitante(),
+                const SizedBox(height: 8),
+              ],
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.person_outline),
