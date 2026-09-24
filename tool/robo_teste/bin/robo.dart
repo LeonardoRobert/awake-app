@@ -1730,6 +1730,23 @@ Future<void> _testarCrudTreinamento() async {
 /// checagem le com o cliente REAL do Membro (nao o bypass) -- confirma
 /// que a MUDANCA FEITA PELO ADMIN chega mesmo na sessao de quem foi
 /// alterado, nao so' que o banco gravou.
+/// Fumaca (smoke test): processar_lembretes() e' chamada pelo pg_cron
+/// a cada 15 min, sobre TODOS os eventos/escalas/inscricoes reais do
+/// banco -- nao tem como isolar em dados de teste. E' seguro chamar
+/// aqui mesmo assim porque a propria funcao e' idempotente (so' notifica
+/// quem ainda nao foi notificado, dentro da janela de horario certa) --
+/// na pior das hipoteses, adianta em alguns minutos um lembrete que o
+/// cron ja ia mandar de qualquer jeito.
+///
+/// Achado root-causando reclamacao do Leo de que NENHUMA notificacao
+/// agendada estava saindo: a funcao quebrava sempre no meio (coluna
+/// inexistente em "inscricoes"), e como nao trata excecao, isso
+/// desfazia (rollback) todo o resto que ja tinha processado na mesma
+/// chamada -- silencioso, sem nenhum teste cobrindo esse caminho.
+Future<void> _testarProcessarLembretesNaoQuebra() async {
+  await _clienteAdmin.rpc('processar_lembretes');
+}
+
 Future<void> _testarPromoverERemoverAdmin() async {
   final membroId = _clienteMembro.auth.currentUser!.id;
 
@@ -2349,6 +2366,7 @@ Future<void> main() async {
       resultados.add(await _rodar('admin_contagem_manual', _testarAdminContagemManual));
       resultados.add(await _rodarEsperandoFalha(
           'nao_admin_nao_pode_ajustar_contagem', _testarNaoAdminNaoPodeAjustarContagem));
+      resultados.add(await _rodar('processar_lembretes_nao_quebra', _testarProcessarLembretesNaoQuebra));
       resultados.add(await _rodar('admin_promover_e_remover_admin', _testarPromoverERemoverAdmin));
       resultados.add(await _rodar('admin_editar_perfil_de_outra_pessoa', _testarEditarPerfilDeOutraPessoa));
       resultados.add(await _rodar('admin_apagar_conta_de_usuario', _testarAdminApagarContaDeUsuario));

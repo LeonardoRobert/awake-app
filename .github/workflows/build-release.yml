@@ -27,9 +27,18 @@ jobs:
 
       - run: flutter pub get
 
-      - run: flutter build apk --release --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} --dart-define=ONESIGNAL_APP_ID=${{ secrets.ONESIGNAL_APP_ID }} --dart-define=YOUTUBE_API_KEY=${{ secrets.YOUTUBE_API_KEY }}
+      # --split-per-abi: em vez de 1 apk "universal" (~80MB, todas as
+      # arquiteturas juntas), gera 1 por arquitetura de processador
+      # (~1/3 do tamanho cada) -- pedido do Leo apos reclamacao de
+      # download travando com conexao fraca. arm64-v8a cobre
+      # praticamente todo celular Android de 2017 pra ca, e' o que o
+      # site de download (docs/index.html) oferece.
+      - run: flutter build apk --release --split-per-abi --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} --dart-define=ONESIGNAL_APP_ID=${{ secrets.ONESIGNAL_APP_ID }} --dart-define=YOUTUBE_API_KEY=${{ secrets.YOUTUBE_API_KEY }}
 
       - name: Publicar no GitHub Releases
         uses: softprops/action-gh-release@v2
         with:
-          files: build/app/outputs/flutter-apk/app-release.apk
+          files: |
+            build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+            build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+            build/app/outputs/flutter-apk/app-x86_64-release.apk
