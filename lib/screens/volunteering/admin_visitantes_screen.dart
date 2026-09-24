@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../../core/erro_amigavel.dart';
+import '../../core/fuso_horario.dart';
 import '../../models/visitante_model.dart';
 import '../../services/visitante_service.dart';
 import '../../widgets/awake_app_bar.dart';
@@ -105,7 +106,10 @@ class _AdminVisitantesScreenState extends State<AdminVisitantesScreen> {
               return const Center(child: Text('Nenhum visitante registrado ainda.'));
             }
 
-            final agora = DateTime.now();
+            // agoraBrasilia() (nao DateTime.now()) pra comparar com
+            // v.criadoEm (que ja vem em Brasilia via paraBrasilia() no
+            // model) sem depender do fuso configurado no aparelho.
+            final agora = agoraBrasilia();
             final inicioSemana = agora.subtract(Duration(days: agora.weekday % 7));
             final inicioSemanaData =
                 DateTime(inicioSemana.year, inicioSemana.month, inicioSemana.day);
