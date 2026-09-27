@@ -6,9 +6,10 @@ import '../../services/event_service.dart';
 import '../../services/volume_button_service.dart';
 import '../../widgets/awake_app_bar.dart';
 
-/// Contador manual de presença -- pra eventos "gerais" (EBD, Culto de
-/// Celebração, Culto da Família) onde não dá pra escanear QR Code de
-/// todo mundo. O admin escolhe o evento de HOJE, vai apertando +/-
+/// Contador manual de presença -- pra eventos "gerais" (escopo
+/// igreja: EBD, Culto de Celebração, Culto da Família, e qualquer
+/// outro evento geral) onde não dá pra escanear QR Code de todo
+/// mundo. O admin escolhe o evento de HOJE, vai apertando +/-
 /// (só na tela, não grava nada ainda) e manda pro banco de uma vez só
 /// no botão "Enviar", quando terminar de contar. Esse dado alimenta a
 /// aba Shallom do painel de gestão.
@@ -18,10 +19,6 @@ class ContadorEventoScreen extends StatefulWidget {
   @override
   State<ContadorEventoScreen> createState() => _ContadorEventoScreenState();
 }
-
-/// Só esses 3 tipos entram aqui -- os mesmos que a aba Shallom do
-/// gestão.html mostra (EBD/Culto de Celebração/Culto da Família).
-const _tiposContagemManual = [EventTipo.ebd, EventTipo.cultoCelebracao, EventTipo.cultoFamilia];
 
 class _ContadorEventoScreenState extends State<ContadorEventoScreen> {
   final _service = EventService();
@@ -58,7 +55,7 @@ class _ContadorEventoScreenState extends State<ContadorEventoScreen> {
 
     final resultado = <({EventModel evento, DateTime data})>[];
     for (final evento in eventos) {
-      if (!_tiposContagemManual.contains(evento.tipo)) continue;
+      if (evento.escopo != EventoEscopo.igreja) continue;
       for (final data in evento.occurrencesBetween(hoje, fimDoDia)) {
         resultado.add((evento: evento, data: data));
       }
@@ -159,7 +156,7 @@ class _ContadorEventoScreenState extends State<ContadorEventoScreen> {
             child: Padding(
               padding: EdgeInsets.all(24),
               child: Text(
-                'Nenhum EBD, Culto de Celebração ou Culto da Família hoje.',
+                'Nenhum evento geral hoje.',
                 textAlign: TextAlign.center,
               ),
             ),

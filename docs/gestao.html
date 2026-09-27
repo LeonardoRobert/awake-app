@@ -625,8 +625,8 @@
       secaoEl.innerHTML = `
         <h2 style="margin-top:0;">Shallom</h2>
         <p style="color:#888; font-size:13px; margin-top:-8px;">
-          Últimas 8 semanas de EBD, Culto de Celebração e Culto da Família --
-          contagem manual (feita pelo admin no app), sem check-in individual.
+          Últimas 8 semanas de eventos gerais (escopo Igreja) -- contagem
+          manual (feita pelo admin no app), sem check-in individual.
         </p>
         <div id="dashboard-shallom"></div>
         <h3>Últimos eventos</h3>
@@ -860,7 +860,11 @@
       if (diaSelecionado) {
         dataInicial = new Date(diaSelecionado);
         const agora = new Date();
-        dataInicial.setHours(agora.getHours(), agora.getMinutes());
+        // setUTCHours (nao setHours) -- diaSelecionado e' um Date
+        // "UTC-rotulado" (mesma convencao do resto do modulo, UTC =
+        // hora de Brasilia); usar o setter local aqui misturava as duas
+        // convencoes no mesmo objeto e deslocava a hora.
+        dataInicial.setUTCHours(agora.getHours(), agora.getMinutes());
       }
       abrirFormularioEvento(null, dataInicial);
     });
@@ -1006,7 +1010,11 @@
       data_inicio: (dataInicial || new Date()).toISOString(), recorrente: false,
       recorrencia_fim: null, semanas_do_mes: [],
     };
-    const dataObj = new Date(ev.data_inicio);
+    // parseDataHoraUtc (nao "new Date(ev.data_inicio)") -- le os digitos
+    // literalmente, sem deixar o navegador reinterpretar como fuso
+    // local (mesmo bug documentado acima, so' que no sentido inverso:
+    // ao abrir "Editar", o formulario mostrava um horario deslocado).
+    const dataObj = parseDataHoraUtc(ev.data_inicio);
     const dataInputValor = dataObj.toISOString().slice(0, 16);
 
     document.getElementById('caixa-modal').innerHTML = `
@@ -1184,7 +1192,13 @@
       titulo,
       escopo,
       tipo,
-      data_inicio: new Date(dataInicio).toISOString(),
+      // NAO usar new Date(dataInicio).toISOString() aqui -- isso converte
+      // pra UTC (desloca pelo fuso do navegador), mas o app le esses
+      // digitos direto, sem converter (_parseDataHoraSemFuso, mesma
+      // convencao ja documentada no CLAUDE.md pro site.html). O input
+      // datetime-local ja vem com os digitos certos ("2026-09-27T19:00"),
+      // so' falta completar os segundos.
+      data_inicio: `${dataInicio}:00`,
       local: document.getElementById('f-local').value.trim() || null,
       descricao: document.getElementById('f-descricao').value.trim() || null,
       recorrente,
@@ -2677,10 +2691,13 @@
     const inicioJanela = new Date(hoje);
     inicioJanela.setUTCDate(inicioJanela.getUTCDate() - 56); // ultimas 8 semanas
 
+    // "Eventos gerais" = escopo igreja (nao mais so' EBD/Culto de
+    // Celebracao/Culto da Familia) -- pedido do Leo, TODO evento geral
+    // deve aparecer e permitir contagem, nao so' esses 3 tipos fixos.
     const { data: eventos, error: erroEv } = await supa
       .from('eventos')
-      .select('id, titulo, data_inicio, recorrente, recorrencia_fim, semanas_do_mes, tipo, excecoes')
-      .in('tipo', ['ebd', 'culto_celebracao', 'culto_familia'])
+      .select('id, titulo, data_inicio, recorrente, recorrencia_fim, semanas_do_mes, tipo, escopo, excecoes')
+      .eq('escopo', 'igreja')
       .order('data_inicio', { ascending: false });
 
     if (erroEv) {
