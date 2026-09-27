@@ -58,6 +58,8 @@ class OutdoorModel {
   final List<String>? escopos;
   final String? criadoPor;
   final DateTime? criadoEm;
+  /// Ordem manual de exibicao no slideshow -- menor aparece primeiro.
+  final int ordem;
 
   OutdoorModel({
     required this.id,
@@ -71,6 +73,7 @@ class OutdoorModel {
     this.escopos,
     this.criadoPor,
     this.criadoEm,
+    this.ordem = 0,
   });
 
   factory OutdoorModel.fromMap(Map<String, dynamic> map) {
@@ -86,6 +89,7 @@ class OutdoorModel {
       escopos: (map['escopos'] as List?)?.map((e) => e.toString()).toList(),
       criadoPor: map['criado_por'] as String?,
       criadoEm: map['criado_em'] != null ? DateTime.parse(map['criado_em'] as String) : null,
+      ordem: map['ordem'] as int? ?? 0,
     );
   }
 
