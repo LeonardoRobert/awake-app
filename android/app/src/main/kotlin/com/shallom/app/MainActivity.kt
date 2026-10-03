@@ -1,4 +1,4 @@
-package com.example.awake_app
+package com.shallom.app
 
 import android.view.KeyEvent
 import io.flutter.embedding.android.FlutterActivity

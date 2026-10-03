@@ -1,7 +1,7 @@
 name: awake_app
 description: App de gestao do ministerio Awake - calendario, voluntariado, metas e treinamentos.
 publish_to: 'none'
-version: 0.1.0+1
+version: 1.9.35+35
 
 environment:
   sdk: '>=3.3.0 <4.0.0'
